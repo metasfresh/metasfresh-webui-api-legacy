@@ -69,7 +69,7 @@ final class UserQueryDocumentFilterDescriptorsProvider implements DocumentFilter
 		repository = UserQueryRepository.builder()
 				.setAD_Tab_ID(adTabId)
 				.setAD_Table_ID(adTableId)
-				.setAD_User_ID_Any()
+				.setAD_User_ID(100) // FIXME: hardcoded, see https://github.com/metasfresh/metasfresh-webui/issues/162
 				.setSearchFields(searchFields)
 				.build();
 	}
@@ -227,7 +227,7 @@ final class UserQueryDocumentFilterDescriptorsProvider implements DocumentFilter
 		@Override
 		public Object convertValueToFieldType(final Object valueObj)
 		{
-			return DocumentFieldDescriptor.convertToValueClass(fieldName, valueObj, valueClass, NullLookupDataSource.instance);
+			return DocumentFieldDescriptor.convertToValueClass(fieldName, valueObj, widgetType, valueClass, NullLookupDataSource.instance);
 		}
 
 		public LookupDescriptor getLookupDescriptor()

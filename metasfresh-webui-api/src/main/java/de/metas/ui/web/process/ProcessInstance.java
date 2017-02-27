@@ -7,9 +7,17 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 
+import org.adempiere.ad.dao.IQueryBL;
+import org.adempiere.ad.dao.IQueryFilter;
+import org.adempiere.ad.trx.api.ITrx;
 import org.adempiere.exceptions.AdempiereException;
 import org.adempiere.model.RecordZoomWindowFinder;
+import org.adempiere.util.Services;
+import org.adempiere.util.lang.IAutoCloseable;
 import org.adempiere.util.lang.impl.TableRecordReference;
 import org.compiere.Adempiere;
 import org.compiere.util.Env;
@@ -80,19 +88,21 @@ public final class ProcessInstance
 	private static final transient Logger logger = LogManager.getLogger(ProcessInstance.class);
 
 	public static final String PARAM_ViewId = "$WEBUI_ViewId";
+	public static final String PARAM_ViewSelectedIds = "$WEBUI_ViewSelectedIds";
 
 	@Autowired
 	@Lazy
 	private IDocumentViewsRepository documentViewsRepo;
 
 	private final DocumentId adPInstanceId;
-	private int version = 1;
 
 	private final ProcessDescriptor processDescriptor;
 	private final Document parameters;
 
 	private boolean executed = false;
 	private ProcessInstanceResult executionResult;
+
+	private final ReentrantReadWriteLock readwriteLock;
 
 	/** New instance constructor */
 	/* package */ ProcessInstance(final ProcessDescriptor processDescriptor, final DocumentId adPInstanceId, final Document parameters)
@@ -106,6 +116,8 @@ public final class ProcessInstance
 
 		executed = false;
 		executionResult = null;
+
+		readwriteLock = new ReentrantReadWriteLock();
 	}
 
 	/** Copy constructor */
@@ -117,13 +129,14 @@ public final class ProcessInstance
 		documentViewsRepo = from.documentViewsRepo;
 
 		adPInstanceId = from.adPInstanceId;
-		version = from.version;
 
 		processDescriptor = from.processDescriptor;
 		parameters = from.parameters.copy(copyMode);
 
 		executed = from.executed;
 		executionResult = from.executionResult;
+
+		readwriteLock = from.readwriteLock; // always share
 	}
 
 	@Override
@@ -132,7 +145,6 @@ public final class ProcessInstance
 		return MoreObjects.toStringHelper(this)
 				.omitNullValues()
 				.add("AD_PInstance_ID", adPInstanceId)
-				.add("version", version)
 				.add("executed", "executed")
 				.add("executionResult", executionResult)
 				.add("processDescriptor", processDescriptor)
@@ -153,16 +165,6 @@ public final class ProcessInstance
 	public DocumentId getAD_PInstance_ID()
 	{
 		return adPInstanceId;
-	}
-
-	/* package */int getVersion()
-	{
-		return version;
-	}
-
-	/* package */void setVersion(final int version)
-	{
-		this.version = version;
 	}
 
 	public Document getParametersDocument()
@@ -391,14 +393,44 @@ public final class ProcessInstance
 
 	private static final JSONReferencing extractJSONReferencing(final ProcessInfo processInfo)
 	{
-		final TableRecordReference sourceRecordRef = processInfo.getRecordRefOrNull();
-		if (sourceRecordRef == null)
+		final String tableName = processInfo.getTableNameOrNull();
+		if (tableName == null)
 		{
 			return null;
 		}
+		final TableRecordReference sourceRecordRef = processInfo.getRecordRefOrNull();
 
-		final int adWindowId = RecordZoomWindowFinder.findAD_Window_ID(sourceRecordRef);
-		return JSONReferencing.of(adWindowId, sourceRecordRef.getRecord_ID());
+		final IQueryFilter<Object> selectionQueryFilter = processInfo.getQueryFilterOrElse(null);
+		if (selectionQueryFilter != null)
+		{
+			final int maxRecordAllowedToSelect = 200;
+			final List<Integer> recordIds = Services.get(IQueryBL.class).createQueryBuilder(tableName, Env.getCtx(), ITrx.TRXNAME_ThreadInherited)
+					.filter(selectionQueryFilter)
+					.setLimit(maxRecordAllowedToSelect + 1)
+					.create()
+					.listIds();
+			if (recordIds.isEmpty())
+			{
+				return null;
+			}
+			else if (recordIds.size() > maxRecordAllowedToSelect)
+			{
+				throw new AdempiereException("Selecting more than " + maxRecordAllowedToSelect + " records is not allowed");
+			}
+
+			final TableRecordReference firstRecordRef = TableRecordReference.of(tableName, recordIds.get(0));
+			final int adWindowId = RecordZoomWindowFinder.findAD_Window_ID(firstRecordRef); // assume all records are from same window
+			return JSONReferencing.of(adWindowId, recordIds);
+		}
+		else if (sourceRecordRef != null)
+		{
+			final int adWindowId = RecordZoomWindowFinder.findAD_Window_ID(sourceRecordRef);
+			return JSONReferencing.of(adWindowId, sourceRecordRef.getRecord_ID());
+		}
+		else
+		{
+			return null;
+		}
 	}
 
 	private static final DocumentPath extractSingleDocumentPath(final RecordsToOpen recordsToOpen)
@@ -440,5 +472,31 @@ public final class ProcessInstance
 		}
 
 		return saved;
+	}
+
+	public IAutoCloseable lockForReading()
+	{
+		final ReadLock readLock = readwriteLock.readLock();
+		logger.debug("Acquiring read lock for {}: {}", this, readLock);
+		readLock.lock();
+		logger.debug("Acquired read lock for {}: {}", this, readLock);
+
+		return () -> {
+			readLock.unlock();
+			logger.debug("Released read lock for {}: {}", this, readLock);
+		};
+	}
+
+	public IAutoCloseable lockForWriting()
+	{
+		final WriteLock writeLock = readwriteLock.writeLock();
+		logger.debug("Acquiring write lock for {}: {}", this, writeLock);
+		writeLock.lock();
+		logger.debug("Acquired write lock for {}: {}", this, writeLock);
+
+		return () -> {
+			writeLock.unlock();
+			logger.debug("Released write lock for {}: {}", this, writeLock);
+		};
 	}
 }

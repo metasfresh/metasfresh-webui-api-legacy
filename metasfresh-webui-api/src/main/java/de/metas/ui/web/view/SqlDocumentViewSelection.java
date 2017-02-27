@@ -20,6 +20,7 @@ import org.adempiere.ad.trx.api.ITrx;
 import org.adempiere.exceptions.DBException;
 import org.adempiere.model.PlainContextAware;
 import org.adempiere.util.Check;
+import org.adempiere.util.GuavaCollectors;
 import org.adempiere.util.Services;
 import org.adempiere.util.lang.impl.TableRecordReference;
 import org.compiere.util.CCache;
@@ -218,6 +219,18 @@ class SqlDocumentViewSelection implements IDocumentViewSelection
 	}
 
 	@Override
+	public int getQueryLimit()
+	{
+		return defaultSelection.getQueryLimit();
+	}
+
+	@Override
+	public boolean isQueryLimitHit()
+	{
+		return defaultSelection.isQueryLimitHit();
+	}
+
+	@Override
 	public List<DocumentFilter> getStickyFilters()
 	{
 		return stickyFilters;
@@ -266,7 +279,7 @@ class SqlDocumentViewSelection implements IDocumentViewSelection
 
 		final String uuid = orderedSelection.getUuid();
 		final int firstSeqNo = firstRow + 1; // NOTE: firstRow is 0-based while SeqNo are 1-based
-		final int lastSeqNo = firstRow + pageLength - 1;
+		final int lastSeqNo = firstRow + pageLength;
 
 		final Object[] sqlParams = new Object[] { uuid, firstSeqNo, lastSeqNo };
 		PreparedStatement pstmt = null;
@@ -388,9 +401,8 @@ class SqlDocumentViewSelection implements IDocumentViewSelection
 			return defaultSelection;
 		}
 
-		final String fromUUID = defaultSelection.getUuid();
 		final ImmutableList<DocumentQueryOrderBy> orderBysImmutable = ImmutableList.copyOf(orderBys);
-		return selectionsByOrderBys.computeIfAbsent(orderBysImmutable, (newOrderBys) -> orderedSelectionFactory.createFromViewId(fromUUID, orderBysImmutable));
+		return selectionsByOrderBys.computeIfAbsent(orderBysImmutable, (newOrderBys) -> orderedSelectionFactory.createFromView(defaultSelection, orderBysImmutable));
 	}
 
 	private final DocumentView.Builder newDocumentViewBuilder()
@@ -502,16 +514,17 @@ class SqlDocumentViewSelection implements IDocumentViewSelection
 	}
 
 	@Override
-	public void notifyRecordChanged(final TableRecordReference recordRef)
+	public void notifyRecordsChanged(final Set<TableRecordReference> recordRefs)
 	{
-		if (!Objects.equals(getTableName(), recordRef.getTableName()))
-		{
-			return;
-		}
+		final String viewTableName = getTableName();
 
-		final DocumentId documentId = DocumentId.of(recordRef.getRecord_ID());
+		final Set<DocumentId> documentIds = recordRefs.stream()
+				.filter(recordRef -> Objects.equals(viewTableName, recordRef.getTableName()))
+				.map(recordRef -> DocumentId.of(recordRef.getRecord_ID()))
+				.collect(GuavaCollectors.toImmutableSet());
+
 		DocumentViewChangesCollector.getCurrentOrAutoflush()
-				.collectDocumentChanged(this, documentId);
+				.collectDocumentsChanged(this, documentIds);
 	}
 
 	//

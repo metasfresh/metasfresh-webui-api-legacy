@@ -427,6 +427,15 @@ public final class DocumentPath
 		return new DocumentPath(documentType, documentTypeId, documentId, detailId, rowId);
 	}
 
+	public DocumentPath getRootDocumentPath()
+	{
+		if(isRootDocument())
+		{
+			return this;
+		}
+		return rootDocumentPath(documentType, documentTypeId, documentId);
+	}
+	
 	public DocumentPath withDocumentId(final DocumentId id)
 	{
 		if (isRootDocument())
