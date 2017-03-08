@@ -1,10 +1,5 @@
 package de.metas.ui.web.handlingunits.process;
 
-import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
-
-import javax.imageio.ImageIO;
-
 import org.adempiere.util.Services;
 import org.compiere.model.MImage;
 
@@ -73,8 +68,7 @@ public class WEBUI_M_ReceiptSchedule_AttachPhoto extends JavaProcess implements 
 
 		final String name = adImage.getName();
 		final byte[] data = adImage.getData();
-		final BufferedImage image = ImageIO.read(new ByteArrayInputStream(data));
-		Services.get(IHUReceiptScheduleBL.class).attachPhoto(receiptSchedule, name, image);
+		Services.get(IHUReceiptScheduleBL.class).attachPhoto(receiptSchedule, name, data);
 
 		return MSG_OK;
 	}
