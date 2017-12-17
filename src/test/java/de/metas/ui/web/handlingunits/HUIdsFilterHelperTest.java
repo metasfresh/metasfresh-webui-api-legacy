@@ -2,6 +2,9 @@ package de.metas.ui.web.handlingunits;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import org.adempiere.util.Services;
+import org.adempiere.util.UnitTestServiceNamePolicy;
+import org.junit.Before;
 import org.junit.Test;
 
 import com.google.common.collect.ImmutableList;
@@ -35,8 +38,14 @@ import de.metas.ui.web.window.model.sql.SqlOptions;
 
 public class HUIdsFilterHelperTest
 {
+	@Before
+	public void init()
+	{
+		Services.setServiceNameAutoDetectPolicy(new UnitTestServiceNamePolicy());
+	}
+
 	/**
-	 * Verifies that if {@link HUIdsFilterHelper#createFilter(java.util.Collection)} is called with an empty list, 
+	 * Verifies that if {@link HUIdsFilterHelper#createFilter(java.util.Collection)} is called with an empty list,
 	 * then the filter's SQL does <b>not</b> select every single f**king HU on this planet.
 	 */
 	@Test
