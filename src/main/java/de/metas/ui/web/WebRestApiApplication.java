@@ -1,14 +1,15 @@
 package de.metas.ui.web;
 
-import org.adempiere.ad.migration.logger.IMigrationLogger;
-import org.adempiere.model.InterfaceWrapperHelper;
+import java.util.List;
+import java.util.Set;
+
+import org.adempiere.ad.wrapper.IInterfaceWrapperHelper;
+import org.adempiere.context.ContextProvider;
 import org.adempiere.util.Check;
-import org.adempiere.util.Services;
 import org.apache.catalina.connector.Connector;
 import org.apache.coyote.http11.AbstractHttp11Protocol;
 import org.compiere.Adempiere;
 import org.compiere.Adempiere.RunMode;
-import org.compiere.util.Env;
 import org.compiere.util.Ini;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,8 +25,13 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.http.MediaType;
 import org.springframework.scheduling.annotation.EnableAsync;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
+
+import de.metas.boot.MetasfreshBootConfiguration;
 import de.metas.logging.LogManager;
 import de.metas.ui.web.base.model.I_T_WEBUI_ViewSelection;
+import de.metas.ui.web.base.model.I_T_WEBUI_ViewSelectionLine;
 import de.metas.ui.web.session.WebRestApiContextProvider;
 import de.metas.ui.web.window.model.DocumentInterfaceWrapperHelper;
 
@@ -54,7 +60,7 @@ import de.metas.ui.web.window.model.DocumentInterfaceWrapperHelper;
 @SpringBootApplication(scanBasePackages = { "de.metas", "org.adempiere" })
 @EnableAsync
 @Profile(WebRestApiApplication.PROFILE_Webui)
-public class WebRestApiApplication
+public class WebRestApiApplication implements MetasfreshBootConfiguration
 {
 	/**
 	 * By default, we run in headless mode. But using this system property, we can also run with headless=false.
@@ -109,22 +115,33 @@ public class WebRestApiApplication
 		return context.getEnvironment().acceptsProfiles(profile);
 	}
 
+//	@Autowired
+//	private ApplicationContext applicationContext;
 	@Autowired
-	private ApplicationContext applicationContext;
-
-	@Bean(Adempiere.BEANNAME)
-	public Adempiere adempiere(final WebRestApiContextProvider webuiContextProvider)
+	private WebRestApiContextProvider webuiContextProvider;
+	
+	@Override
+	public RunMode getRunMode()
 	{
-		Env.setContextProvider(webuiContextProvider);
-
-		InterfaceWrapperHelper.registerHelper(new DocumentInterfaceWrapperHelper());
-
-		final Adempiere adempiere = Env.getSingleAdempiereInstance(applicationContext);
-		adempiere.startup(RunMode.WEBUI);
-
-		Services.get(IMigrationLogger.class).addTableToIgnoreList(I_T_WEBUI_ViewSelection.Table_Name);
-
-		return adempiere;
+		return RunMode.WEBUI;
+	}
+	
+	@Override
+	public ContextProvider createContextProvider()
+	{
+		return webuiContextProvider;
+	}
+	
+	@Override
+	public List<IInterfaceWrapperHelper> getInterfaceWrapperHelpers()
+	{
+		return ImmutableList.of(new DocumentInterfaceWrapperHelper());
+	}
+	
+	@Override
+	public Set<String> getTableNamesToIgnoreFromMigrationScriptsLogging()
+	{
+		return ImmutableSet.of(I_T_WEBUI_ViewSelection.Table_Name, I_T_WEBUI_ViewSelectionLine.Table_Name);
 	}
 
 	@Bean

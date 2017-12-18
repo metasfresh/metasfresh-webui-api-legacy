@@ -15,12 +15,12 @@ import org.adempiere.exceptions.AdempiereException;
 import org.adempiere.util.Check;
 import org.adempiere.util.lang.MutableInt;
 import org.adempiere.util.lang.impl.TableRecordReference;
-import org.compiere.Adempiere;
 import org.compiere.util.DB;
 import org.compiere.util.Util.ArrayKey;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Repository;
 
@@ -29,6 +29,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Streams;
 
+import de.metas.boot.Metasfresh;
 import de.metas.logging.LogManager;
 import de.metas.ui.web.base.model.I_T_WEBUI_ViewSelection;
 import de.metas.ui.web.base.model.I_T_WEBUI_ViewSelectionLine;
@@ -66,6 +67,7 @@ import lombok.NonNull;
  */
 
 @Repository
+@DependsOn(Metasfresh.DEPENDS_ON_DATABASE_INITIALIZED)
 public class ViewsRepository implements IViewsRepository
 {
 	private static final Logger logger = LogManager.getLogger(ViewsRepository.class);
@@ -83,14 +85,7 @@ public class ViewsRepository implements IViewsRepository
 	private final ConcurrentHashMap<WindowId, IViewsIndexStorage> viewsIndexStorages = new ConcurrentHashMap<>();
 	private final IViewsIndexStorage defaultViewsIndexStorage = new DefaultViewsRepositoryStorage();
 
-	/**
-	 * 
-	 * @param neededForDBAccess not used in here, but we need to cause spring to initialize it <b>before</b> this component can be initialized.
-	 *            So, if you clean this up, please make sure that the webui-API still starts up ^^.
-	 */
-	public ViewsRepository(
-			@NonNull final Adempiere neededForDBAccess,
-			@NonNull final Collection<IViewFactory> viewFactories)
+	public ViewsRepository(@NonNull final Collection<IViewFactory> viewFactories)
 	{
 		factories = createFactoriesMap(viewFactories);
 		logger.info("Registered following view factories: ", factories);

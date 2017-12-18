@@ -9,7 +9,6 @@ import org.adempiere.model.InterfaceWrapperHelper;
 import org.adempiere.user.api.IUserDAO;
 import org.adempiere.util.Check;
 import org.adempiere.util.Services;
-import org.compiere.Adempiere;
 import org.compiere.model.ModelValidator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.DependsOn;
@@ -18,6 +17,7 @@ import org.springframework.stereotype.Component;
 import com.google.common.base.Strings;
 
 import de.metas.adempiere.model.I_AD_User;
+import de.metas.boot.Metasfresh;
 import de.metas.ui.web.session.json.JSONUserSessionChangesEvent;
 import de.metas.ui.web.session.json.JSONUserSessionChangesEvent.JSONUserSessionChangesEventBuilder;
 import de.metas.ui.web.websocket.WebSocketConfig;
@@ -47,7 +47,7 @@ import lombok.AllArgsConstructor;
  */
 
 @Component
-@DependsOn(Adempiere.BEANNAME) // NOTE: we need Adempiere as parameter to make sure it was initialized. Else the "addModelInterceptor" will fail.
+@DependsOn(Metasfresh.DEPENDS_ON_MODEL_INTERCEPTORS_SYSTEM_INITIALIZED) // NOTE: we need Metasfresh as parameter to make sure it was initialized. Else the "addModelInterceptor" will fail.
 public class UserSessionRepository
 {
 	@Autowired
