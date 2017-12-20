@@ -9,6 +9,7 @@ import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import javax.annotation.Nullable;
 
@@ -418,7 +419,7 @@ public class SqlHUEditorViewRepository implements HUEditorViewRepository
 		}
 
 		final Set<Integer> initialHUIdsOrEmpty = initialHUIds != null ? initialHUIds : ImmutableSet.of();
-		
+
 		return Stream.concat(initialHUIdsOrEmpty.stream(), huIdsToInclude.stream())
 				.filter(huId -> !huIdsToExclude.contains(huId))
 				.distinct()
