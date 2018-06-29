@@ -1,19 +1,21 @@
 package de.metas.ui.web.picking.pickingslot.process;
 
-import static org.adempiere.model.InterfaceWrapperHelper.loadOutOfTrx;
-
 import java.util.List;
 
 import org.adempiere.util.Services;
+import org.adempiere.util.collections.ListUtils;
+import org.compiere.model.I_C_OrderLine;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import de.metas.handlingunits.picking.IHUPickingSlotBL;
-import de.metas.handlingunits.picking.IHUPickingSlotBL.PickingHUsQuery;
-import de.metas.inoutcandidate.model.I_M_ShipmentSchedule;
+import de.metas.order.OrderLineId;
 import de.metas.process.ProcessPreconditionsResolution;
+import de.metas.ui.web.document.filter.DocumentFilter;
 import de.metas.ui.web.handlingunits.HUIdsFilterHelper;
+import de.metas.ui.web.order.sales.hu.reservation.HUsReservationViewFactory;
 import de.metas.ui.web.picking.husToPick.HUsToPickViewFactory;
 import de.metas.ui.web.picking.pickingslot.PickingSlotRow;
+import de.metas.ui.web.picking.pickingslot.PickingSlotRowId;
 import de.metas.ui.web.view.CreateViewRequest;
 import de.metas.ui.web.view.IView;
 import de.metas.ui.web.view.IViewsRepository;
@@ -71,40 +73,29 @@ public class WEBUI_Picking_HUEditor_Launcher extends PickingSlotViewBasedProcess
 	@Override
 	protected String doIt()
 	{
-		final List<Integer> availableHUIdsToPick = retrieveAvailableHuIdsForCurrentShipmentScheduleId();
+		final PickingSlotRowId pickingSlotRowId = getSingleSelectedRow().getPickingSlotRowId();
+		final ViewId pickingSlotViewId = getView().getViewId();
+		final int shipmentScheduleId = getView().getCurrentShipmentScheduleId();;
 
-		final IView husToPickView = createHUEditorView(availableHUIdsToPick);
+		final CreateViewRequest createViewRequest = husToPickViewFactory.createViewRequest(pickingSlotViewId, pickingSlotRowId, shipmentScheduleId);
 
-		getResult().setWebuiIncludedViewIdToOpen(husToPickView.getViewId().getViewId());
+		final DocumentFilter stickyFilters = createViewRequest.getStickyFilters().get(0); // TODO
+
+		final IView view = viewsRepo
+				.createView(CreateViewRequest
+						.builder(HUsToPickViewFactory.WINDOW_ID)
+						.addStickyFilters(stickyFilters)
+						// .setParameter(VIEW_PARAM_PARENT_SALES_ORDER_LINE_ID, orderLineId)
+						.build());
+
+		// final List<Integer> availableHUIdsToPick = retrieveAvailableHuIdsForCurrentShipmentScheduleId();
+
+		getResult().setWebuiIncludedViewIdToOpen(view.getViewId().getViewId());
 		getResult().setWebuiViewProfileId("husToPick");
 		return MSG_OK;
 	}
 
-	private List<Integer> retrieveAvailableHuIdsForCurrentShipmentScheduleId()
-	{
-		final int shipmentScheduleId = getView().getCurrentShipmentScheduleId();
 
-		final PickingHUsQuery query = PickingHUsQuery.builder()
-				.shipmentSchedule(loadOutOfTrx(shipmentScheduleId, I_M_ShipmentSchedule.class))
-				.onlyTopLevelHUs(false)
-				.onlyIfAttributesMatchWithShipmentSchedules(false)
-				.build();
-		final List<Integer> availableHUIdsToPick = huPickingSlotBL.retrieveAvailableHUIdsToPick(query);
-		return availableHUIdsToPick;
-	}
 
-	private IView createHUEditorView(@NonNull final List<Integer> availableHUIdsToPick)
-	{
-		final PickingSlotRow pickingSlotRow = getSingleSelectedRow();
-		final ViewId pickingSlotViewId = getView().getViewId();
-
-		final IView husToPickView = viewsRepo.createView(
-				CreateViewRequest.builder(HUsToPickViewFactory.WINDOW_ID, JSONViewDataType.includedView)
-						.setParentViewId(pickingSlotViewId)
-						.setParentRowId(pickingSlotRow.getId())
-						.addStickyFilters(HUIdsFilterHelper.createFilter(availableHUIdsToPick))
-						.build());
-		return husToPickView;
-	}
-
+	
 }
