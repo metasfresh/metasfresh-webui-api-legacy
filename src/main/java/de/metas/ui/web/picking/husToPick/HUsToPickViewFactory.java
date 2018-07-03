@@ -8,12 +8,15 @@ import java.util.function.Supplier;
 
 import org.adempiere.util.Check;
 import org.adempiere.util.Services;
+import org.adempiere.warehouse.WarehouseId;
 import org.compiere.util.Env;
 
 import com.google.common.collect.ImmutableList;
 
+import de.metas.handlingunits.IHUQueryBuilder;
+import de.metas.handlingunits.IHandlingUnitsDAO;
+import de.metas.handlingunits.model.X_M_HU;
 import de.metas.inoutcandidate.model.I_M_ShipmentSchedule;
-import de.metas.order.OrderLineId;
 import de.metas.process.IADProcessDAO;
 import de.metas.process.RelatedProcessDescriptor;
 import de.metas.ui.web.document.filter.DocumentFilter;
@@ -24,6 +27,7 @@ import de.metas.ui.web.handlingunits.HUEditorRow;
 import de.metas.ui.web.handlingunits.HUEditorView;
 import de.metas.ui.web.handlingunits.HUEditorViewBuilder;
 import de.metas.ui.web.handlingunits.HUEditorViewFactoryTemplate;
+import de.metas.ui.web.handlingunits.HUIdsFilterHelper;
 import de.metas.ui.web.handlingunits.SqlHUEditorViewRepository.SqlHUEditorViewRepositoryBuilder;
 import de.metas.ui.web.order.sales.hu.reservation.HUReservationDocumentFilterService;
 import de.metas.ui.web.picking.pickingslot.PickingSlotRowId;
@@ -89,22 +93,40 @@ public class HUsToPickViewFactory extends HUEditorViewFactoryTemplate
 	{
 		Check.assumeGreaterThanZero(shipmentScheduleId, "shipmentScheduleId");
 
+		final IHandlingUnitsDAO handlingUnitsDAO = Services.get(IHandlingUnitsDAO.class);
+
+	
+
 		final Builder builder = CreateViewRequest.builder(WINDOW_ID, JSONViewDataType.includedView)
 				.setParentViewId(pickingSlotViewId)
 				.setParentRowId(pickingSlotRowId.toDocumentId())
 				.setParameter(HUsToPickViewFilters.PARAM_CurrentShipmentScheduleId, shipmentScheduleId);
 
 		final I_M_ShipmentSchedule shipmentScheduleRecord = loadOutOfTrx(shipmentScheduleId, I_M_ShipmentSchedule.class);
-		final DocumentFilter stickyFilter;
-		if (shipmentScheduleRecord.getC_OrderLine_ID() > 0)
-		{
-			final OrderLineId orderLineId = OrderLineId.ofRepoId(shipmentScheduleRecord.getC_OrderLine_ID());
-			stickyFilter = huReservationDocumentFilterService.createOrderLineDocumentFilter(orderLineId);
-		}
-		else
-		{
-			stickyFilter = huReservationDocumentFilterService.createNoReservationDocumentFilter();
-		}
+
+		final IHUQueryBuilder huQuery = handlingUnitsDAO
+				.createHUQueryBuilder()
+				.addOnlyWithProductId(shipmentScheduleRecord.getM_Product_ID())
+				.addOnlyInWarehouseId(WarehouseId.ofRepoId(shipmentScheduleRecord.getM_Warehouse_ID()))
+				.addHUStatusToInclude(X_M_HU.HUSTATUS_Active)
+
+			;
+		
+		
+		final DocumentFilter stickyFilter = HUIdsFilterHelper.createFilter(huQuery);
+		
+		//TODO verify orderline
+
+//		final DocumentFilter stickyFilter;
+//		if (shipmentScheduleRecord.getC_OrderLine_ID() > 0)
+//		{
+//			final OrderLineId orderLineId = OrderLineId.ofRepoId(shipmentScheduleRecord.getC_OrderLine_ID());
+//			stickyFilter = huReservationDocumentFilterService.createOrderLineDocumentFilter(orderLineId);
+//		}
+//		else
+//		{
+//			stickyFilter = huReservationDocumentFilterService.createNoReservationDocumentFilter();
+//		}
 		builder.addStickyFilters(stickyFilter);
 
 		return builder.build();
