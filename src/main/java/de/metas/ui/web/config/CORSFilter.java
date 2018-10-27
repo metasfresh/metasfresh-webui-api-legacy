@@ -12,13 +12,13 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.adempiere.service.ISysConfigBL;
-import org.adempiere.util.Services;
 import org.slf4j.Logger;
 import org.springframework.stereotype.Component;
 
 import de.metas.logging.LogManager;
 import de.metas.printing.esb.base.util.Check;
 import de.metas.ui.web.WebuiURLs;
+import de.metas.util.Services;
 
 /*
  * #%L
@@ -108,7 +108,7 @@ public class CORSFilter implements Filter
 			}
 			else
 			{
-				logger.warn("Accepting any CORS Origin because even though CORS are enabled, the FrontendURL is not set");
+				logger.warn("Accepting any CORS Origin because even though CORS are enabled, the FrontendURL is not set.\n Please and set `{}` sysconfig or disable CORS (`{}` sysconfig).", WebuiURLs.SYSCONFIG_FRONTEND_URL, SYSCONFIG_IsCORSEnabled);
 			}
 		}
 

@@ -11,8 +11,6 @@ import org.adempiere.ad.session.MFSession;
 import org.adempiere.exceptions.AdempiereException;
 import org.adempiere.user.api.IUserBL;
 import org.adempiere.user.api.IUserDAO;
-import org.adempiere.util.Check;
-import org.adempiere.util.Services;
 import org.compiere.model.I_AD_User;
 import org.compiere.util.Env;
 import org.compiere.util.KeyNamePair;
@@ -33,7 +31,6 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableSet;
 
-import de.metas.hash.HashableString;
 import de.metas.i18n.ILanguageBL;
 import de.metas.ui.web.base.session.UserPreference;
 import de.metas.ui.web.config.WebConfig;
@@ -51,6 +48,9 @@ import de.metas.ui.web.upload.WebuiImageId;
 import de.metas.ui.web.upload.WebuiImageService;
 import de.metas.ui.web.window.datatypes.json.JSONLookupValue;
 import de.metas.ui.web.window.datatypes.json.JSONLookupValuesList;
+import de.metas.util.Check;
+import de.metas.util.Services;
+import de.metas.util.hash.HashableString;
 
 /*
  * #%L
@@ -340,10 +340,25 @@ public class LoginRestController
 	}
 
 	@GetMapping("/resetPassword/{token}")
+	@Deprecated
 	public JSONResetPassword getResetPasswordInfo(@PathVariable("token") final String token)
 	{
+		return resetPasswordInitByToken(token);
+	}
+
+	@PostMapping("/resetPassword/{token}/init")
+	public JSONResetPassword resetPasswordInitByToken(@PathVariable("token") final String token)
+	{
+		userSession.assertNotLoggedIn();
+
 		final IUserDAO usersRepo = Services.get(IUserDAO.class);
 		final I_AD_User user = usersRepo.getByPasswordResetCode(token);
+
+		final String userADLanguage = user.getAD_Language();
+		if (!Check.isEmpty(userADLanguage, true))
+		{
+			userSession.setAD_Language(userADLanguage);
+		}
 
 		return JSONResetPassword.builder()
 				.fullname(user.getName())

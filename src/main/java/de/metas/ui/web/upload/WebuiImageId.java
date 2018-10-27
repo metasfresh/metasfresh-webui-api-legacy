@@ -1,14 +1,15 @@
 package de.metas.ui.web.upload;
 
 import org.adempiere.exceptions.AdempiereException;
-import org.adempiere.util.Check;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 
-import de.metas.lang.RepoIdAware;
+import de.metas.util.Check;
+import de.metas.util.lang.RepoIdAware;
+
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 

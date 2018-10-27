@@ -1,5 +1,6 @@
 package de.metas.ui.web.window.descriptor;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -8,8 +9,6 @@ import java.util.Map;
 
 import javax.annotation.Nullable;
 
-import org.adempiere.util.Check;
-import org.adempiere.util.GuavaCollectors;
 import org.slf4j.Logger;
 
 import com.google.common.base.MoreObjects;
@@ -23,6 +22,9 @@ import de.metas.logging.LogManager;
 import de.metas.ui.web.view.descriptor.ViewLayout;
 import de.metas.ui.web.window.datatypes.WindowId;
 import de.metas.ui.web.window.exceptions.DocumentLayoutDetailNotFoundException;
+import de.metas.util.Check;
+import de.metas.util.GuavaCollectors;
+
 import lombok.NonNull;
 
 /*
@@ -207,7 +209,7 @@ public final class DocumentLayoutDescriptor
 			//
 			// Debug informations:
 			putDebugProperty("generator-thread", Thread.currentThread().getName());
-			putDebugProperty("generator-timestamp", new java.util.Date().toString());
+			putDebugProperty("generator-timestamp", LocalDateTime.now().toString());
 			if (stopwatch != null)
 			{
 				putDebugProperty("generator-duration", stopwatch.toString());

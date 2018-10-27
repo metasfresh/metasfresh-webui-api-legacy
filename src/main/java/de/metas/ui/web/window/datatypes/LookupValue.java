@@ -23,6 +23,9 @@ import de.metas.i18n.ImmutableTranslatableString;
 import de.metas.process.IProcessDefaultParametersProvider;
 import de.metas.process.JavaProcess;
 import de.metas.ui.web.process.descriptor.ProcessParamLookupValuesProvider;
+import de.metas.util.lang.ReferenceListAwareEnum;
+import de.metas.util.lang.RepoIdAware;
+
 import lombok.Builder;
 import lombok.NonNull;
 import lombok.Singular;
@@ -57,8 +60,7 @@ public abstract class LookupValue
 		{
 			return null;
 		}
-
-		if (numericKey)
+		else if (numericKey)
 		{
 			if (idObj instanceof Number)
 			{
@@ -69,23 +71,36 @@ public abstract class LookupValue
 				}
 				return idInt;
 			}
-
-			final String idStr = idObj.toString().trim();
-			if (idStr.isEmpty())
+			else if (idObj instanceof RepoIdAware)
 			{
-				return null;
+				return ((RepoIdAware)idObj).getRepoId();
 			}
-
-			final int idInt = Integer.parseInt(idObj.toString());
-			if (idInt < 0)
+			else
 			{
-				return null;
+				final String idStr = idObj.toString().trim();
+				if (idStr.isEmpty())
+				{
+					return null;
+				}
+
+				final int idInt = Integer.parseInt(idStr);
+				if (idInt < 0)
+				{
+					return null;
+				}
+				return idInt;
 			}
-			return idInt;
 		}
-		else
+		else // string key
 		{
-			return idObj.toString();
+			if (idObj instanceof ReferenceListAwareEnum)
+			{
+				return ((ReferenceListAwareEnum)idObj).getCode();
+			}
+			else
+			{
+				return idObj.toString();
+			}
 		}
 	}
 
@@ -230,6 +245,11 @@ public abstract class LookupValue
 	public String getIdAsString()
 	{
 		return id.toString();
+	}
+
+	public <T extends RepoIdAware> T getIdAs(@NonNull final Function<Integer, T> idMapper)
+	{
+		return idMapper.apply(getIdAsInt());
 	}
 
 	public final <T> T transform(final Function<LookupValue, T> transformation)

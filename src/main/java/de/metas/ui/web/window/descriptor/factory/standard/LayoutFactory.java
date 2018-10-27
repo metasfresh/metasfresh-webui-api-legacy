@@ -52,6 +52,8 @@ import de.metas.ui.web.window.descriptor.DocumentLayoutSingleRow;
 import de.metas.ui.web.window.descriptor.LayoutType;
 import de.metas.ui.web.window.descriptor.ViewEditorRenderMode;
 import de.metas.ui.web.window.descriptor.WidgetSize;
+import de.metas.util.Check;
+
 import lombok.NonNull;
 
 /*
@@ -424,6 +426,11 @@ public class LayoutFactory
 				layoutElementBuilder.setWidgetType(field.getWidgetType());
 			}
 
+			if (!layoutElementBuilder.isWidgetSizeSet())
+			{
+				layoutElementBuilder.setWidgetSize(field.getWidgetSize());
+			}
+
 			layoutElementBuilder.setButtonActionDescriptor(field.getButtonActionDescriptor());
 
 			layoutElementBuilder.addField(layoutElementFieldBuilder);
@@ -509,6 +516,7 @@ public class LayoutFactory
 		final String uiElementType = Util.coalesce(uiElement.getAD_UI_ElementType(), X_AD_UI_Element.AD_UI_ELEMENTTYPE_Field);
 		if (X_AD_UI_Element.AD_UI_ELEMENTTYPE_Field.equals(uiElementType))
 		{
+			// add the "primary" field
 			{
 				final DocumentFieldDescriptor.Builder field = descriptorsFactory.documentFieldByAD_Field_ID(uiElement.getAD_Field_ID());
 				if (field != null)
@@ -517,10 +525,11 @@ public class LayoutFactory
 				}
 				else
 				{
-					logger.warn("No field found for {} (AD_Field_ID={})", uiElement, uiElement.getAD_Field_ID());
+					logger.warn("No field found for AD_Field_ID={}; AD_UI_Element={}", uiElement.getAD_Field_ID(), uiElement);
 				}
 			}
 
+			// add additional fields / tooltips (if any)
 			for (final I_AD_UI_ElementField uiElementField : getUIProvider().getUIElementFields(uiElement))
 			{
 				if (!uiElementField.isActive())
@@ -529,10 +538,10 @@ public class LayoutFactory
 					continue;
 				}
 
-				final DocumentFieldDescriptor.Builder field = descriptorsFactory.documentFieldByAD_Field_ID(uiElementField.getAD_Field_ID());
+				final DocumentFieldDescriptor.Builder field = descriptorsFactory.documentFieldByAD_UI_ElementField(uiElementField);
 				if (field == null)
 				{
-					logger.warn("No field found for {} (AD_Field_ID={})", uiElementField, uiElementField.getAD_Field_ID());
+					logger.warn("No field found for AD_UI_ElementField_ID={}; AD_UI_ElementField={}", uiElementField.getAD_Field_ID(), uiElementField);
 					continue;
 				}
 
@@ -545,7 +554,7 @@ public class LayoutFactory
 			final DocumentFieldDescriptor.Builder field = descriptorsFactory.documentField(labelsFieldName);
 			if (field == null)
 			{
-				logger.warn("No label field found for {}", labelsFieldName);
+				logger.warn("No label field found for labelsFieldName={}", labelsFieldName);
 			}
 			else
 			{
@@ -663,6 +672,12 @@ public class LayoutFactory
 				.setSupportZoomInto(field.isSupportZoomInto())
 				.trackField(field);
 
+		if(!Check.isEmpty(field.getTooltipIconName()))
+		{
+			layoutElementFieldBuilder.setFieldType(FieldType.Tooltip);
+			layoutElementFieldBuilder.setTooltipIconName(field.getTooltipIconName());
+		}
+
 		logger.trace("Built layout element field for {}: {}", field, layoutElementFieldBuilder);
 		return layoutElementFieldBuilder;
 	}
@@ -753,5 +768,4 @@ public class LayoutFactory
 				.addField(layoutElementField(docActionField).setFieldType(FieldType.ActionButton))
 				.build();
 	}
-
 }

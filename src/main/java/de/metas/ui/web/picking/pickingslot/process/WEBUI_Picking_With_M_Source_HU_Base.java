@@ -1,15 +1,18 @@
 package de.metas.ui.web.picking.pickingslot.process;
 
+import java.math.BigDecimal;
 import java.util.List;
-
-import org.adempiere.util.Services;
 
 import com.google.common.collect.ImmutableList;
 
 import de.metas.handlingunits.model.I_M_HU;
 import de.metas.handlingunits.picking.IHUPickingSlotBL;
 import de.metas.handlingunits.picking.IHUPickingSlotBL.PickingHUsQuery;
+import de.metas.inoutcandidate.api.IPackagingDAO;
+import de.metas.inoutcandidate.api.IShipmentSchedulePA;
+import de.metas.inoutcandidate.api.ShipmentScheduleId;
 import de.metas.inoutcandidate.model.I_M_ShipmentSchedule;
+import de.metas.util.Services;
 
 /*
  * #%L
@@ -55,5 +58,20 @@ import de.metas.inoutcandidate.model.I_M_ShipmentSchedule;
 
 		final List<I_M_HU> sourceHUs = huPickingSlotBL.retrieveAvailableSourceHUs(query);
 		return !sourceHUs.isEmpty();
+	}
+	
+	protected final BigDecimal retrieveQtyToPick()
+	{
+		final ShipmentScheduleId shipmentScheduleId = getView().getCurrentShipmentScheduleId();
+		final BigDecimal qtyPickedPlanned = Services.get(IPackagingDAO.class).retrieveQtyPickedPlannedOrNull(shipmentScheduleId);
+		if (qtyPickedPlanned == null)
+		{
+			return BigDecimal.ZERO;
+		}
+
+		final I_M_ShipmentSchedule shipmentSchedule = Services.get(IShipmentSchedulePA.class).getById(shipmentScheduleId, I_M_ShipmentSchedule.class);
+		final BigDecimal qtyToPick = shipmentSchedule.getQtyToDeliver().subtract(qtyPickedPlanned);
+
+		return qtyToPick.signum() > 0 ? qtyToPick : BigDecimal.ZERO;
 	}
 }

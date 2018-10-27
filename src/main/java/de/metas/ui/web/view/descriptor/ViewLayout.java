@@ -13,8 +13,6 @@ import java.util.stream.Stream;
 import javax.annotation.Nullable;
 
 import org.adempiere.exceptions.AdempiereException;
-import org.adempiere.util.Check;
-import org.adempiere.util.GuavaCollectors;
 import org.adempiere.util.comparator.FixedOrderByKeyComparator;
 import org.slf4j.Logger;
 
@@ -38,6 +36,9 @@ import de.metas.ui.web.window.descriptor.DetailId;
 import de.metas.ui.web.window.descriptor.DocumentLayoutElementDescriptor;
 import de.metas.ui.web.window.descriptor.factory.standard.LayoutFactory;
 import de.metas.ui.web.window.model.DocumentQueryOrderBy;
+import de.metas.util.Check;
+import de.metas.util.GuavaCollectors;
+
 import lombok.AccessLevel;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
@@ -100,6 +101,9 @@ public class ViewLayout implements ETagAware
 	public static final int TreeExpandedDepth_ExpandedFirstLevel = 1;
 	public static final int TreeExpandedDepth_AllExpanded = 100;
 
+	/** If false, frontend shall not allow double clicking on a row in order to open it as a document */
+	private final boolean allowOpeningRowDetails;
+
 	// ETag support
 	private static final AtomicInteger nextETagVersionSupplier = new AtomicInteger(1);
 	private final ETag eTag;
@@ -132,14 +136,13 @@ public class ViewLayout implements ETagAware
 
 		allowNewCaption = null;
 
+		allowOpeningRowDetails = builder.allowOpeningRowDetails;
+
 		eTag = ETag.of(nextETagVersionSupplier.getAndIncrement(), extractETagAttributes(filters, allowNewCaption));
 	}
 
 	/**
 	 * copy and override constructor
-	 *
-	 * @param elements
-	 * @param defaultOrderBys
 	 */
 	private ViewLayout(final ViewLayout from,
 			final WindowId windowId,
@@ -175,6 +178,8 @@ public class ViewLayout implements ETagAware
 		includedViewLayout = from.includedViewLayout;
 
 		this.allowNewCaption = allowNewCaption;
+
+		this.allowOpeningRowDetails = from.allowOpeningRowDetails;
 
 		eTag = from.eTag.overridingAttributes(extractETagAttributes(filters, allowNewCaption));
 	}
@@ -309,6 +314,11 @@ public class ViewLayout implements ETagAware
 	public String getAllowNewCaption()
 	{
 		return allowNewCaption;
+	}
+	
+	public boolean isAllowOpeningRowDetails()
+	{
+		return allowOpeningRowDetails;
 	}
 
 	@Override
@@ -486,6 +496,8 @@ public class ViewLayout implements ETagAware
 		private boolean treeCollapsible = false;
 		private int treeExpandedDepth = TreeExpandedDepth_AllExpanded;
 
+		private boolean allowOpeningRowDetails = true;
+
 		private final List<DocumentLayoutElementDescriptor.Builder> elementBuilders = new ArrayList<>();
 
 		private String idFieldName;
@@ -602,9 +614,9 @@ public class ViewLayout implements ETagAware
 			return this;
 		}
 
-		public <T extends IViewRow> Builder addElementsFromViewRowClassAndFieldNames(final Class<T> viewRowClass, final ClassViewColumnOverrides... columns)
+		public <T extends IViewRow> Builder addElementsFromViewRowClassAndFieldNames(final Class<T> viewRowClass, final JSONViewDataType viewDataType, final ClassViewColumnOverrides... columns)
 		{
-			final List<DocumentLayoutElementDescriptor.Builder> elements = ViewColumnHelper.createLayoutElementsForClassAndFieldNames(viewRowClass, columns);
+			final List<DocumentLayoutElementDescriptor.Builder> elements = ViewColumnHelper.createLayoutElementsForClassAndFieldNames(viewRowClass, viewDataType, columns);
 			Check.assumeNotEmpty(elements, "elements is not empty"); // shall never happen
 
 			addElements(elements);
@@ -705,5 +717,12 @@ public class ViewLayout implements ETagAware
 			this.treeExpandedDepth = treeExpandedDepth;
 			return this;
 		}
+
+		public Builder setAllowOpeningRowDetails(boolean allowOpeningRowDetails)
+		{
+			this.allowOpeningRowDetails = allowOpeningRowDetails;
+			return this;
+		}
+
 	}
 }

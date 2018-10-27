@@ -7,9 +7,6 @@ import java.util.Set;
 import java.util.stream.Stream;
 
 import org.adempiere.exceptions.AdempiereException;
-import org.adempiere.util.Check;
-import org.adempiere.util.GuavaCollectors;
-import org.adempiere.util.Services;
 import org.slf4j.Logger;
 
 import com.google.common.base.Joiner;
@@ -23,6 +20,10 @@ import de.metas.i18n.ImmutableTranslatableString;
 import de.metas.logging.LogManager;
 import de.metas.ui.web.window.datatypes.MediaType;
 import de.metas.ui.web.window.exceptions.DocumentLayoutBuildException;
+import de.metas.util.Check;
+import de.metas.util.GuavaCollectors;
+import de.metas.util.Services;
+
 import lombok.NonNull;
 
 /*
@@ -63,7 +64,8 @@ public final class DocumentLayoutElementDescriptor
 		final Builder elementBuilder = new Builder()
 				.setCaption(firstField.getCaption())
 				// .setDescription(firstField.getDescription())
-				.setWidgetType(firstField.getWidgetType());
+				.setWidgetType(firstField.getWidgetType())
+				.setWidgetSize(firstField.getWidgetSize());
 
 		for (final DocumentFieldDescriptor field : fields)
 		{
@@ -429,6 +431,11 @@ public final class DocumentLayoutElementDescriptor
 			return _widgetType != null;
 		}
 
+		public boolean isWidgetSizeSet()
+		{
+			return _widgetSize != null;
+		}
+
 		public DocumentFieldWidgetType getWidgetType()
 		{
 			Check.assumeNotNull(_widgetType, DocumentLayoutBuildException.class, "Parameter widgetType is not null for {}", this);
@@ -524,9 +531,8 @@ public final class DocumentLayoutElementDescriptor
 			return _advancedField;
 		}
 
-		public Builder addField(final DocumentLayoutElementFieldDescriptor.Builder fieldBuilder)
+		public Builder addField(@NonNull final DocumentLayoutElementFieldDescriptor.Builder fieldBuilder)
 		{
-			Check.assumeNotNull(fieldBuilder, "Parameter fieldBuilder is not null");
 			final DocumentLayoutElementFieldDescriptor.Builder previousFieldBuilder = _fieldsBuilders.put(fieldBuilder.getFieldName(), fieldBuilder);
 			if (previousFieldBuilder != null)
 			{

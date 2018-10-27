@@ -3,8 +3,6 @@ package de.metas.ui.web.window.datatypes.json;
 import java.util.List;
 import java.util.Set;
 
-import org.adempiere.util.GuavaCollectors;
-
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -19,6 +17,7 @@ import de.metas.ui.web.window.datatypes.json.JSONDocumentLayoutElementField.JSON
 import de.metas.ui.web.window.datatypes.json.JSONDocumentLayoutElementField.JSONLookupSource;
 import de.metas.ui.web.window.descriptor.ButtonFieldActionDescriptor;
 import de.metas.ui.web.window.descriptor.ButtonFieldActionDescriptor.ButtonFieldActionType;
+import de.metas.util.GuavaCollectors;
 import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
 import de.metas.ui.web.window.descriptor.DocumentLayoutElementDescriptor;
 import de.metas.ui.web.window.descriptor.ViewEditorRenderMode;
@@ -206,13 +205,15 @@ public final class JSONDocumentLayoutElement
 		restrictToMediaTypes = null;
 
 		fields = ImmutableSet.of(new JSONDocumentLayoutElementField( //
-				fieldName, (JSONFieldType)null // type
-				, (JSONLookupSource)null // lookupSource
-				, "no " + fieldName // emptyText
-				, (List<JSONDeviceDescriptor>)null // devices
-				, (String)null // newRecordWindowId
-				, (String)null // newRecordCaption
-				, widgetType.isSupportZoomInto() // supportZoomInfo
+				fieldName,
+				(JSONFieldType)null,
+				(String)null, // tooltipIconName
+				(JSONLookupSource)null,
+				"no " + fieldName, // emptyText
+				(List<JSONDeviceDescriptor>)null,
+				(String)null, // newRecordWindowId
+				(String)null, // newRecordCaption
+				widgetType.isSupportZoomInto()
 		));
 	}
 
