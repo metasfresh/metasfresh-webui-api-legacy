@@ -16,15 +16,12 @@ import org.compiere.Adempiere.RunMode;
 import org.compiere.model.ModelValidationEngine;
 import org.compiere.util.Env;
 import org.compiere.util.Ini;
-import org.elasticsearch.common.logging.ESLoggerFactory;
-import org.elasticsearch.common.logging.slf4j.Slf4jESLoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.builder.SpringApplicationBuilder;
-import org.springframework.boot.context.embedded.ConfigurableEmbeddedServletContainer;
-import org.springframework.boot.context.embedded.EmbeddedServletContainerCustomizer;
-import org.springframework.boot.context.embedded.tomcat.TomcatConnectorCustomizer;
-import org.springframework.boot.context.embedded.tomcat.TomcatEmbeddedServletContainerFactory;
+import org.springframework.boot.web.embedded.tomcat.TomcatConnectorCustomizer;
+import org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactory;
+import org.springframework.boot.web.server.WebServerFactoryCustomizer;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Profile;
@@ -87,8 +84,8 @@ public class WebRestApiApplication
 			System.setProperty("PropertyFile", "./metasfresh.properties");
 		}
 
-		// Make sure slf4j is used (by default, in v2.4.4 log4j is used, see https://github.com/metasfresh/metasfresh-webui-api/issues/757)
-		ESLoggerFactory.setDefaultFactory(new Slf4jESLoggerFactory());
+		// Make sure slf4j is used (by default, in v2.4.4 log4j is used
+		// https://www.elastic.co/guide/en/elasticsearch/client/java-api/current/_using_another_logger.html
 
 		try (final IAutoCloseable c = ModelValidationEngine.postponeInit())
 		{
@@ -139,14 +136,13 @@ public class WebRestApiApplication
 	}
 
 	@Bean
-	public EmbeddedServletContainerCustomizer servletContainerCustomizer()
+	public WebServerFactoryCustomizer<TomcatServletWebServerFactory> servletContainerCustomizer()
 	{
-		return new EmbeddedServletContainerCustomizer()
+		return new WebServerFactoryCustomizer<TomcatServletWebServerFactory>()
 		{
 			@Override
-			public void customize(final ConfigurableEmbeddedServletContainer servletContainer)
+			public void customize(final TomcatServletWebServerFactory tomcatContainerFactory)
 			{
-				final TomcatEmbeddedServletContainerFactory tomcatContainerFactory = (TomcatEmbeddedServletContainerFactory)servletContainer;
 				tomcatContainerFactory.addConnectorCustomizers(new TomcatConnectorCustomizer()
 				{
 					@Override
