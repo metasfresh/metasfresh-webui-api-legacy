@@ -62,6 +62,8 @@ import io.swagger.annotations.ApiParam;
 @RequestMapping(value = MigrationScriptRestController.ENDPOINT)
 public class MigrationScriptRestController
 {
+	private static final String DOT_SQL = ".sql";
+
 	public static final String ENDPOINT = WebConfig.ENDPOINT_ROOT + "/dev/migrationScriptsLogger";
 
 	private static final Logger logger = LogManager.getLogger(MigrationScriptRestController.class);
@@ -122,15 +124,19 @@ public class MigrationScriptRestController
 		}
 	}
 
-	private Path getMigrationScriptPath(final String filename)
+	private Path getMigrationScriptPath(@NonNull final String filename)
 	{
+		final String fileNameToUse = filename.endsWith(DOT_SQL)
+				? filename
+				: filename + DOT_SQL;
+
 		final Path migrationScriptDirectory = getMigrationScriptsDirectoryPath();
 		final List<String> scriptFileNames = getMigrationScriptFileNames();
-		if (!scriptFileNames.contains(filename))
+		if (!scriptFileNames.contains(fileNameToUse))
 		{
-			throw new AdempiereException("File '" + filename + "' is not available. Try one of followings: " + scriptFileNames);
+			throw new AdempiereException("File '" + fileNameToUse + "' is not available. Try one of followings: " + scriptFileNames);
 		}
-		return migrationScriptDirectory.resolve(filename);
+		return migrationScriptDirectory.resolve(fileNameToUse);
 	}
 
 	private Path getCurrentScriptPath()
@@ -151,7 +157,7 @@ public class MigrationScriptRestController
 			return Files.list(migrationScriptDirectory)
 					.map(Path::toFile)
 					.map(File::getName)
-					.filter(filename -> filename.toLowerCase().endsWith(".sql"))
+					.filter(filename -> filename.toLowerCase().endsWith(DOT_SQL))
 					.collect(ImmutableList.toImmutableList());
 		}
 		catch (final IOException e)
