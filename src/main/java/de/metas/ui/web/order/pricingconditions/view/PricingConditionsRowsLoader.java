@@ -14,6 +14,8 @@ import java.util.stream.Stream;
 
 import javax.annotation.Nullable;
 
+import org.adempiere.service.ClientId;
+import org.adempiere.service.OrgId;
 import org.slf4j.Logger;
 
 import com.google.common.base.Predicates;
@@ -195,17 +197,24 @@ class PricingConditionsRowsLoader
 		return PricingConditionsId.ofDiscountSchemaId(discountSchemaId);
 	}
 
-	private Stream<PricingConditionsRow> createPricingConditionsRows(final PricingConditionsBreak pricingConditionsBreak)
+	private Stream<PricingConditionsRow> createPricingConditionsRows(@NonNull final PricingConditionsBreak pricingConditionsBreak)
 	{
 		return getPricingConditionsInfos(pricingConditionsBreak.getPricingConditionsId())
 				.stream()
 				.map(pricingConditionsInfo -> createPricingConditionsRow(pricingConditionsBreak, pricingConditionsInfo));
 	}
 
-	private PricingConditionsRow createPricingConditionsRow(final PricingConditionsBreak pricingConditionsBreak, final PricingConditionsInfo pricingConditionsInfo)
+	private PricingConditionsRow createPricingConditionsRow(
+			@NonNull final PricingConditionsBreak pricingConditionsBreak,
+			@NonNull final PricingConditionsInfo pricingConditionsInfo)
 	{
+
+
 		final SOTrx soTrx = pricingConditionsInfo.getBpartnerType().getSOTrx();
 		return PricingConditionsRow.builder()
+				.clientId(pricingConditionsBreak.getClientId())
+				.orgId(pricingConditionsBreak.getOrgId())
+
 				.lookups(lookups)
 				.editable(false)
 				//
@@ -254,6 +263,8 @@ class PricingConditionsRowsLoader
 
 		final PricingConditionsBreak pricingConditionsBreak = PricingConditionsBreak.builder()
 				.id(null) // N/A
+				.clientId(sourceDocumentLine.getClientId())
+				.orgId(sourceDocumentLine.getOrgId())
 				.matchCriteria(PricingConditionsBreakMatchCriteria.builder()
 						.breakValue(BigDecimal.ZERO)
 						.productId(sourceDocumentLine.getProductId())
@@ -268,6 +279,8 @@ class PricingConditionsRowsLoader
 				.build();
 
 		return PricingConditionsRow.builder()
+				.clientId(sourceDocumentLine.getClientId())
+				.orgId(sourceDocumentLine.getOrgId())
 				.lookups(lookups)
 				.editable(true)
 				//
@@ -338,6 +351,12 @@ class PricingConditionsRowsLoader
 	@lombok.Builder
 	public static final class SourceDocumentLine
 	{
+		@NonNull
+		ClientId clientId;
+
+		@NonNull
+		OrgId orgId;
+
 		@Nullable
 		OrderLineId orderLineId;
 		@NonNull

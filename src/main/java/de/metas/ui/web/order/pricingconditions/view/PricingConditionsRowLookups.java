@@ -5,6 +5,8 @@ import java.awt.Color;
 import javax.annotation.Nullable;
 
 import org.adempiere.exceptions.AdempiereException;
+import org.adempiere.service.ClientId;
+import org.adempiere.service.OrgId;
 import org.adempiere.user.UserId;
 import org.compiere.model.I_AD_User;
 import org.compiere.model.I_C_BPartner;
@@ -177,14 +179,19 @@ public class PricingConditionsRowLookups
 		}
 	}
 
-	public String getTemporaryPriceConditionsColor()
+	public String getTemporaryPriceConditionsColor(
+			@NonNull final ClientId clientId,
+			@NonNull final OrgId orgId)
 	{
-		return temporaryPriceConditionsColorCache.getOrLoad(0, this::retrieveTemporaryPriceConditionsColor);
+		return temporaryPriceConditionsColorCache.getOrLoad(0, () -> retrieveTemporaryPriceConditionsColor(clientId, orgId));
 	}
 
-	private String retrieveTemporaryPriceConditionsColor()
+	private String retrieveTemporaryPriceConditionsColor(
+			@NonNull final ClientId clientId,
+			@NonNull final OrgId orgId)
 	{
-		final int temporaryPriceConditionsColorId = Services.get(IOrderLinePricingConditions.class).getTemporaryPriceConditionsColorId();
+		final IOrderLinePricingConditions orderLinePricingConditions = Services.get(IOrderLinePricingConditions.class);
+		final int temporaryPriceConditionsColorId = orderLinePricingConditions.getTemporaryPriceConditionsColorId(clientId, orgId);
 		return toHexString(Services.get(IColorRepository.class).getColorById(temporaryPriceConditionsColorId));
 	}
 

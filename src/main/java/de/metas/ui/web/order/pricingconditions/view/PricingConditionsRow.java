@@ -11,6 +11,8 @@ import java.util.Map;
 import java.util.Optional;
 
 import org.adempiere.exceptions.AdempiereException;
+import org.adempiere.service.ClientId;
+import org.adempiere.service.OrgId;
 import org.compiere.model.I_M_DiscountSchemaBreak;
 
 import com.google.common.collect.ImmutableList;
@@ -191,6 +193,9 @@ public class PricingConditionsRow implements IViewRow
 	//
 	private final PricingConditionsRowLookups lookups;
 
+	private final ClientId clientId;
+	private final OrgId orgId;
+
 	@Getter
 	private final DocumentId id;
 
@@ -213,6 +218,8 @@ public class PricingConditionsRow implements IViewRow
 
 	@Builder(toBuilder = true)
 	private PricingConditionsRow(
+			@NonNull final ClientId clientId,
+			@NonNull final OrgId orgId,
 			@NonNull final PricingConditionsRowLookups lookups,
 			@NonNull final LookupValue bpartner,
 			final boolean customer,
@@ -223,11 +230,14 @@ public class PricingConditionsRow implements IViewRow
 			final PricingConditionsBreakId copiedFromPricingConditionsBreakId,
 			final boolean editable)
 	{
+		this.orgId = orgId;
+		this.clientId = clientId;
+
 		this.lookups = lookups;
 		this.bpartner = bpartner;
 		this.customer = customer;
 
-		this.statusColor = pricingConditionsBreak.isTemporaryPricingConditionsBreak() ? lookups.getTemporaryPriceConditionsColor() : null;
+		this.statusColor = pricingConditionsBreak.isTemporaryPricingConditionsBreak() ? lookups.getTemporaryPriceConditionsColor(clientId, orgId) : null;
 
 		PricingConditionsBreakId.assertMatching(pricingConditionsId, pricingConditionsBreak.getId());
 		this.pricingConditionsId = pricingConditionsId;
@@ -271,7 +281,7 @@ public class PricingConditionsRow implements IViewRow
 
 				this.basePricingSystem = lookups.lookupPricingSystem(price.getBasePricingSystemId());
 				this.basePriceAmt = basePrice.getValue();
-				
+
 				final Money surcharge = price.getPricingSystemSurcharge();
 				this.pricingSystemSurchargeAmt = surcharge != null ? surcharge.getValue() : null;
 				this.currency = lookups.lookupCurrency(surcharge != null ? surcharge.getCurrencyId() : null);
@@ -280,7 +290,7 @@ public class PricingConditionsRow implements IViewRow
 			case FIXED_PRICE:
 			{
 				final Money fixedPrice = price.getFixedPrice();
-				
+
 				this.basePricingSystem = null;
 				this.basePriceAmt = fixedPrice != null ? fixedPrice.getValue() : null;
 				this.pricingSystemSurchargeAmt = null;

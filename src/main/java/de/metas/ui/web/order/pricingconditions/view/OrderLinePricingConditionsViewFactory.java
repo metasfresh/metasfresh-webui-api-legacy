@@ -7,6 +7,8 @@ import java.util.stream.Stream;
 import org.adempiere.mm.attributes.AttributeSetInstanceId;
 import org.adempiere.mm.attributes.api.IAttributeDAO;
 import org.adempiere.mm.attributes.api.ImmutableAttributeSet;
+import org.adempiere.service.ClientId;
+import org.adempiere.service.OrgId;
 import org.compiere.model.I_C_Order;
 import org.compiere.model.I_C_OrderLine;
 
@@ -139,6 +141,8 @@ public class OrderLinePricingConditionsViewFactory extends PricingConditionsView
 		final Money priceEntered = Money.of(orderLineRecord.getPriceEntered(), CurrencyId.ofRepoId(orderLineRecord.getC_Currency_ID()));
 
 		return SourceDocumentLine.builder()
+				.clientId(ClientId.ofRepoId(orderLineRecord.getAD_Client_ID()))
+				.orgId(OrgId.ofRepoIdOrAny(orderLineRecord.getAD_Org_ID()))
 				.orderLineId(OrderLineId.ofRepoIdOrNull(orderLineRecord.getC_OrderLine_ID()))
 				.soTrx(soTrx)
 				.bpartnerId(BPartnerId.ofRepoId(orderLineRecord.getC_BPartner_ID()))
