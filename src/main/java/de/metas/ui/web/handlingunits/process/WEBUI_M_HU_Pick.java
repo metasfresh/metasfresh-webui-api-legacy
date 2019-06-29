@@ -1,8 +1,14 @@
 package de.metas.ui.web.handlingunits.process;
 
+import java.math.BigDecimal;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.stream.Stream;
 
+import org.adempiere.ad.dao.IQueryBL;
 import org.adempiere.exceptions.AdempiereException;
+import org.compiere.model.I_M_AttributeInstance;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -11,6 +17,9 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
 import de.metas.handlingunits.HuId;
+import de.metas.handlingunits.model.I_M_ShipmentSchedule;
+import de.metas.handlingunits.picking.PickingCandidate;
+import de.metas.handlingunits.picking.PickingCandidatePickStatus;
 import de.metas.handlingunits.picking.PickingCandidateService;
 import de.metas.handlingunits.picking.requests.PickHURequest;
 import de.metas.inoutcandidate.api.ShipmentScheduleId;
@@ -34,8 +43,11 @@ import de.metas.ui.web.window.datatypes.LookupValuesList;
 import de.metas.ui.web.window.descriptor.DocumentLayoutElementFieldDescriptor.LookupSource;
 import de.metas.ui.web.window.model.lookup.LookupDataSourceContext;
 import de.metas.util.GuavaCollectors;
+import de.metas.util.Services;
 import lombok.Builder;
 import lombok.Value;
+
+import static org.adempiere.model.InterfaceWrapperHelper.load;
 
 /*
  * #%L
@@ -125,8 +137,85 @@ public class WEBUI_M_HU_Pick extends ViewBasedProcessTemplate implements IProces
 			lookupSource = LookupSource.lookup)
 	private LookupValuesList getShipmentScheduleValues(final LookupDataSourceContext context)
 	{
-		return createNewDefaultParametersFiller().getShipmentScheduleValues(context);
+
+		final HUEditorRow huEditorRow = getSingleHUEditorRow();
+
+		// Get all the matching shipment schedules and then filter for schedules which are not picked and match the order-line attributes.
+		return createNewDefaultParametersFiller()
+				.getShipmentScheduleValues(context)
+				.stream()
+				.filter(shipmentSchedule -> (!isShipmentSchedulePicked(shipmentSchedule.getIdAsInt())
+						&& doesHUAttribsMatchOrderLineAttribs(shipmentSchedule.getIdAsInt(), huEditorRow)))
+				.collect(LookupValuesList.collect());
+
 	}
+	
+	private HUEditorRow getSingleHUEditorRow() {
+		return streamSelectedRows()
+				.map(row -> HUEditorRow.cast(row))
+				.collect(GuavaCollectors.singleElementOrThrow(() -> new AdempiereException("only one selected row was expected")));
+	}
+
+	// if picking candidate is available for the shipment schedule, then check if it is already picked
+	private boolean isShipmentSchedulePicked(int shipmentScheduleId)
+	{
+		final Set<ShipmentScheduleId> shipmentScheduleIds = new HashSet<>();
+		shipmentScheduleIds.add(ShipmentScheduleId.ofRepoId(shipmentScheduleId));
+
+		final List<PickingCandidate> pickingCandidates = pickingCandidateService.getPickingCandidatesForShipmentSchedules(shipmentScheduleIds);
+		if(pickingCandidates.isEmpty()) {
+			return false;
+		}
+
+		PickingCandidate pickingCandidate = pickingCandidates.get(0);
+
+		return (pickingCandidate.getShipmentScheduleId()
+				.equals(ShipmentScheduleId.ofRepoId(shipmentScheduleId))
+				&& pickingCandidate.getPickStatus().equals(PickingCandidatePickStatus.PICKED));
+	}
+
+	// For the order-line item corresponding to given shipment schedule, check if its attributes match to the corresponding attributes in the selected HU item.
+	private boolean doesHUAttribsMatchOrderLineAttribs(int shipmentScheduleId, HUEditorRow huEditorRow)
+	{
+
+		final I_M_ShipmentSchedule shipmentSchedule = load(ShipmentScheduleId.ofRepoId(shipmentScheduleId), I_M_ShipmentSchedule.class);
+
+		final IQueryBL queryBL = Services.get(IQueryBL.class);
+		Set<I_M_AttributeInstance> attributeInstances = queryBL.createQueryBuilder(I_M_AttributeInstance.class)
+				.addOnlyActiveRecordsFilter()
+				.addEqualsFilter(I_M_AttributeInstance.COLUMN_M_AttributeSetInstance_ID, shipmentSchedule.getM_AttributeSetInstance_ID())
+				.create()
+				.stream()
+				.collect(ImmutableSet.toImmutableSet());
+
+		return attributeInstances.stream()
+				.allMatch(attributeInstance -> doesHUAttribsMatch(attributeInstance, huEditorRow));
+
+	}
+
+	// For the given attribute, match the corresponding attributes in the given HU item.
+	private boolean doesHUAttribsMatch(I_M_AttributeInstance attributeInstance, HUEditorRow huEditorRow)
+	{
+		if (attributeInstance.getM_Attribute().isStorageRelevant())
+		{
+			final Object attribValue = huEditorRow.getAttributes()
+					.getValue(attributeInstance.getM_Attribute().getValue());
+
+			if(attribValue != null) {
+				if (attribValue instanceof BigDecimal)
+				{
+					return ((BigDecimal)attribValue).compareTo(new BigDecimal(attributeInstance.getValue())) == 0;
+				}
+				else
+				{
+					return attribValue.equals(attributeInstance.getValue());
+				}
+			}
+			return false;
+		}
+		return true;
+	}
+	
 
 	private WEBUI_M_HU_Pick_ParametersFiller createNewDefaultParametersFiller()
 	{
