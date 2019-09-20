@@ -84,7 +84,7 @@ public class ViewsRepository implements IViewsRepository
 	private final IViewsIndexStorage defaultViewsIndexStorage = new DefaultViewsRepositoryStorage();
 
 	/**
-	 * 
+	 *
 	 * @param neededForDBAccess not used in here, but we need to cause spring to initialize it <b>before</b> this component can be initialized.
 	 *            So, if you clean this up, please make sure that the webui-API still starts up ^^.
 	 */
@@ -115,7 +115,7 @@ public class ViewsRepository implements IViewsRepository
 		final Stopwatch stopwatch = Stopwatch.createStarted();
 		try
 		{
-			final int no = DB.executeUpdateEx("TRUNCATE TABLE " + tableName, ITrx.TRXNAME_NoneNotNull);
+			final int no = DB.executeUpdateEx("DELETE FROM " + tableName, ITrx.TRXNAME_NoneNotNull);
 			logger.info("Deleted {} records(all) from table {} (Took: {})", no, tableName, stopwatch);
 		}
 		catch (final Exception ex)
