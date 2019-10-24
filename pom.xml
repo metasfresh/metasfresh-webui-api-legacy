@@ -19,7 +19,7 @@
 
 	<properties>
 
-		<spring-boot.version>1.5.3.RELEASE</spring-boot.version>
+		<spring-boot.version>2.2.0.RELEASE</spring-boot.version>
 
 		<!-- See http://www.mojohaus.org/versions-maven-plugin/examples/update-properties.html 
 			and http://stackoverflow.com/questions/3628471/maven-versions-plugin-not-picking-up-properties-from-parent -->
