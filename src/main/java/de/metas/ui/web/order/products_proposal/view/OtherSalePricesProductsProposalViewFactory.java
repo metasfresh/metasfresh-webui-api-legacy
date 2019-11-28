@@ -206,6 +206,7 @@ public class OtherSalePricesProductsProposalViewFactory extends ProductsProposal
 					.product(productLookup.findById(stats.getProductId()))
 					.price(ProductProposalPrice.builder()
 							.priceListPrice(moneyService.toAmount(lastSalesInvoice.getPrice()))
+							.invoicableQtyBasedOn(lastSalesInvoice.getInvoicableQtyBasedOn())
 							.build())
 					.lastShipmentDays(stats.getLastShipmentInDays())
 					.lastSalesInvoiceDate(lastSalesInvoice.getInvoiceDate())

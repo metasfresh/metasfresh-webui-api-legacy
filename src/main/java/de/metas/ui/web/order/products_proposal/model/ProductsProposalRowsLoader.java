@@ -34,6 +34,7 @@ import de.metas.i18n.ITranslatableString;
 import de.metas.i18n.TranslatableStrings;
 import de.metas.lang.SOTrx;
 import de.metas.money.CurrencyId;
+import de.metas.pricing.InvoicableQtyBasedOn;
 import de.metas.pricing.PriceListVersionId;
 import de.metas.pricing.ProductPriceId;
 import de.metas.pricing.service.IPriceListDAO;
@@ -221,17 +222,19 @@ public final class ProductsProposalRowsLoader
 		return ProductASIDescription.ofString(attributeSetInstanceBL.getASIDescriptionById(asiId));
 	}
 
-	private ProductProposalPrice extractProductProposalPrice(final I_M_ProductPrice record)
+	private ProductProposalPrice extractProductProposalPrice(final I_M_ProductPrice productPriceRecord)
 	{
-		final PriceListVersionId priceListVersionId = PriceListVersionId.ofRepoId(record.getM_PriceList_Version_ID());
-		final Amount priceListPrice = Amount.of(record.getPriceStd(), getCurrencyCode(priceListVersionId));
+		final PriceListVersionId priceListVersionId = PriceListVersionId.ofRepoId(productPriceRecord.getM_PriceList_Version_ID());
+		final Amount priceListPrice = Amount.of(productPriceRecord.getPriceStd(), getCurrencyCode(priceListVersionId));
+		final InvoicableQtyBasedOn invoicableQtyBasedOn = InvoicableQtyBasedOn.ofCode(productPriceRecord.getInvoicableQtyBasedOn());
 
-		final ProductId productId = ProductId.ofRepoId(record.getM_Product_ID());
+		final ProductId productId = ProductId.ofRepoId(productPriceRecord.getM_Product_ID());
 		final ProductProposalCampaignPrice campaignPrice = campaignPriceProvider.getCampaignPrice(productId).orElse(null);
 
 		return ProductProposalPrice.builder()
 				.priceListPrice(priceListPrice)
 				.campaignPrice(campaignPrice)
+				.invoicableQtyBasedOn(invoicableQtyBasedOn)
 				.build();
 	}
 

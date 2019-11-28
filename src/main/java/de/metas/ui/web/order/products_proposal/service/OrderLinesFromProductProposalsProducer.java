@@ -140,9 +140,10 @@ public final class OrderLinesFromProductProposalsProducer
 				.copyTo(orderLinePackingAware);
 
 		final ProductProposalPrice price = fromRow.getPrice();
-		// IMPORTANT: manual price is always true because we want to make sure the price the sales guy saw in proposals list is the price which gets into order line
+		// IMPORTANT: manual price is always true because we want to make sure the price the sales person saw in proposals list is the price which gets into order line
 		newOrderLine.setIsManualPrice(true);
 		newOrderLine.setPriceEntered(price.getUserEnteredPriceValue());
+		newOrderLine.setInvoicableQtyBasedOn(price.getInvoicableQtyBasedOn().getCode());
 
 		newOrderLine.setDescription(fromRow.getDescription());
 	}

@@ -8,6 +8,7 @@ import org.adempiere.exceptions.AdempiereException;
 
 import de.metas.currency.Amount;
 import de.metas.currency.CurrencyCode;
+import de.metas.pricing.InvoicableQtyBasedOn;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NonNull;
@@ -44,6 +45,10 @@ public class ProductProposalPrice
 	private final CurrencyCode currencyCode;
 
 	private final Amount priceListPrice;
+
+	@Getter
+	private final InvoicableQtyBasedOn invoicableQtyBasedOn;
+
 	private final ProductProposalCampaignPrice campaignPrice;
 
 	@Getter
@@ -55,10 +60,12 @@ public class ProductProposalPrice
 	@Builder(toBuilder = true)
 	private ProductProposalPrice(
 			@NonNull final Amount priceListPrice,
+			@NonNull final InvoicableQtyBasedOn invoicableQtyBasedOn,
 			@Nullable final ProductProposalCampaignPrice campaignPrice,
 			@Nullable final BigDecimal userEnteredPriceValue)
 	{
 		this.priceListPrice = priceListPrice;
+		this.invoicableQtyBasedOn = invoicableQtyBasedOn;
 		this.campaignPrice = campaignPrice;
 
 		//
