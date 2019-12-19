@@ -24,12 +24,14 @@ package de.metas.ui.web.inout.process;
 
 import com.google.common.collect.ImmutableList;
 import de.metas.handlingunits.IHUShipperTransportationBL;
+import de.metas.handlingunits.IHandlingUnitsBL;
 import de.metas.handlingunits.inout.IHUInOutDAO;
 import de.metas.handlingunits.model.I_M_HU;
 import de.metas.handlingunits.model.I_M_InOut;
 import de.metas.handlingunits.model.I_M_Package_HU;
 import de.metas.inout.IInOutDAO;
 import de.metas.inout.InOutId;
+import de.metas.inout.InOutLineId;
 import de.metas.shipping.api.IShipperTransportationDAO;
 import de.metas.shipping.model.I_M_ShipperTransportation;
 import de.metas.shipping.model.I_M_ShippingPackage;
@@ -69,15 +71,19 @@ public class InOutToTransportationOrderService
 		final I_M_ShipperTransportation transportationOrder = shipperTransportationDAO.retrieve(transportationOrderId);
 
 		final IHUShipperTransportationBL huShipperTransportationBL = Services.get(IHUShipperTransportationBL.class);
+
 		final ImmutableList<I_M_InOut> selectedInOuts = retrieveAllInOuts(inOutIds);
 
 		final ShipperTransportationId shipperTransportationId = ShipperTransportationId.ofRepoId(Objects.requireNonNull(transportationOrder).getM_ShipperTransportation_ID());
 		for (final I_M_InOut inOut : selectedInOuts)
 		{
-			final boolean hasNoHus = Services.get(IHUInOutDAO.class).retrieveHandlingUnits(inOut).isEmpty();
-
-			if (hasNoHus)
+			final List<I_M_HU> husToTest = retrieveAllNonAnonymousHUs(inOut);
+			if (husToTest.isEmpty())
 			{
+				if (inOut.getM_ShipperTransportation_ID() != 0)
+				{
+					continue;
+				}
 				huShipperTransportationBL.addInOutWithoutHUToShipperTransportation(shipperTransportationId, ImmutableList.of(inOut));
 				InterfaceWrapperHelper.save(inOut);
 				Loggables.addLog("M_InOut={} added to M_ShipperTransportation_ID={}", inOut.getM_InOut_ID(), shipperTransportationId);
@@ -97,6 +103,28 @@ public class InOutToTransportationOrderService
 		}
 	}
 
+	// this was made in extreme haste.
+	private static ImmutableList<I_M_HU> retrieveAllNonAnonymousHUs(final org.compiere.model.I_M_InOut inOut)
+	{
+		final IHandlingUnitsBL handlingUnitsBL = Services.get(IHandlingUnitsBL.class);
+
+		final IInOutDAO inOutDAO = Services.get(IInOutDAO.class);
+		final ImmutableList<InOutLineId> lineIds = inOutDAO.retrieveLines(inOut).stream().map(it -> InOutLineId.ofRepoId(it.getM_InOutLine_ID())).collect(GuavaCollectors.toImmutableList());
+
+		final List<I_M_HU> allHUs = Services.get(IHUInOutDAO.class).retrieveHandlingUnits(inOut);
+
+		final ImmutableList.Builder<I_M_HU> result = ImmutableList.builder();
+		for (final I_M_HU hu : allHUs)
+		{
+
+			if (!handlingUnitsBL.isAnonymousHuPickedOnTheFly(hu, lineIds))
+			{
+				result.add(hu);
+			}
+		}
+		return result.build();
+	}
+
 	private ImmutableList<I_M_InOut> retrieveAllInOuts(final ImmutableList<InOutId> inOutIds)
 	{
 		final ImmutableList.Builder<I_M_InOut> result = ImmutableList.builder();
@@ -113,7 +141,7 @@ public class InOutToTransportationOrderService
 	@NonNull
 	private static ImmutableList<I_M_HU> selectOnlyHUsWithoutShipperTransportation(final I_M_InOut inOut)
 	{
-		final List<I_M_HU> huList = Services.get(IHUInOutDAO.class).retrieveHandlingUnits(inOut);
+		final List<I_M_HU> huList = retrieveAllNonAnonymousHUs(inOut);
 		final ImmutableList<Integer> allHuIds = huList.stream().map(I_M_HU::getM_HU_ID).collect(GuavaCollectors.toImmutableList());
 
 		final ImmutableList<Integer> alreadyInHUs = findAllHUsWithAShipperTransportation(allHuIds);
