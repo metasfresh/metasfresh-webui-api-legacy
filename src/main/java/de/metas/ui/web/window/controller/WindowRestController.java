@@ -67,7 +67,6 @@ import de.metas.ui.web.window.descriptor.DocumentFieldDescriptor;
 import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
 import de.metas.ui.web.window.descriptor.factory.NewRecordDescriptorsProvider;
 import de.metas.ui.web.window.events.DocumentWebsocketPublisher;
-import de.metas.ui.web.window.exceptions.InvalidDocumentPathException;
 import de.metas.ui.web.window.model.Document;
 import de.metas.ui.web.window.model.DocumentChangeLogService;
 import de.metas.ui.web.window.model.DocumentCollection;
@@ -287,8 +286,7 @@ public class WindowRestController
 			}
 			else
 			{
-				// TODO: implement multiple included documents fetching 
-				throw new InvalidDocumentPathException(documentPath);
+				documents = rootDocument.getIncludedDocuments(documentPath.getDetailId(), documentPath.getRowIds()).toList();
 			}
 
 			return JSONDocument.ofDocumentsList(documents, jsonOpts);

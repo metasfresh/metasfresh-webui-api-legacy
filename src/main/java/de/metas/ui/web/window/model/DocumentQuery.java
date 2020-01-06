@@ -1,6 +1,7 @@
 package de.metas.ui.web.window.model;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
@@ -234,6 +235,15 @@ public final class DocumentQuery
 		{
 			recordIds = documentId != null
 					? ImmutableSet.of(documentId)
+					: ImmutableSet.of();
+
+			return this;
+		}
+
+		public Builder setRecordIds(@Nullable final Collection<DocumentId> documentIds)
+		{
+			recordIds = documentIds != null
+					? ImmutableSet.copyOf(documentIds)
 					: ImmutableSet.of();
 
 			return this;

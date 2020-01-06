@@ -409,7 +409,7 @@ public class SqlDocumentQueryBuilder
 						.map(DocumentId::toInt)
 						.collect(ImmutableSet.toImmutableSet());
 				sqlWhereClauseBuilder.appendIfNotEmpty("\n /* key */ AND ");
-				DB.buildSqlList(singleKeyColumnName, recordIdsIntSet, sqlParams.toLiveList());
+				sqlWhereClauseBuilder.append(DB.buildSqlList(singleKeyColumnName, recordIdsIntSet, sqlParams.toLiveList()));
 			}
 			// Composed primary key
 			else
@@ -445,8 +445,6 @@ public class SqlDocumentQueryBuilder
 					firstRecord = false;
 				}
 			}
-
-			sqlWhereClauseBuilder.append(")");
 		}
 
 		//
