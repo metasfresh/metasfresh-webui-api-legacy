@@ -41,6 +41,8 @@ public interface IIncludedDocumentsCollection
 	OrderedDocumentsList getDocuments(List<DocumentQueryOrderBy> orderBys);
 
 	Document getDocumentById(DocumentId documentId);
+	
+	OrderedDocumentsList getDocumentsByIds(DocumentIdsSelection documentIds);
 
 	void updateStatusFromParent();
 

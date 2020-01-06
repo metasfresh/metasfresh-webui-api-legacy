@@ -222,6 +222,7 @@ public class WindowRestController
 			@PathVariable("windowId") final String windowIdStr,
 			@PathVariable("documentId") final String documentIdStr,
 			@PathVariable("tabId") final String tabIdStr,
+			@RequestParam(name = "ids", required = false) @ApiParam("comma separated rowIds") final String rowIdsListStr,
 			@RequestParam(name = PARAM_FieldsList, required = false) @ApiParam("comma separated field names") final String fieldsListStr,
 			@RequestParam(name = PARAM_Advanced, required = false, defaultValue = PARAM_Advanced_DefaultValue) final boolean advanced,
 			@RequestParam(name = "orderBy", required = false) final String orderBysListStr)
@@ -229,7 +230,18 @@ public class WindowRestController
 		final WindowId windowId = WindowId.fromJson(windowIdStr);
 		final DocumentId documentId = DocumentId.of(documentIdStr);
 		final DetailId tabId = DetailId.fromJson(tabIdStr);
-		final DocumentPath documentPath = DocumentPath.includedDocumentPath(windowId, documentId, tabId);
+
+		final DocumentIdsSelection onlyRowIds = DocumentIdsSelection.ofCommaSeparatedString(rowIdsListStr);
+		final DocumentPath documentPath;
+		if (onlyRowIds.isEmpty() || onlyRowIds.isAll())
+		{
+			documentPath = DocumentPath.includedDocumentPath(windowId, documentId, tabId);
+		}
+		else
+		{
+			documentPath = DocumentPath.includedDocumentPath(windowId, documentId, tabId, onlyRowIds);
+		}
+
 		final List<DocumentQueryOrderBy> orderBys = DocumentQueryOrderBy.parseOrderBysList(orderBysListStr);
 		return getData(documentPath, fieldsListStr, advanced, orderBys);
 	}
@@ -275,6 +287,7 @@ public class WindowRestController
 			}
 			else
 			{
+				// TODO: implement multiple included documents fetching 
 				throw new InvalidDocumentPathException(documentPath);
 			}
 
