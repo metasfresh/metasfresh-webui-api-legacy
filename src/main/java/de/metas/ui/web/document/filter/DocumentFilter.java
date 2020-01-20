@@ -82,8 +82,10 @@ public final class DocumentFilter
 				.build();
 	}
 
+	@Getter
 	private final String filterId;
 	private final ITranslatableString caption;
+	@Getter
 	private final ImmutableList<DocumentFilterParam> parameters;
 	private final ImmutableSet<String> internalParameterNames;
 
@@ -110,22 +112,9 @@ public final class DocumentFilter
 				.toString();
 	}
 
-	public String getFilterId()
-	{
-		return filterId;
-	}
-
 	public String getCaption(@Nullable final String adLanguage)
 	{
 		return caption != null ? caption.translate(adLanguage) : null;
-	}
-
-	/**
-	 * @return never returns {@code null}
-	 */
-	public List<DocumentFilterParam> getParameters()
-	{
-		return parameters;
 	}
 
 	public boolean isInternalParameter(final String parameterName)
@@ -135,7 +124,7 @@ public final class DocumentFilter
 
 	public DocumentFilterParam getParameter(@NonNull final String parameterName)
 	{
-		return parameters
+		return getParameters()
 				.stream()
 				.filter(param -> parameterName.equals(param.getFieldName()))
 				.findFirst()
@@ -144,7 +133,7 @@ public final class DocumentFilter
 
 	public DocumentFilterParam getParameterOrNull(@NonNull final String parameterName)
 	{
-		return parameters
+		return getParameters()
 				.stream()
 				.filter(param -> parameterName.equals(param.getFieldName()))
 				.findFirst()
@@ -257,7 +246,6 @@ public final class DocumentFilter
 
 		private Builder()
 		{
-			super();
 		}
 
 		public DocumentFilter build()
