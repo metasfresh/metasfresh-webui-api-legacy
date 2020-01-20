@@ -74,17 +74,19 @@ public final class DocumentFilterDescriptor
 
 	@Getter
 	private final PanelLayoutType parametersLayoutType;
-	private final Map<String, DocumentFilterParamDescriptor> parametersByName;
+	private final ImmutableMap<String, DocumentFilterParamDescriptor> parametersByName;
 	@Getter
-	private final List<DocumentFilterParam> internalParameters;
+	private final ImmutableList<DocumentFilterParam> internalParameters;
 	@Getter
 	private final boolean autoFilter;
 
 	@Getter
-	private BarcodeScannerType barcodeScannerType;
+	private final BarcodeScannerType barcodeScannerType;
 
 	@Getter
-	private final Map<String, Object> debugProperties;
+
+	@Getter
+	private final ImmutableMap<String, Object> debugProperties;
 
 	private DocumentFilterDescriptor(final Builder builder)
 	{
@@ -163,7 +165,6 @@ public final class DocumentFilterDescriptor
 
 		private Builder()
 		{
-			super();
 		}
 
 		public DocumentFilterDescriptor build()
@@ -171,7 +172,7 @@ public final class DocumentFilterDescriptor
 			return new DocumentFilterDescriptor(this);
 		}
 
-		private Map<String, DocumentFilterParamDescriptor> buildParameters()
+		private ImmutableMap<String, DocumentFilterParamDescriptor> buildParameters()
 		{
 			final Map<String, Integer> nextParamIndexByFieldName = new HashMap<>();
 			return parameters
