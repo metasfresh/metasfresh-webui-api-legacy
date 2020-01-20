@@ -20,6 +20,7 @@ import de.metas.ui.web.document.filter.provider.DocumentFilterDescriptorsProvide
 import de.metas.ui.web.window.datatypes.json.JSONOptions;
 import de.metas.util.Check;
 import de.metas.util.GuavaCollectors;
+import lombok.NonNull;
 import lombok.Value;
 
 /*
@@ -61,7 +62,9 @@ public final class JSONDocumentFilter
 				.collect(GuavaCollectors.toImmutableList());
 	}
 
-	public static DocumentFilter unwrap(final JSONDocumentFilter jsonFilter, final DocumentFilterDescriptorsProvider filterDescriptorProvider)
+	public static DocumentFilter unwrap(
+			@NonNull final JSONDocumentFilter jsonFilter,
+			@NonNull final DocumentFilterDescriptorsProvider filterDescriptorProvider)
 	{
 		final String filterId = jsonFilter.getFilterId();
 		final DocumentFilterDescriptor filterDescriptor = filterDescriptorProvider.getByFilterIdOrNull(filterId);
@@ -94,7 +97,9 @@ public final class JSONDocumentFilter
 				.build();
 	}
 
-	private static DocumentFilter unwrapUsingDescriptor(final JSONDocumentFilter jsonFilter, final DocumentFilterDescriptor filterDescriptor)
+	private static DocumentFilter unwrapUsingDescriptor(
+			@NonNull final JSONDocumentFilter jsonFilter,
+			@NonNull final DocumentFilterDescriptor filterDescriptor)
 	{
 		final DocumentFilter.Builder filter = DocumentFilter.builder()
 				.setFilterId(jsonFilter.getFilterId());

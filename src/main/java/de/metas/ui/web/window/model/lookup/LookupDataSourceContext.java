@@ -15,6 +15,7 @@ import javax.annotation.concurrent.Immutable;
 import org.adempiere.ad.expression.exceptions.ExpressionEvaluationException;
 import org.adempiere.ad.validationRule.INamePairPredicate;
 import org.adempiere.ad.validationRule.IValidationContext;
+import org.adempiere.exceptions.AdempiereException;
 import org.compiere.util.CtxName;
 import org.compiere.util.CtxNames;
 import org.compiere.util.DB;
@@ -30,6 +31,7 @@ import com.google.common.collect.ImmutableMap;
 import de.metas.logging.LogManager;
 import de.metas.security.UserRolePermissionsKey;
 import de.metas.security.impl.AccessSqlStringExpression;
+import de.metas.ui.web.view.ViewId;
 import de.metas.ui.web.window.datatypes.LookupValue;
 import de.metas.ui.web.window.descriptor.sql.SqlLookupDescriptor;
 import de.metas.ui.web.window.model.lookup.LookupValueFilterPredicates.LookupValueFilterPredicate;
@@ -328,6 +330,18 @@ public final class LookupDataSourceContext implements Evaluatee2, IValidationCon
 	public String getIdToFilterAsString()
 	{
 		return idToFilter != null ? idToFilter.toString() : null;
+	}
+
+	public ViewId getViewId()
+	{
+		final ViewId viewId = get_ValueAsObject(PARAM_ViewId.getName());
+		if (viewId == null)
+		{
+			throw new AdempiereException("@NotFound@ ViewId: ")
+					.setParameter("context", this);
+		}
+
+		return viewId;
 	}
 
 	//
