@@ -38,18 +38,18 @@ import lombok.Value;
 @Value
 public final class SqlAndParams
 {
-	public static final SqlAndParams of(final String sql)
+	public static SqlAndParams of(final String sql)
 	{
 		final Object[] sqlParams = null;
 		return new SqlAndParams(sql, sqlParams);
 	}
 
-	public static final SqlAndParams of(final String sql, final List<Object> sqlParams)
+	public static SqlAndParams of(final CharSequence sql, final List<Object> sqlParams)
 	{
 		return new SqlAndParams(sql, sqlParams != null && !sqlParams.isEmpty() ? sqlParams.toArray() : null);
 	}
 
-	public static final SqlAndParams of(final String sql, final Object... sqlParamsArray)
+	public static final SqlAndParams of(final CharSequence sql, final Object... sqlParamsArray)
 	{
 		return new SqlAndParams(sql, sqlParamsArray);
 	}
@@ -80,9 +80,9 @@ public final class SqlAndParams
 	private final String sql;
 	private final List<Object> sqlParams;
 
-	private SqlAndParams(@NonNull final String sql, @Nullable final Object[] sqlParamsArray)
+	private SqlAndParams(@NonNull final CharSequence sql, @Nullable final Object[] sqlParamsArray)
 	{
-		this.sql = sql;
+		this.sql = sql.toString();
 		this.sqlParams = sqlParamsArray != null && sqlParamsArray.length > 0 ? Arrays.asList(sqlParamsArray) : ImmutableList.of();
 	}
 
