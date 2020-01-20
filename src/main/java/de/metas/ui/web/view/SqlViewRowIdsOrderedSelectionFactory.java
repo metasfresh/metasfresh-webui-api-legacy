@@ -125,10 +125,10 @@ public class SqlViewRowIdsOrderedSelectionFactory implements ViewRowIdsOrderedSe
 		}
 
 		return ViewRowIdsOrderedSelection.builder()
-				.setViewId(viewId)
-				.setSize(rowsCount)
-				.setOrderBys(orderBys)
-				.setQueryLimit(queryLimit)
+				.viewId(viewId)
+				.size(rowsCount)
+				.orderBys(orderBys)
+				.queryLimit(queryLimit)
 				.build();
 	}
 
@@ -163,10 +163,10 @@ public class SqlViewRowIdsOrderedSelectionFactory implements ViewRowIdsOrderedSe
 		}
 
 		return ViewRowIdsOrderedSelection.builder()
-				.setViewId(newViewId)
-				.setSize(rowsCount)
-				.setOrderBys(orderBys)
-				.setQueryLimit(fromSelection.getQueryLimit())
+				.viewId(newViewId)
+				.size(rowsCount)
+				.orderBys(orderBys)
+				.queryLimit(fromSelection.getQueryLimit())
 				.build();
 	}
 
@@ -210,9 +210,7 @@ public class SqlViewRowIdsOrderedSelectionFactory implements ViewRowIdsOrderedSe
 		// NOTE: we are querying it instead of adding how many we added to current "size" because it might be that the size is staled
 		final int size = retrieveSize(selectionId);
 
-		return selection.toBuilder()
-				.setSize(size)
-				.build();
+		return selection.withSize(size);
 	}
 
 	@Override
@@ -241,9 +239,7 @@ public class SqlViewRowIdsOrderedSelectionFactory implements ViewRowIdsOrderedSe
 		// NOTE: we are querying it instead of subtracting "deleted" from current "size" because it might be that the size is staled
 		final int size = retrieveSize(selection.getSelectionId());
 
-		return selection.toBuilder()
-				.setSize(size)
-				.build();
+		return selection.withSize(size);
 	}
 
 	private final int retrieveSize(final String selectionId)
