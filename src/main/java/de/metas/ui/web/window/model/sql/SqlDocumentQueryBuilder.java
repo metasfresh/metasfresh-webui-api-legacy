@@ -18,12 +18,11 @@ import org.compiere.util.Evaluatee;
 import org.compiere.util.Evaluatees;
 
 import com.google.common.base.MoreObjects;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
 import de.metas.security.UserRolePermissionsKey;
 import de.metas.security.impl.AccessSqlStringExpression;
-import de.metas.ui.web.document.filter.DocumentFilter;
+import de.metas.ui.web.document.filter.DocumentFilterList;
 import de.metas.ui.web.document.filter.sql.SqlDocumentFilterConverterContext;
 import de.metas.ui.web.document.filter.sql.SqlDocumentFilterConverters;
 import de.metas.ui.web.document.filter.sql.SqlParamsCollector;
@@ -42,6 +41,7 @@ import de.metas.ui.web.window.model.DocumentQueryOrderByList;
 import de.metas.ui.web.window.model.IDocumentFieldView;
 import de.metas.ui.web.window.model.lookup.LookupValueByIdSupplier;
 import de.metas.util.Check;
+import lombok.NonNull;
 
 /*
  * #%L
@@ -92,7 +92,7 @@ public class SqlDocumentQueryBuilder
 	private final SqlDocumentEntityDataBindingDescriptor entityBinding;
 
 	private transient Evaluatee _evaluationContext = null; // lazy
-	private final List<DocumentFilter> documentFilters = new ArrayList<>();
+	private DocumentFilterList documentFilters = DocumentFilterList.EMPTY;
 	private Document parentDocument;
 	private DocumentId recordId = null;
 
@@ -477,21 +477,14 @@ public class SqlDocumentQueryBuilder
 		return SqlDocumentOrderByBuilder.newInstance(entityBinding::getFieldOrderBy).buildSqlOrderBy(orderBys);
 	}
 
-	private List<DocumentFilter> getDocumentFilters()
+	private DocumentFilterList getDocumentFilters()
 	{
-		return documentFilters == null ? ImmutableList.of() : ImmutableList.copyOf(documentFilters);
+		return documentFilters;
 	}
 
-	public SqlDocumentQueryBuilder setDocumentFilters(final List<DocumentFilter> documentFilters)
+	public SqlDocumentQueryBuilder setDocumentFilters(@NonNull final DocumentFilterList documentFilters)
 	{
-		this.documentFilters.clear();
-		this.documentFilters.addAll(documentFilters);
-		return this;
-	}
-
-	public SqlDocumentQueryBuilder addDocumentFilters(final List<DocumentFilter> documentFiltersToAdd)
-	{
-		this.documentFilters.addAll(documentFiltersToAdd);
+		this.documentFilters = documentFilters;
 		return this;
 	}
 

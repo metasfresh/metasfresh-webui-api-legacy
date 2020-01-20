@@ -22,7 +22,6 @@ import de.metas.ui.web.document.filter.DocumentFilter;
 import de.metas.ui.web.document.filter.DocumentFilterDescriptor;
 import de.metas.ui.web.document.filter.DocumentFilterParam.Operator;
 import de.metas.ui.web.document.filter.DocumentFilterParamDescriptor;
-import de.metas.ui.web.document.filter.DocumentFiltersList;
 import de.metas.ui.web.document.filter.sql.SqlDocumentFilterConverter;
 import de.metas.ui.web.document.filter.sql.SqlDocumentFilterConverterContext;
 import de.metas.ui.web.document.filter.sql.SqlParamsCollector;
@@ -94,11 +93,6 @@ class HUsToPickViewFilters
 						.setWidgetType(DocumentFieldWidgetType.Text)
 						.barcodeScannerType(BarcodeScannerType.QRCode))
 				.build();
-	}
-
-	public static String getLocatorBarcode(final DocumentFiltersList filters)
-	{
-		return filters.getParamValueAsString(LocatorBarcode_FilterId, PARAM_Barcode);
 	}
 
 	public static String getLocatorBarcodeFilterSql(

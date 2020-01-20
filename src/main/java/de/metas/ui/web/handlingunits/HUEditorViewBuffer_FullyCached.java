@@ -15,11 +15,11 @@ import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Iterables;
 
 import de.metas.handlingunits.HuId;
 import de.metas.handlingunits.model.I_M_HU;
 import de.metas.ui.web.document.filter.DocumentFilter;
+import de.metas.ui.web.document.filter.DocumentFilterList;
 import de.metas.ui.web.document.filter.sql.SqlDocumentFilterConverterContext;
 import de.metas.ui.web.exceptions.EntityNotFoundException;
 import de.metas.ui.web.handlingunits.HUIdsFilterHelper.HUIdsFilterData;
@@ -65,7 +65,7 @@ class HUEditorViewBuffer_FullyCached implements HUEditorViewBuffer
 	private final ViewId viewId;
 	private final HUEditorViewRepository huEditorRepo;
 
-	private final ImmutableList<DocumentFilter> stickyFiltersWithoutHUIdsFilter;
+	private final DocumentFilterList stickyFiltersWithoutHUIdsFilter;
 
 	private final HUIdsFilterData huIdsFilterData;
 	private final ExtendedMemorizingSupplier<CopyOnWriteArraySet<HuId>> huIdsSupplier;
@@ -76,8 +76,8 @@ class HUEditorViewBuffer_FullyCached implements HUEditorViewBuffer
 	HUEditorViewBuffer_FullyCached(
 			@NonNull final ViewId viewId,
 			@NonNull final HUEditorViewRepository huEditorRepo,
-			final List<DocumentFilter> stickyFilters,
-			final List<DocumentFilter> filters,
+			final DocumentFilterList stickyFilters,
+			final DocumentFilterList filters,
 			final DocumentQueryOrderByList orderBys,
 			@NonNull final SqlDocumentFilterConverterContext context)
 	{
@@ -97,9 +97,9 @@ class HUEditorViewBuffer_FullyCached implements HUEditorViewBuffer
 
 		stickyFiltersWithoutHUIdsFilter = stickyFilters.stream()
 				.filter(HUIdsFilterHelper::isNotHUIdsFilter)
-				.collect(ImmutableList.toImmutableList());
+				.collect(DocumentFilterList.toDocumentFilterList());
 
-		final List<DocumentFilter> filtersAll = ImmutableList.copyOf(Iterables.concat(stickyFiltersWithoutHUIdsFilter, filters));
+		final DocumentFilterList filtersAll = stickyFiltersWithoutHUIdsFilter.mergeWith(filters);
 
 		huIdsSupplier = ExtendedMemorizingSupplier.of(() -> new CopyOnWriteArraySet<>(huEditorRepo.retrieveHUIdsEffective(this.huIdsFilterData, filtersAll, context)));
 
@@ -113,12 +113,10 @@ class HUEditorViewBuffer_FullyCached implements HUEditorViewBuffer
 	}
 
 	@Override
-	public List<DocumentFilter> getStickyFilters()
+	public DocumentFilterList getStickyFilters()
 	{
-		return ImmutableList.<DocumentFilter> builder()
-				.add(HUIdsFilterHelper.createFilter(huIdsFilterData.copy()))
-				.addAll(stickyFiltersWithoutHUIdsFilter)
-				.build();
+		final DocumentFilter huIdsFilter = HUIdsFilterHelper.createFilter(huIdsFilterData.copy());
+		return stickyFiltersWithoutHUIdsFilter.mergeWith(huIdsFilter);
 	}
 
 	private CopyOnWriteArraySet<HuId> getHUIds()

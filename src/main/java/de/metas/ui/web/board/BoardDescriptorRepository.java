@@ -61,6 +61,7 @@ import de.metas.ui.web.board.json.events.JSONBoardChangedEventsList;
 import de.metas.ui.web.board.json.events.JSONBoardChangedEventsList.JSONBoardChangedEventsListBuilder;
 import de.metas.ui.web.board.json.events.JSONBoardLaneChangedEvent;
 import de.metas.ui.web.document.filter.DocumentFilter;
+import de.metas.ui.web.document.filter.DocumentFilterList;
 import de.metas.ui.web.document.filter.DocumentFilterParam;
 import de.metas.ui.web.exceptions.EntityNotFoundException;
 import de.metas.ui.web.websocket.WebSocketConfig;
@@ -231,7 +232,7 @@ public class BoardDescriptorRepository
 					.setFilterId("AD_Val_Rule_" + adValRuleId)
 					.addParameter(DocumentFilterParam.ofSqlWhereClause(true, sqlWhereClause))
 					.build();
-			boardDescriptor.documentFilter(adValRuleFilter);
+			boardDescriptor.documentFilters(DocumentFilterList.of(adValRuleFilter));
 		}
 
 		//

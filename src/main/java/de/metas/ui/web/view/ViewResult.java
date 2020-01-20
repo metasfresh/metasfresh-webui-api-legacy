@@ -12,7 +12,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 
 import de.metas.i18n.ITranslatableString;
-import de.metas.ui.web.document.filter.DocumentFilter;
+import de.metas.ui.web.document.filter.DocumentFilterList;
 import de.metas.ui.web.window.datatypes.DocumentId;
 import de.metas.ui.web.window.model.DocumentQueryOrderByList;
 import de.metas.util.Check;
@@ -98,8 +98,8 @@ public final class ViewResult
 	private final int queryLimit;
 	private final boolean queryLimitHit;
 
-	private final ImmutableList<DocumentFilter> stickyFilters;
-	private final ImmutableList<DocumentFilter> filters;
+	private final DocumentFilterList stickyFilters;
+	private final DocumentFilterList filters;
 	private final DocumentQueryOrderByList orderBys;
 
 	//
@@ -133,8 +133,8 @@ public final class ViewResult
 		this.queryLimit = view.getQueryLimit();
 		this.queryLimitHit = view.isQueryLimitHit();
 
-		stickyFilters = ImmutableList.copyOf(view.getStickyFilters());
-		filters = ImmutableList.copyOf(view.getFilters());
+		stickyFilters = view.getStickyFilters();
+		filters = view.getFilters();
 		this.orderBys = orderBys;
 
 		//
@@ -163,8 +163,8 @@ public final class ViewResult
 		this.queryLimit = view.getQueryLimit();
 		this.queryLimitHit = view.isQueryLimitHit();
 
-		stickyFilters = ImmutableList.copyOf(view.getStickyFilters());
-		filters = ImmutableList.copyOf(view.getFilters());
+		stickyFilters = view.getStickyFilters();
+		filters = view.getFilters();
 		orderBys = view.getDefaultOrderBys();
 
 		//
@@ -241,12 +241,12 @@ public final class ViewResult
 		return pageLength;
 	}
 
-	public List<DocumentFilter> getStickyFilters()
+	public DocumentFilterList getStickyFilters()
 	{
 		return stickyFilters;
 	}
 
-	public List<DocumentFilter> getFilters()
+	public DocumentFilterList getFilters()
 	{
 		return filters;
 	}

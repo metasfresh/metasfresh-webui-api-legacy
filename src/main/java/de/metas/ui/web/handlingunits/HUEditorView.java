@@ -25,7 +25,7 @@ import de.metas.handlingunits.model.I_M_HU;
 import de.metas.i18n.ITranslatableString;
 import de.metas.i18n.TranslatableStrings;
 import de.metas.process.RelatedProcessDescriptor;
-import de.metas.ui.web.document.filter.DocumentFilter;
+import de.metas.ui.web.document.filter.DocumentFilterList;
 import de.metas.ui.web.document.filter.provider.DocumentFilterDescriptorsProvider;
 import de.metas.ui.web.document.filter.sql.SqlDocumentFilterConverterContext;
 import de.metas.ui.web.exceptions.EntityNotFoundException;
@@ -96,7 +96,7 @@ public class HUEditorView implements IView
 	private final HUEditorViewBuffer rowsBuffer;
 
 	private final transient DocumentFilterDescriptorsProvider filterDescriptors;
-	private final ImmutableList<DocumentFilter> filters;
+	private final DocumentFilterList filters;
 
 	private final ImmutableMap<String, Object> parameters;
 
@@ -108,7 +108,7 @@ public class HUEditorView implements IView
 		viewId = builder.getViewId();
 		referencingTableName = builder.getReferencingTableName();
 		filterDescriptors = builder.getFilterDescriptors();
-		filters = ImmutableList.copyOf(builder.getFilters());
+		filters = builder.getFilters();
 		referencingDocumentPaths = builder.getReferencingDocumentPaths();
 		actions = builder.getActions();
 		additionalRelatedProcessDescriptors = builder.getAdditionalRelatedProcessDescriptors();
@@ -268,13 +268,13 @@ public class HUEditorView implements IView
 	}
 
 	@Override
-	public List<DocumentFilter> getStickyFilters()
+	public DocumentFilterList getStickyFilters()
 	{
 		return rowsBuffer.getStickyFilters();
 	}
 
 	@Override
-	public List<DocumentFilter> getFilters()
+	public DocumentFilterList getFilters()
 	{
 		return filters;
 	}

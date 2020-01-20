@@ -6,7 +6,7 @@ import java.util.Set;
 
 import org.adempiere.exceptions.DBException;
 
-import de.metas.ui.web.document.filter.DocumentFilter;
+import de.metas.ui.web.document.filter.DocumentFilterList;
 import de.metas.ui.web.document.filter.provider.DocumentFilterDescriptorsProvider;
 import de.metas.ui.web.document.filter.sql.SqlDocumentFilterConverterContext;
 import de.metas.ui.web.window.datatypes.DocumentId;
@@ -48,7 +48,7 @@ public interface IViewDataRepository
 {
 	String getTableName();
 
-	String getSqlWhereClause(ViewId viewId, List<DocumentFilter> filters, DocumentIdsSelection rowIds, SqlOptions sqlOpts);
+	String getSqlWhereClause(ViewId viewId, DocumentFilterList filters, DocumentIdsSelection rowIds, SqlOptions sqlOpts);
 
 	Map<String, DocumentFieldWidgetType> getWidgetTypesByFieldName();
 
@@ -68,7 +68,7 @@ public interface IViewDataRepository
 
 	void scheduleDeleteSelections(Set<String> viewIds);
 
-	ViewRowIdsOrderedSelection createOrderedSelection(ViewEvaluationCtx viewEvalCtx, ViewId viewId, List<DocumentFilter> filters, boolean applySecurityRestrictions, SqlDocumentFilterConverterContext context);
+	ViewRowIdsOrderedSelection createOrderedSelection(ViewEvaluationCtx viewEvalCtx, ViewId viewId, DocumentFilterList filters, boolean applySecurityRestrictions, SqlDocumentFilterConverterContext context);
 
-	ViewRowIdsOrderedSelection removeRowIdsNotMatchingFilters(ViewRowIdsOrderedSelection selection, List<DocumentFilter> filters, Set<DocumentId> rowIds);
+	ViewRowIdsOrderedSelection removeRowIdsNotMatchingFilters(ViewRowIdsOrderedSelection selection, DocumentFilterList filters, Set<DocumentId> rowIds);
 }

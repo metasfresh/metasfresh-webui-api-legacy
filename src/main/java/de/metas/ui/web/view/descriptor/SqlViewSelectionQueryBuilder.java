@@ -25,7 +25,7 @@ import de.metas.security.impl.AccessSqlStringExpression;
 import de.metas.security.permissions.Access;
 import de.metas.ui.web.base.model.I_T_WEBUI_ViewSelection;
 import de.metas.ui.web.base.model.I_T_WEBUI_ViewSelectionLine;
-import de.metas.ui.web.document.filter.DocumentFilter;
+import de.metas.ui.web.document.filter.DocumentFilterList;
 import de.metas.ui.web.document.filter.sql.SqlDocumentFilterConverter;
 import de.metas.ui.web.document.filter.sql.SqlDocumentFilterConverterContext;
 import de.metas.ui.web.document.filter.sql.SqlDocumentFilterConverters;
@@ -197,7 +197,7 @@ public final class SqlViewSelectionQueryBuilder
 	public SqlCreateSelection buildSqlCreateSelectionFrom(
 			final ViewEvaluationCtx viewEvalCtx,
 			final ViewId newViewId,
-			final List<DocumentFilter> filters,
+			final DocumentFilterList filters,
 			final DocumentQueryOrderByList orderBys,
 			final int queryLimit,
 			final SqlDocumentFilterConverterContext context)
@@ -218,7 +218,7 @@ public final class SqlViewSelectionQueryBuilder
 	private SqlAndParams buildSqlCreateSelection_WithoutGrouping(
 			final ViewEvaluationCtx viewEvalCtx,
 			final ViewId newViewId,
-			final List<DocumentFilter> filters,
+			final DocumentFilterList filters,
 			final DocumentQueryOrderByList orderBys,
 			final int queryLimit,
 			final SqlDocumentFilterConverterContext context)
@@ -297,7 +297,7 @@ public final class SqlViewSelectionQueryBuilder
 	private SqlAndParams buildSqlCreateSelectionLines_WithGrouping(
 			final ViewEvaluationCtx viewEvalCtx,
 			final ViewId newViewId,
-			final List<DocumentFilter> filters,
+			final DocumentFilterList filters,
 			final int queryLimit,
 			final SqlDocumentFilterConverterContext context)
 	{
@@ -454,7 +454,7 @@ public final class SqlViewSelectionQueryBuilder
 	}
 
 	private IStringExpression buildSqlWhereClause(final SqlParamsCollector sqlParams,
-			@Nullable final List<DocumentFilter> filters,
+			@Nullable final DocumentFilterList filters,
 			final SqlOptions sqlOpts,
 			final SqlDocumentFilterConverterContext context)
 	{

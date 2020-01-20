@@ -2,7 +2,6 @@ package de.metas.ui.web.handlingunits;
 
 import java.util.Collection;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -13,14 +12,12 @@ import java.util.stream.Stream;
 import org.adempiere.util.lang.Mutables;
 import org.adempiere.util.lang.SynchronizedMutable;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Iterables;
 
 import de.metas.cache.CCache;
 import de.metas.handlingunits.HuId;
 import de.metas.handlingunits.model.I_M_HU;
-import de.metas.ui.web.document.filter.DocumentFilter;
+import de.metas.ui.web.document.filter.DocumentFilterList;
 import de.metas.ui.web.document.filter.sql.SqlDocumentFilterConverterContext;
 import de.metas.ui.web.exceptions.EntityNotFoundException;
 import de.metas.ui.web.handlingunits.HUIdsFilterHelper.HUIdsFilterData;
@@ -66,7 +63,7 @@ public class HUEditorViewBuffer_HighVolume implements HUEditorViewBuffer
 	private final ViewEvaluationCtx viewEvaluationCtx;
 
 	private final HUEditorViewRepository huEditorRepo;
-	private final ImmutableList<DocumentFilter> stickyFilters;
+	private final DocumentFilterList stickyFilters;
 
 	private Supplier<ViewRowIdsOrderedSelection> defaultSelectionFactory;
 	private final SynchronizedMutable<ViewRowIdsOrderedSelection> defaultSelectionRef;
@@ -77,17 +74,17 @@ public class HUEditorViewBuffer_HighVolume implements HUEditorViewBuffer
 	HUEditorViewBuffer_HighVolume(
 			final ViewId viewId,
 			final HUEditorViewRepository huEditorRepo,
-			final List<DocumentFilter> stickyFilters,
-			final List<DocumentFilter> filters,
+			@NonNull final DocumentFilterList stickyFilters,
+			@NonNull final DocumentFilterList filters,
 			final DocumentQueryOrderByList orderBys,
 			final SqlDocumentFilterConverterContext context)
 	{
 		this.viewEvaluationCtx = ViewEvaluationCtx.newInstanceFromCurrentContext();
 
 		this.huEditorRepo = huEditorRepo;
-		this.stickyFilters = ImmutableList.copyOf(stickyFilters);
+		this.stickyFilters = stickyFilters;
 
-		final List<DocumentFilter> filtersAll = ImmutableList.copyOf(Iterables.concat(stickyFilters, filters));
+		final DocumentFilterList filtersAll = stickyFilters.mergeWith(filters);
 
 		defaultSelectionFactory = () -> huEditorRepo.createSelection(getViewEvaluationCtx(), viewId, filtersAll, orderBys, context);
 		defaultSelectionRef = Mutables.synchronizedMutable(defaultSelectionFactory.get());
@@ -95,7 +92,7 @@ public class HUEditorViewBuffer_HighVolume implements HUEditorViewBuffer
 	}
 
 	@Override
-	public List<DocumentFilter> getStickyFilters()
+	public DocumentFilterList getStickyFilters()
 	{
 		return stickyFilters;
 	}
@@ -315,7 +312,7 @@ public class HUEditorViewBuffer_HighVolume implements HUEditorViewBuffer
 		return huEditorRepo.buildSqlWhereClause(getDefaultSelection(), rowIds);
 	}
 
-	public static boolean isHighVolume(final List<DocumentFilter> stickyFilters)
+	public static boolean isHighVolume(final DocumentFilterList stickyFilters)
 	{
 		final HUIdsFilterData huIdsFilterData = HUIdsFilterHelper.extractFilterDataOrNull(stickyFilters);
 		if (huIdsFilterData == null)

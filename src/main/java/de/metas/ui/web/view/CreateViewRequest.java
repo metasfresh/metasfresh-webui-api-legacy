@@ -17,7 +17,7 @@ import com.google.common.collect.ImmutableSet;
 
 import de.metas.process.RelatedProcessDescriptor;
 import de.metas.ui.web.document.filter.DocumentFilter;
-import de.metas.ui.web.document.filter.DocumentFiltersList;
+import de.metas.ui.web.document.filter.DocumentFilterList;
 import de.metas.ui.web.document.filter.json.JSONDocumentFilter;
 import de.metas.ui.web.document.filter.provider.DocumentFilterDescriptorsProvider;
 import de.metas.ui.web.process.view.ViewActionDescriptorsFactory;
@@ -30,7 +30,10 @@ import de.metas.ui.web.window.datatypes.WindowId;
 import de.metas.ui.web.window.descriptor.DocumentFieldDescriptor.Characteristic;
 import de.metas.util.Check;
 import de.metas.util.collections.CollectionUtils;
+import lombok.AccessLevel;
+import lombok.Getter;
 import lombok.NonNull;
+import lombok.ToString;
 import lombok.Value;
 
 /*
@@ -104,10 +107,10 @@ public final class CreateViewRequest
 			@NonNull final IView view,
 			@NonNull final String stickyFilterIdToDelete)
 	{
-		final List<DocumentFilter> stickyFilters = view.getStickyFilters()
+		final DocumentFilterList stickyFilters = view.getStickyFilters()
 				.stream()
 				.filter(stickyFilter -> !Objects.equals(stickyFilter.getFilterId(), stickyFilterIdToDelete))
-				.collect(ImmutableList.toImmutableList());
+				.collect(DocumentFilterList.toDocumentFilterList());
 
 		// FIXME: instead of removing all referencing document paths (to prevent creating sticky filters from them),
 		// we shall remove only those is are related to "stickyFilterIdToDelete".
@@ -141,14 +144,15 @@ public final class CreateViewRequest
 	 * <p>
 	 * Multiple sticky filters are always <code>AND</code>ed.
 	 */
-	List<DocumentFilter> stickyFilters;
+	DocumentFilterList stickyFilters;
 
 	/**
 	 * Filters can be changed by the user.
 	 * <p>
 	 * Multiple filters are always <code>AND</code>ed.
 	 */
-	DocumentFiltersList filters;
+	@Getter(AccessLevel.PRIVATE)
+	WrappedDocumentFilterList filters;
 
 	/**
 	 * This one is becoming kind of legacy.... it's a particular kind of sticky filter which filters by given IDs.<br>
@@ -191,7 +195,7 @@ public final class CreateViewRequest
 		applySecurityRestrictions = builder.isApplySecurityRestrictions();
 	}
 
-	private CreateViewRequest(@NonNull final CreateViewRequest from, @NonNull final DocumentFiltersList filters)
+	private CreateViewRequest(@NonNull final CreateViewRequest from, @NonNull final WrappedDocumentFilterList filters)
 	{
 		viewId = from.viewId;
 		viewType = from.viewType;
@@ -239,21 +243,9 @@ public final class CreateViewRequest
 		return CollectionUtils.singleElement(getFilterOnlyIds());
 	}
 
-	public List<DocumentFilter> getOrUnwrapFilters(final DocumentFilterDescriptorsProvider descriptors)
+	public DocumentFilterList getFiltersUnwrapped(final DocumentFilterDescriptorsProvider descriptors)
 	{
-		return getFilters().getOrUnwrapFilters(descriptors);
-	}
-
-	public CreateViewRequest unwrapFiltersAndCopy(final DocumentFilterDescriptorsProvider descriptors)
-	{
-		final DocumentFiltersList filters = getFilters();
-		final DocumentFiltersList filtersNew = filters.unwrapAndCopy(descriptors);
-		if (Objects.equals(filters, filtersNew))
-		{
-			return this;
-		}
-
-		return new CreateViewRequest(this, filtersNew);
+		return getFilters().unwrap(descriptors);
 	}
 
 	public void assertNoParentViewOrRow()
@@ -297,8 +289,8 @@ public final class CreateViewRequest
 		@Deprecated
 		private Set<Integer> filterOnlyIds;
 
-		private List<DocumentFilter> stickyFilters;
-		private DocumentFiltersList filters;
+		private ArrayList<DocumentFilter> stickyFilters;
+		private WrappedDocumentFilterList filters;
 		private boolean useAutoFilters;
 
 		private ViewActionDescriptorsList actions = ViewActionDescriptorsList.EMPTY;
@@ -381,9 +373,9 @@ public final class CreateViewRequest
 			return referencingDocumentPaths == null ? ImmutableSet.of() : ImmutableSet.copyOf(referencingDocumentPaths);
 		}
 
-		public Builder setStickyFilters(final List<DocumentFilter> stickyFilters)
+		public Builder setStickyFilters(final DocumentFilterList stickyFilters)
 		{
-			this.stickyFilters = stickyFilters;
+			this.stickyFilters = stickyFilters != null ? new ArrayList<>(stickyFilters.toList()) : null;
 			return this;
 		}
 
@@ -397,26 +389,26 @@ public final class CreateViewRequest
 			return this;
 		}
 
-		private List<DocumentFilter> getStickyFilters()
+		private DocumentFilterList getStickyFilters()
 		{
-			return stickyFilters == null ? ImmutableList.of() : ImmutableList.copyOf(stickyFilters);
+			return DocumentFilterList.ofList(stickyFilters);
 		}
 
 		public Builder setFiltersFromJSON(final List<JSONDocumentFilter> jsonFilters)
 		{
-			filters = DocumentFiltersList.ofJSONFilters(jsonFilters);
+			filters = WrappedDocumentFilterList.ofJSONFilters(jsonFilters);
 			return this;
 		}
 
-		public Builder setFilters(final List<DocumentFilter> filters)
+		public Builder setFilters(final DocumentFilterList filters)
 		{
-			this.filters = DocumentFiltersList.ofFilters(filters);
+			this.filters = WrappedDocumentFilterList.ofFilters(filters);
 			return this;
 		}
 
-		private DocumentFiltersList getFilters()
+		private WrappedDocumentFilterList getFilters()
 		{
-			return filters != null ? filters : DocumentFiltersList.EMPTY;
+			return filters != null ? filters : WrappedDocumentFilterList.EMPTY;
 		}
 
 		public Builder setFilterOnlyIds(final Collection<Integer> filterOnlyIds)
@@ -531,6 +523,72 @@ public final class CreateViewRequest
 		private boolean isApplySecurityRestrictions()
 		{
 			return applySecurityRestrictions;
+		}
+	}
+
+	//
+	//
+	//
+	//
+	//
+	@ToString
+	private static final class WrappedDocumentFilterList
+	{
+		public static WrappedDocumentFilterList ofFilters(final DocumentFilterList filters)
+		{
+			if (filters == null || filters.isEmpty())
+			{
+				return EMPTY;
+			}
+
+			final ImmutableList<JSONDocumentFilter> jsonFiltersEffective = null;
+			final DocumentFilterList filtersEffective = filters;
+			return new WrappedDocumentFilterList(jsonFiltersEffective, filtersEffective);
+		}
+
+		public static WrappedDocumentFilterList ofJSONFilters(final List<JSONDocumentFilter> jsonFilters)
+		{
+			if (jsonFilters == null || jsonFilters.isEmpty())
+			{
+				return EMPTY;
+			}
+
+			final ImmutableList<JSONDocumentFilter> jsonFiltersEffective = ImmutableList.copyOf(jsonFilters);
+			final DocumentFilterList filtersEffective = null;
+			return new WrappedDocumentFilterList(jsonFiltersEffective, filtersEffective);
+		}
+
+		public static final WrappedDocumentFilterList EMPTY = new WrappedDocumentFilterList();
+
+		private final ImmutableList<JSONDocumentFilter> jsonFilters;
+		private final DocumentFilterList filters;
+
+		private WrappedDocumentFilterList(final ImmutableList<JSONDocumentFilter> jsonFilters, final DocumentFilterList filters)
+		{
+			this.jsonFilters = jsonFilters;
+			this.filters = filters;
+		}
+
+		/** empty constructor */
+		private WrappedDocumentFilterList()
+		{
+			filters = DocumentFilterList.EMPTY;
+			jsonFilters = null;
+		}
+
+		public DocumentFilterList unwrap(final DocumentFilterDescriptorsProvider descriptors)
+		{
+			if (filters != null)
+			{
+				return filters;
+			}
+
+			if (jsonFilters == null || jsonFilters.isEmpty())
+			{
+				return DocumentFilterList.EMPTY;
+			}
+
+			return JSONDocumentFilter.unwrapList(jsonFilters, descriptors);
 		}
 	}
 }

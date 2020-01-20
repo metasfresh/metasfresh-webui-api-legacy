@@ -19,6 +19,7 @@ import de.metas.handlingunits.HuId;
 import de.metas.handlingunits.IHUQueryBuilder;
 import de.metas.handlingunits.IHandlingUnitsDAO;
 import de.metas.ui.web.document.filter.DocumentFilter;
+import de.metas.ui.web.document.filter.DocumentFilterList;
 import de.metas.ui.web.document.filter.DocumentFilterParam.Operator;
 import de.metas.ui.web.document.filter.sql.SqlDocumentFilterConverter;
 import de.metas.ui.web.document.filter.sql.SqlDocumentFilterConverterContext;
@@ -179,16 +180,14 @@ public final class HUIdsFilterHelper
 
 	public static final transient HUIdsSqlDocumentFilterConverter SQL_DOCUMENT_FILTER_CONVERTER = new HUIdsSqlDocumentFilterConverter();
 
-	public static final DocumentFilter findExistingOrNull(final Collection<DocumentFilter> filters)
+	public static DocumentFilter findExistingOrNull(final DocumentFilterList filters)
 	{
 		if (filters == null || filters.isEmpty())
 		{
 			return null;
 		}
 
-		return filters.stream()
-				.filter(filter -> FILTER_ID.equals(filter.getFilterId()))
-				.findFirst().orElse(null);
+		return filters.getFilterById(FILTER_ID).orElse(null);
 	}
 
 	/**
@@ -197,30 +196,30 @@ public final class HUIdsFilterHelper
 	 * 
 	 * @return
 	 */
-	public static final DocumentFilter createFilter(@NonNull final Collection<HuId> huIds)
+	public static DocumentFilter createFilter(@NonNull final Collection<HuId> huIds)
 	{
 		final HUIdsFilterData filterData = HUIdsFilterData.ofHUIds(huIds);
 		return DocumentFilter.singleParameterFilter(FILTER_ID, FILTER_PARAM_Data, Operator.EQUAL, filterData);
 	}
 
-	public static final DocumentFilter createFilter(final IHUQueryBuilder huQuery)
+	public static DocumentFilter createFilter(final IHUQueryBuilder huQuery)
 	{
 		final HUIdsFilterData filterData = HUIdsFilterData.ofHUQuery(huQuery);
 		return DocumentFilter.singleParameterFilter(FILTER_ID, FILTER_PARAM_Data, Operator.EQUAL, filterData);
 	}
 
-	public static final DocumentFilter createFilter(@NonNull final HUIdsFilterData filterData)
+	public static DocumentFilter createFilter(@NonNull final HUIdsFilterData filterData)
 	{
 		return DocumentFilter.singleParameterFilter(FILTER_ID, FILTER_PARAM_Data, Operator.EQUAL, filterData);
 	}
 
-	private static final HUIdsFilterData extractFilterData(@NonNull final DocumentFilter huIdsFilter)
+	private static HUIdsFilterData extractFilterData(@NonNull final DocumentFilter huIdsFilter)
 	{
 		Preconditions.checkArgument(!isNotHUIdsFilter(huIdsFilter), "Not a HUIds filter: %s", huIdsFilter);
 		return (HUIdsFilterData)huIdsFilter.getParameter(FILTER_PARAM_Data).getValue();
 	}
 
-	public static final HUIdsFilterData extractFilterDataOrNull(final Collection<DocumentFilter> filters)
+	public static HUIdsFilterData extractFilterDataOrNull(final DocumentFilterList filters)
 	{
 		final DocumentFilter huIdsFilter = findExistingOrNull(filters);
 		if (huIdsFilter == null)
@@ -230,7 +229,7 @@ public final class HUIdsFilterHelper
 		return HUIdsFilterHelper.extractFilterData(huIdsFilter);
 	}
 
-	public static final boolean isNotHUIdsFilter(final DocumentFilter filter)
+	public static boolean isNotHUIdsFilter(final DocumentFilter filter)
 	{
 		return !FILTER_ID.equals(filter.getFilterId());
 	}
@@ -246,8 +245,8 @@ public final class HUIdsFilterHelper
 
 		@Override
 		public String getSql(
-				@NonNull final SqlParamsCollector sqlParamsOut, 
-				@NonNull final DocumentFilter filter, 
+				@NonNull final SqlParamsCollector sqlParamsOut,
+				@NonNull final DocumentFilter filter,
 				final SqlOptions sqlOpts_NOTUSED,
 				@NonNull final SqlDocumentFilterConverterContext context)
 		{

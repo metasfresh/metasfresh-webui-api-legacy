@@ -51,7 +51,7 @@ import de.metas.logging.LogManager;
 import de.metas.order.OrderLineId;
 import de.metas.product.IProductBL;
 import de.metas.product.ProductId;
-import de.metas.ui.web.document.filter.DocumentFilter;
+import de.metas.ui.web.document.filter.DocumentFilterList;
 import de.metas.ui.web.document.filter.sql.SqlDocumentFilterConverter;
 import de.metas.ui.web.document.filter.sql.SqlDocumentFilterConverterContext;
 import de.metas.ui.web.document.filter.sql.SqlDocumentFilterConverters;
@@ -485,7 +485,7 @@ public class SqlHUEditorViewRepository implements HUEditorViewRepository
 	@Override
 	public Set<HuId> retrieveHUIdsEffective(
 			@NonNull final HUIdsFilterData huIdsFilter,
-			@NonNull final List<DocumentFilter> filters,
+			@NonNull final DocumentFilterList filters,
 			@NonNull final SqlDocumentFilterConverterContext context)
 	{
 		final ImmutableSet<HuId> onlyHUIds = extractHUIds(huIdsFilter);
@@ -608,7 +608,7 @@ public class SqlHUEditorViewRepository implements HUEditorViewRepository
 	public ViewRowIdsOrderedSelection createSelection(
 			@NonNull final ViewEvaluationCtx viewEvalCtx,
 			final ViewId viewId,
-			final List<DocumentFilter> filters,
+			final DocumentFilterList filters,
 			final DocumentQueryOrderByList orderBys,
 			final SqlDocumentFilterConverterContext context)
 	{

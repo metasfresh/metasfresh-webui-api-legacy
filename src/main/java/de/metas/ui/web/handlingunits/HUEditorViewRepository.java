@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.Set;
 
 import de.metas.handlingunits.HuId;
-import de.metas.ui.web.document.filter.DocumentFilter;
+import de.metas.ui.web.document.filter.DocumentFilterList;
 import de.metas.ui.web.document.filter.sql.SqlDocumentFilterConverterContext;
 import de.metas.ui.web.handlingunits.HUIdsFilterHelper.HUIdsFilterData;
 import de.metas.ui.web.view.ViewEvaluationCtx;
@@ -41,7 +41,7 @@ public interface HUEditorViewRepository
 {
 	void invalidateCache();
 
-	ViewRowIdsOrderedSelection createSelection(ViewEvaluationCtx viewEvalCtx, ViewId viewId, List<DocumentFilter> filters, DocumentQueryOrderByList orderBys, SqlDocumentFilterConverterContext context);
+	ViewRowIdsOrderedSelection createSelection(ViewEvaluationCtx viewEvalCtx, ViewId viewId, DocumentFilterList filters, DocumentQueryOrderByList orderBys, SqlDocumentFilterConverterContext context);
 
 	ViewRowIdsOrderedSelection createSelectionFromSelection(ViewEvaluationCtx viewEvalCtx, ViewRowIdsOrderedSelection fromSelection, DocumentQueryOrderByList orderBys);
 
@@ -58,7 +58,7 @@ public interface HUEditorViewRepository
 	HUEditorRow retrieveForHUId(HuId huId);
 
 	Set<HuId> retrieveHUIdsEffective(HUIdsFilterData huIdsFilter,
-			List<DocumentFilter> filters,
+			DocumentFilterList filters,
 			SqlDocumentFilterConverterContext context);
 
 	Page<HuId> retrieveHUIdsPage(ViewEvaluationCtx viewEvalCtx, ViewRowIdsOrderedSelection selection, int firstRow, int maxRows);

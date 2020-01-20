@@ -15,10 +15,10 @@ import de.metas.logging.LogManager;
 import de.metas.ui.web.document.filter.DocumentFilter;
 import de.metas.ui.web.document.filter.DocumentFilter.Builder;
 import de.metas.ui.web.document.filter.DocumentFilterDescriptor;
+import de.metas.ui.web.document.filter.DocumentFilterList;
 import de.metas.ui.web.document.filter.DocumentFilterParam;
 import de.metas.ui.web.document.filter.DocumentFilterParam.Operator;
 import de.metas.ui.web.document.filter.DocumentFilterParamDescriptor;
-import de.metas.ui.web.document.filter.DocumentFiltersList;
 import de.metas.ui.web.document.filter.sql.SqlDocumentFilterConverterDecorator;
 import de.metas.ui.web.document.geo_location.GeoLocationDocumentService;
 import de.metas.ui.web.view.descriptor.SqlViewBinding;
@@ -159,15 +159,8 @@ public class SqlViewFactory implements IViewFactory
 				.viewInvalidationAdvisor(sqlViewBinding.getViewInvalidationAdvisor())
 				.refreshViewOnChangeEvents(sqlViewBinding.isRefreshViewOnChangeEvents());
 
-		final DocumentFiltersList filters = request.getFilters();
-		if (filters.isJson())
-		{
-			viewBuilder.setFiltersFromJSON(filters.getJsonFilters());
-		}
-		else
-		{
-			viewBuilder.setFilters(filters.getFilters());
-		}
+		final DocumentFilterList filters = request.getFiltersUnwrapped(viewDataRepository.getViewFilterDescriptors());
+		viewBuilder.setFilters(filters);
 
 		if (request.isUseAutoFilters())
 		{

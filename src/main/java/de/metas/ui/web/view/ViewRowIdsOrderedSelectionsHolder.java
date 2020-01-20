@@ -7,11 +7,9 @@ import javax.annotation.Nullable;
 
 import org.adempiere.util.lang.ExtendedMemorizingSupplier;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Iterables;
 
-import de.metas.ui.web.document.filter.DocumentFilter;
+import de.metas.ui.web.document.filter.DocumentFilterList;
 import de.metas.ui.web.document.filter.sql.SqlDocumentFilterConverterContext;
 import de.metas.ui.web.window.model.DocumentQueryOrderByList;
 import lombok.NonNull;
@@ -43,8 +41,8 @@ final class ViewRowIdsOrderedSelectionsHolder
 	private final IViewDataRepository viewDataRepository;
 	private final ViewId viewId;
 	private final boolean applySecurityRestrictions;
-	private final ImmutableList<DocumentFilter> stickyFilters;
-	private final ImmutableList<DocumentFilter> filters;
+	private final DocumentFilterList stickyFilters;
+	private final DocumentFilterList filters;
 	private final ViewEvaluationCtx viewEvaluationCtx;
 
 	private final AtomicBoolean defaultSelectionDeleteBeforeCreate = new AtomicBoolean(false);
@@ -55,8 +53,8 @@ final class ViewRowIdsOrderedSelectionsHolder
 			@NonNull final IViewDataRepository viewDataRepository,
 			@NonNull final ViewId viewId,
 			final boolean applySecurityRestrictions,
-			@NonNull final ImmutableList<DocumentFilter> stickyFilters,
-			@NonNull final ImmutableList<DocumentFilter> filters,
+			@NonNull final DocumentFilterList stickyFilters,
+			@NonNull final DocumentFilterList filters,
 			@NonNull final ViewEvaluationCtx viewEvaluationCtx)
 	{
 		this.viewDataRepository = viewDataRepository;
@@ -79,7 +77,7 @@ final class ViewRowIdsOrderedSelectionsHolder
 		final ViewRowIdsOrderedSelection defaultSelection = viewDataRepository.createOrderedSelection(
 				viewEvaluationCtx,
 				viewId,
-				ImmutableList.copyOf(Iterables.concat(stickyFilters, filters)),
+				stickyFilters.mergeWith(filters),
 				applySecurityRestrictions,
 				SqlDocumentFilterConverterContext.EMPTY);
 

@@ -26,7 +26,7 @@ import de.metas.material.planning.pporder.IPPOrderBOMDAO;
 import de.metas.material.planning.pporder.PPOrderId;
 import de.metas.order.OrderLineId;
 import de.metas.process.RelatedProcessDescriptor;
-import de.metas.ui.web.document.filter.DocumentFilter;
+import de.metas.ui.web.document.filter.DocumentFilterList;
 import de.metas.ui.web.exceptions.EntityNotFoundException;
 import de.metas.ui.web.view.IView;
 import de.metas.ui.web.view.IViewRow;
@@ -254,15 +254,15 @@ public class PPOrderLinesView implements IView
 	}
 
 	@Override
-	public List<DocumentFilter> getStickyFilters()
+	public DocumentFilterList getStickyFilters()
 	{
-		return ImmutableList.of();
+		return DocumentFilterList.EMPTY;
 	}
 
 	@Override
-	public List<DocumentFilter> getFilters()
+	public DocumentFilterList getFilters()
 	{
-		return ImmutableList.of();
+		return DocumentFilterList.EMPTY;
 	}
 
 	@Override

@@ -8,7 +8,7 @@ import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 
 import de.metas.handlingunits.HuId;
-import de.metas.ui.web.document.filter.DocumentFilter;
+import de.metas.ui.web.document.filter.DocumentFilterList;
 import de.metas.ui.web.document.filter.sql.SqlDocumentFilterConverterContext;
 import de.metas.ui.web.exceptions.EntityNotFoundException;
 import de.metas.ui.web.handlingunits.HUEditorRow;
@@ -83,7 +83,7 @@ public class MockedHUEditorViewRepository implements HUEditorViewRepository
 	}
 
 	@Override
-	public Set<HuId> retrieveHUIdsEffective(final HUIdsFilterData huIdsFilter, final List<DocumentFilter> filters, final SqlDocumentFilterConverterContext context)
+	public Set<HuId> retrieveHUIdsEffective(final HUIdsFilterData huIdsFilter, final DocumentFilterList filters, final SqlDocumentFilterConverterContext context)
 	{
 		throw new UnsupportedOperationException("not implemented");
 	}
@@ -95,7 +95,7 @@ public class MockedHUEditorViewRepository implements HUEditorViewRepository
 	}
 
 	@Override
-	public ViewRowIdsOrderedSelection createSelection(final ViewEvaluationCtx viewEvalCtx, final ViewId viewId, final List<DocumentFilter> filters, final DocumentQueryOrderByList orderBys, final SqlDocumentFilterConverterContext context)
+	public ViewRowIdsOrderedSelection createSelection(final ViewEvaluationCtx viewEvalCtx, final ViewId viewId, final DocumentFilterList filters, final DocumentQueryOrderByList orderBys, final SqlDocumentFilterConverterContext context)
 	{
 		throw new UnsupportedOperationException("not implemented");
 	}

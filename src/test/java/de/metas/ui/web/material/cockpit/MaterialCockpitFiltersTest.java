@@ -9,10 +9,9 @@ import org.compiere.model.IQuery;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.google.common.collect.ImmutableList;
-
 import de.metas.fresh.model.I_X_MRP_ProductInfo_Detail_MV;
 import de.metas.material.cockpit.model.I_MD_Cockpit;
+import de.metas.ui.web.document.filter.DocumentFilterList;
 import de.metas.ui.web.material.cockpit.filters.MaterialCockpitFilters;
 
 /*
@@ -52,7 +51,7 @@ public class MaterialCockpitFiltersTest
 		final I_X_MRP_ProductInfo_Detail_MV record = newInstance(I_X_MRP_ProductInfo_Detail_MV.class);
 		save(record);
 
-		final IQuery<I_MD_Cockpit> query = new MaterialCockpitFilters().createQuery(ImmutableList.of());
+		final IQuery<I_MD_Cockpit> query = new MaterialCockpitFilters().createQuery(DocumentFilterList.EMPTY);
 		assertThat(query).isNotNull();
 		assertThat(query.list()).isEmpty();
 	}

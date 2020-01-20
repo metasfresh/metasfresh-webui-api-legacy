@@ -18,7 +18,7 @@ import com.google.common.collect.ImmutableSet;
 
 import de.metas.i18n.ITranslatableString;
 import de.metas.i18n.TranslatableStrings;
-import de.metas.ui.web.document.filter.DocumentFilter;
+import de.metas.ui.web.document.filter.DocumentFilterList;
 import de.metas.ui.web.document.filter.provider.DocumentFilterDescriptorsProvider;
 import de.metas.ui.web.exceptions.EntityNotFoundException;
 import de.metas.ui.web.view.IEditableView.RowEditingContext;
@@ -191,9 +191,9 @@ public abstract class AbstractCustomView<T extends IViewRow> implements IView
 	 * Just returns an empty list.
 	 */
 	@Override
-	public List<DocumentFilter> getStickyFilters()
+	public DocumentFilterList getStickyFilters()
 	{
-		return ImmutableList.of();
+		return DocumentFilterList.EMPTY;
 	}
 
 	protected final DocumentFilterDescriptorsProvider getFilterDescriptors()
@@ -205,9 +205,9 @@ public abstract class AbstractCustomView<T extends IViewRow> implements IView
 	 * Just returns an empty list.
 	 */
 	@Override
-	public List<DocumentFilter> getFilters()
+	public DocumentFilterList getFilters()
 	{
-		return ImmutableList.of();
+		return DocumentFilterList.EMPTY;
 	}
 
 	/**

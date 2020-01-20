@@ -9,11 +9,13 @@ import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 
 import de.metas.ui.web.document.filter.DocumentFilter;
 import de.metas.ui.web.document.filter.DocumentFilterDescriptor;
+import de.metas.ui.web.document.filter.DocumentFilterList;
 import de.metas.ui.web.document.filter.DocumentFilterParam;
 import de.metas.ui.web.document.filter.DocumentFilterParamDescriptor;
 import de.metas.ui.web.document.filter.provider.DocumentFilterDescriptorsProvider;
@@ -49,17 +51,17 @@ import lombok.Value;
 @Value
 public final class JSONDocumentFilter
 {
-	public static ImmutableList<DocumentFilter> unwrapList(final List<JSONDocumentFilter> jsonFilters, final DocumentFilterDescriptorsProvider filterDescriptorProvider)
+	public static DocumentFilterList unwrapList(final List<JSONDocumentFilter> jsonFilters, final DocumentFilterDescriptorsProvider filterDescriptorProvider)
 	{
 		if (jsonFilters == null || jsonFilters.isEmpty())
 		{
-			return ImmutableList.of();
+			return DocumentFilterList.EMPTY;
 		}
 		return jsonFilters
 				.stream()
 				.map(jsonFilter -> unwrap(jsonFilter, filterDescriptorProvider))
-				.filter(filter -> filter != null)
-				.collect(GuavaCollectors.toImmutableList());
+				.filter(Predicates.notNull())
+				.collect(DocumentFilterList.toDocumentFilterList());
 	}
 
 	public static DocumentFilter unwrap(
@@ -102,7 +104,8 @@ public final class JSONDocumentFilter
 			@NonNull final DocumentFilterDescriptor filterDescriptor)
 	{
 		final DocumentFilter.Builder filter = DocumentFilter.builder()
-				.setFilterId(jsonFilter.getFilterId());
+				.setFilterId(jsonFilter.getFilterId())
+				.setFacetFilter(filterDescriptor.isFacetFilter());
 
 		final Map<String, JSONDocumentFilterParam> jsonParams = Maps.uniqueIndex(jsonFilter.getParameters(), JSONDocumentFilterParam::getParameterName);
 
@@ -150,7 +153,7 @@ public final class JSONDocumentFilter
 		return filter.build();
 	}
 
-	public static List<JSONDocumentFilter> ofList(final List<DocumentFilter> filters, final JSONOptions jsonOpts)
+	public static List<JSONDocumentFilter> ofList(final DocumentFilterList filters, final JSONOptions jsonOpts)
 	{
 		if (filters == null || filters.isEmpty())
 		{

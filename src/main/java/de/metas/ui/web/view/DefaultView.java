@@ -28,7 +28,7 @@ import de.metas.i18n.ITranslatableString;
 import de.metas.i18n.TranslatableStrings;
 import de.metas.logging.LogManager;
 import de.metas.ui.web.document.filter.DocumentFilter;
-import de.metas.ui.web.document.filter.json.JSONDocumentFilter;
+import de.metas.ui.web.document.filter.DocumentFilterList;
 import de.metas.ui.web.document.filter.provider.DocumentFilterDescriptorsProvider;
 import de.metas.ui.web.exceptions.EntityNotFoundException;
 import de.metas.ui.web.view.event.ViewChangesCollector;
@@ -111,10 +111,10 @@ public final class DefaultView implements IEditableView
 	// Filters
 	private final DocumentFilterDescriptorsProvider viewFilterDescriptors;
 	/** Sticky filters (i.e. active filters which cannot be changed) */
-	private final ImmutableList<DocumentFilter> stickyFilters;
+	private final DocumentFilterList stickyFilters;
 	/** Regular filters */
-	private final ImmutableList<DocumentFilter> filters;
-	private transient ImmutableList<DocumentFilter> _allFilters;
+	private final DocumentFilterList filters;
+	private transient DocumentFilterList _allFilters;
 
 	//
 	// Misc
@@ -273,26 +273,28 @@ public final class DefaultView implements IEditableView
 	}
 
 	@Override
-	public List<DocumentFilter> getStickyFilters()
+	public DocumentFilterList getStickyFilters()
 	{
 		return stickyFilters;
 	}
 
 	@Override
-	public List<DocumentFilter> getFilters()
+	public DocumentFilterList getFilters()
 	{
 		return filters;
 	}
 
-	public List<DocumentFilter> getAllFilters()
+	public DocumentFilterDescriptorsProvider getFilterDescriptors()
 	{
-		ImmutableList<DocumentFilter> allFilters = _allFilters;
+		return viewDataRepository.getViewFilterDescriptors();
+	}
+
+	public DocumentFilterList getAllFilters()
+	{
+		DocumentFilterList allFilters = _allFilters;
 		if (allFilters == null)
 		{
-			_allFilters = allFilters = ImmutableList.<DocumentFilter> builder()
-					.addAll(getFilters())
-					.addAll(getStickyFilters())
-					.build();
+			_allFilters = allFilters = getFilters().mergeWith(getStickyFilters());
 		}
 		return allFilters;
 	}
@@ -808,7 +810,7 @@ public final class DefaultView implements IEditableView
 			return this;
 		}
 
-		public Builder addStickyFilters(final List<DocumentFilter> stickyFilters)
+		public Builder addStickyFilters(final DocumentFilterList stickyFilters)
 		{
 			if (stickyFilters == null || stickyFilters.isEmpty())
 			{
@@ -820,27 +822,21 @@ public final class DefaultView implements IEditableView
 			return this;
 		}
 
-		private ImmutableList<DocumentFilter> getStickyFilters()
+		private DocumentFilterList getStickyFilters()
 		{
-			return _stickyFiltersById == null ? ImmutableList.of() : ImmutableList.copyOf(_stickyFiltersById.values());
+			return _stickyFiltersById == null ? DocumentFilterList.EMPTY : DocumentFilterList.ofList(_stickyFiltersById.values());
 		}
 
-		public Builder setFilters(final List<DocumentFilter> filters)
+		public Builder setFilters(final DocumentFilterList filters)
 		{
 			_filtersById.clear();
 			filters.forEach(filter -> _filtersById.put(filter.getFilterId(), filter));
 			return this;
 		}
 
-		public Builder setFiltersFromJSON(final List<JSONDocumentFilter> jsonFilters)
+		private DocumentFilterList getFilters()
 		{
-			setFilters(JSONDocumentFilter.unwrapList(jsonFilters, getViewFilterDescriptors()));
-			return this;
-		}
-
-		private ImmutableList<DocumentFilter> getFilters()
-		{
-			return _filtersById.isEmpty() ? ImmutableList.of() : ImmutableList.copyOf(_filtersById.values());
+			return _filtersById.isEmpty() ? DocumentFilterList.EMPTY : DocumentFilterList.ofList(_filtersById.values());
 		}
 
 		public boolean hasFilters()

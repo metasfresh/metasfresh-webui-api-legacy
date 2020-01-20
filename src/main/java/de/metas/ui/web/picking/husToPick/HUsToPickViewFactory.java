@@ -17,6 +17,7 @@ import de.metas.process.IADProcessDAO;
 import de.metas.process.RelatedProcessDescriptor;
 import de.metas.process.RelatedProcessDescriptor.DisplayPlace;
 import de.metas.ui.web.document.filter.DocumentFilter;
+import de.metas.ui.web.document.filter.DocumentFilterList;
 import de.metas.ui.web.document.filter.provider.DocumentFilterDescriptorsProvider;
 import de.metas.ui.web.document.filter.provider.ImmutableDocumentFilterDescriptorsProvider;
 import de.metas.ui.web.document.filter.sql.SqlDocumentFilterConverter;
@@ -104,7 +105,7 @@ public class HUsToPickViewFactory extends HUEditorViewFactoryTemplate
 				.setParameter(HUsToPickViewFilters.PARAM_BestBeforePolicy, bestBeforePolicy)
 				//
 				.addStickyFilters(stickyFilter)
-				.setFilters(ImmutableList.of(HUsToPickViewFilters.createHUIdsFilter(true))) // https://github.com/metasfresh/metasfresh-webui-api/issues/1067
+				.setFilters(DocumentFilterList.of(HUsToPickViewFilters.createHUIdsFilter(true))) // https://github.com/metasfresh/metasfresh-webui-api/issues/1067
 				//
 				.build();
 	}

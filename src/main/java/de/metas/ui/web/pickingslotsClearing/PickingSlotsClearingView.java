@@ -18,7 +18,7 @@ import de.metas.i18n.ITranslatableString;
 import de.metas.i18n.TranslatableStrings;
 import de.metas.picking.model.I_M_PickingSlot;
 import de.metas.process.RelatedProcessDescriptor;
-import de.metas.ui.web.document.filter.DocumentFilter;
+import de.metas.ui.web.document.filter.DocumentFilterList;
 import de.metas.ui.web.document.filter.provider.DocumentFilterDescriptorsProvider;
 import de.metas.ui.web.exceptions.EntityNotFoundException;
 import de.metas.ui.web.handlingunits.HUEditorView;
@@ -44,7 +44,6 @@ import de.metas.ui.web.window.model.DocumentQueryOrderByList;
 import de.metas.ui.web.window.model.sql.SqlOptions;
 import lombok.Builder;
 import lombok.NonNull;
-import lombok.Singular;
 
 /*
  * #%L
@@ -79,7 +78,7 @@ public class PickingSlotsClearingView implements IView, IViewRowOverrides
 	private final PackingHUsViewsCollection packingHUsViewsCollection = new PackingHUsViewsCollection();
 
 	private final DocumentFilterDescriptorsProvider filterDescriptors;
-	private final ImmutableList<DocumentFilter> filters;
+	private final DocumentFilterList filters;
 
 	@Builder
 	private PickingSlotsClearingView(
@@ -88,7 +87,7 @@ public class PickingSlotsClearingView implements IView, IViewRowOverrides
 			@NonNull final Supplier<List<PickingSlotRow>> rows,
 			@Nullable final List<RelatedProcessDescriptor> additionalRelatedProcessDescriptors,
 			@NonNull final DocumentFilterDescriptorsProvider filterDescriptors,
-			@NonNull @Singular final ImmutableList<DocumentFilter> filters)
+			@NonNull final DocumentFilterList filters)
 	{
 		this.viewId = viewId;
 		this.description = TranslatableStrings.nullToEmpty(description);
@@ -226,13 +225,13 @@ public class PickingSlotsClearingView implements IView, IViewRowOverrides
 	}
 
 	@Override
-	public List<DocumentFilter> getStickyFilters()
+	public DocumentFilterList getStickyFilters()
 	{
-		return ImmutableList.of();
+		return DocumentFilterList.EMPTY;
 	}
 
 	@Override
-	public List<DocumentFilter> getFilters()
+	public DocumentFilterList getFilters()
 	{
 		return filters;
 	}

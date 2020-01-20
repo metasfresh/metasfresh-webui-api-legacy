@@ -1,9 +1,8 @@
 package de.metas.ui.web.view;
 
-import java.util.List;
 import java.util.Set;
 
-import de.metas.ui.web.document.filter.DocumentFilter;
+import de.metas.ui.web.document.filter.DocumentFilterList;
 import de.metas.ui.web.document.filter.sql.SqlDocumentFilterConverterContext;
 import de.metas.ui.web.window.datatypes.DocumentIdsSelection;
 import de.metas.ui.web.window.model.DocumentQueryOrderByList;
@@ -34,8 +33,8 @@ public interface ViewRowIdsOrderedSelectionFactory
 {
 	ViewRowIdsOrderedSelection createOrderedSelection(ViewEvaluationCtx viewEvalCtx,
 			ViewId viewId,
-			List<DocumentFilter> filters,
-			final DocumentQueryOrderByList orderBys, 
+			DocumentFilterList filters,
+			final DocumentQueryOrderByList orderBys,
 			final boolean applySecurityRestrictions,
 			SqlDocumentFilterConverterContext context);
 
@@ -54,7 +53,7 @@ public interface ViewRowIdsOrderedSelectionFactory
 	ViewRowIdsOrderedSelection removeRowIdsFromSelection(ViewRowIdsOrderedSelection selection, DocumentIdsSelection rowIds);
 
 	boolean containsAnyOfRowIds(ViewRowIdsOrderedSelection selection, DocumentIdsSelection rowIds);
-	
+
 	void deleteSelection(ViewId viewId);
 
 	void scheduleDeleteSelections(Set<String> viewIds);

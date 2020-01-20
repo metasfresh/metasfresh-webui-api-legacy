@@ -3,7 +3,6 @@ package de.metas.ui.web.view;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.List;
 import java.util.Set;
 
 import org.adempiere.ad.trx.api.ITrx;
@@ -19,7 +18,7 @@ import de.metas.security.IUserRolePermissions;
 import de.metas.security.IUserRolePermissionsDAO;
 import de.metas.security.UserRolePermissionsKey;
 import de.metas.security.permissions.WindowMaxQueryRecordsConstraint;
-import de.metas.ui.web.document.filter.DocumentFilter;
+import de.metas.ui.web.document.filter.DocumentFilterList;
 import de.metas.ui.web.document.filter.sql.SqlDocumentFilterConverterContext;
 import de.metas.ui.web.view.descriptor.SqlAndParams;
 import de.metas.ui.web.view.descriptor.SqlViewBinding;
@@ -86,7 +85,7 @@ public class SqlViewRowIdsOrderedSelectionFactory implements ViewRowIdsOrderedSe
 	public ViewRowIdsOrderedSelection createOrderedSelection(
 			final ViewEvaluationCtx viewEvalCtx,
 			final ViewId viewId,
-			final List<DocumentFilter> filters,
+			final DocumentFilterList filters,
 			final DocumentQueryOrderByList orderBys,
 			final boolean applySecurityRestrictions,
 			final SqlDocumentFilterConverterContext context)
@@ -134,8 +133,8 @@ public class SqlViewRowIdsOrderedSelectionFactory implements ViewRowIdsOrderedSe
 
 	@Override
 	public ViewRowIdsOrderedSelection createOrderedSelectionFromSelection(
-			final ViewEvaluationCtx viewEvalCtx, 
-			final ViewRowIdsOrderedSelection fromSelection, 
+			final ViewEvaluationCtx viewEvalCtx,
+			final ViewRowIdsOrderedSelection fromSelection,
 			final DocumentQueryOrderByList orderBys)
 	{
 		final WindowId windowId = fromSelection.getWindowId();
