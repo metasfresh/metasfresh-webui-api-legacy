@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
+import javax.annotation.Nullable;
+
 import com.google.common.collect.ImmutableList;
 
 import lombok.NonNull;
@@ -42,23 +44,25 @@ import lombok.ToString;
 @ToString
 public final class OrderedDocumentsList
 {
-	public static final OrderedDocumentsList of(final Collection<Document> documents, final List<DocumentQueryOrderBy> orderBys)
+	public static OrderedDocumentsList of(final Collection<Document> documents, final DocumentQueryOrderByList orderBys)
 	{
 		return new OrderedDocumentsList(documents, orderBys);
 	}
 
-	public static final OrderedDocumentsList newEmpty(final List<DocumentQueryOrderBy> orderBys)
+	public static OrderedDocumentsList newEmpty(final DocumentQueryOrderByList orderBys)
 	{
 		return new OrderedDocumentsList(ImmutableList.of(), orderBys);
 	}
 
 	private final List<Document> documents;
-	private final List<DocumentQueryOrderBy> orderBys;
+	private final DocumentQueryOrderByList orderBys;
 
-	private OrderedDocumentsList(final Collection<Document> documents, final List<DocumentQueryOrderBy> orderBys)
+	private OrderedDocumentsList(
+			@Nullable final Collection<Document> documents,
+			@NonNull final DocumentQueryOrderByList orderBys)
 	{
 		this.documents = documents == null ? new ArrayList<>() : new ArrayList<>(documents);
-		this.orderBys = ImmutableList.copyOf(orderBys);
+		this.orderBys = orderBys;
 	}
 
 	public List<Document> toList()
@@ -96,7 +100,7 @@ public final class OrderedDocumentsList
 		return documents.get(index);
 	}
 
-	public List<DocumentQueryOrderBy> getOrderBys()
+	public DocumentQueryOrderByList getOrderBys()
 	{
 		return orderBys;
 	}

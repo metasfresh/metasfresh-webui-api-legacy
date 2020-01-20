@@ -2,18 +2,13 @@ package de.metas.ui.web.view;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
-import java.util.Objects;
 import java.util.function.UnaryOperator;
-
-import javax.annotation.Nullable;
 
 import org.adempiere.exceptions.AdempiereException;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
-import de.metas.ui.web.window.model.DocumentQueryOrderBy;
+import de.metas.ui.web.window.model.DocumentQueryOrderByList;
 import lombok.NonNull;
 
 /*
@@ -41,7 +36,7 @@ import lombok.NonNull;
 final class ViewRowIdsOrderedSelections
 {
 	private ViewRowIdsOrderedSelection defaultSelection;
-	private final HashMap<ImmutableList<DocumentQueryOrderBy>, ViewRowIdsOrderedSelection> selectionsByOrderBys = new HashMap<>();
+	private final HashMap<DocumentQueryOrderByList, ViewRowIdsOrderedSelection> selectionsByOrderBys = new HashMap<>();
 
 	public ViewRowIdsOrderedSelections(@NonNull final ViewRowIdsOrderedSelection defaultSelection)
 	{
@@ -73,11 +68,11 @@ final class ViewRowIdsOrderedSelections
 	@FunctionalInterface
 	public interface ViewRowIdsOrderedSelectionFactory
 	{
-		ViewRowIdsOrderedSelection create(ViewRowIdsOrderedSelection defaultSelection, List<DocumentQueryOrderBy> orderBys);
+		ViewRowIdsOrderedSelection create(ViewRowIdsOrderedSelection defaultSelection, DocumentQueryOrderByList orderBys);
 	}
 
 	public synchronized ViewRowIdsOrderedSelection computeIfAbsent(
-			@Nullable final List<DocumentQueryOrderBy> orderBys,
+			@NonNull final DocumentQueryOrderByList orderBys,
 			@NonNull final ViewRowIdsOrderedSelections.ViewRowIdsOrderedSelectionFactory factory)
 	{
 		if (orderBys == null || orderBys.isEmpty())
@@ -85,14 +80,14 @@ final class ViewRowIdsOrderedSelections
 			return defaultSelection;
 		}
 
-		if (Objects.equals(defaultSelection.getOrderBys(), orderBys))
+		if (DocumentQueryOrderByList.equals(defaultSelection.getOrderBys(), orderBys))
 		{
 			return defaultSelection;
 		}
 
 		return selectionsByOrderBys.computeIfAbsent(
-				ImmutableList.copyOf(orderBys),
-				orderBysImmutable -> factory.create(defaultSelection, orderBysImmutable));
+				orderBys,
+				k -> factory.create(defaultSelection, orderBys));
 	}
 
 	public synchronized ImmutableSet<String> getSelectionIds()

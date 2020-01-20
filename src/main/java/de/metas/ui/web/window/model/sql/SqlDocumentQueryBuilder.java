@@ -38,7 +38,7 @@ import de.metas.ui.web.window.descriptor.sql.SqlDocumentFieldDataBindingDescript
 import de.metas.ui.web.window.descriptor.sql.SqlEntityFieldBinding;
 import de.metas.ui.web.window.model.Document;
 import de.metas.ui.web.window.model.DocumentQuery;
-import de.metas.ui.web.window.model.DocumentQueryOrderBy;
+import de.metas.ui.web.window.model.DocumentQueryOrderByList;
 import de.metas.ui.web.window.model.IDocumentFieldView;
 import de.metas.ui.web.window.model.lookup.LookupValueByIdSupplier;
 import de.metas.util.Check;
@@ -97,7 +97,7 @@ public class SqlDocumentQueryBuilder
 	private DocumentId recordId = null;
 
 	private boolean noSorting = false;
-	private List<DocumentQueryOrderBy> orderBys;
+	private DocumentQueryOrderByList orderBys = DocumentQueryOrderByList.EMPTY;
 
 	private int firstRow;
 	private int pageLength;
@@ -455,14 +455,14 @@ public class SqlDocumentQueryBuilder
 		return ImmutablePair.of(sqlWhereClauseBuilder.build(), Collections.unmodifiableList(sqlParams.toList()));
 	}
 
-	private List<DocumentQueryOrderBy> getOrderBysEffective()
+	private DocumentQueryOrderByList getOrderBysEffective()
 	{
 		if (noSorting)
 		{
-			return ImmutableList.of();
+			return DocumentQueryOrderByList.EMPTY;
 		}
 
-		final List<DocumentQueryOrderBy> queryOrderBys = getOrderBys();
+		final DocumentQueryOrderByList queryOrderBys = getOrderBys();
 		if (queryOrderBys != null && !queryOrderBys.isEmpty())
 		{
 			return queryOrderBys;
@@ -473,7 +473,7 @@ public class SqlDocumentQueryBuilder
 
 	private IStringExpression getSqlOrderByEffective()
 	{
-		final List<DocumentQueryOrderBy> orderBys = getOrderBysEffective();
+		final DocumentQueryOrderByList orderBys = getOrderBysEffective();
 		return SqlDocumentOrderByBuilder.newInstance(entityBinding::getFieldOrderBy).buildSqlOrderBy(orderBys);
 	}
 
@@ -544,12 +544,12 @@ public class SqlDocumentQueryBuilder
 		return noSorting;
 	}
 
-	private List<DocumentQueryOrderBy> getOrderBys()
+	private DocumentQueryOrderByList getOrderBys()
 	{
 		return orderBys;
 	}
 
-	public SqlDocumentQueryBuilder setOrderBys(final List<DocumentQueryOrderBy> orderBys)
+	public SqlDocumentQueryBuilder setOrderBys(final DocumentQueryOrderByList orderBys)
 	{
 		// Don't throw exception if noSorting is true. Just do nothing.
 		// REASON: it gives us better flexibility when this builder is handled by different methods, each of them adding stuff to it
@@ -559,7 +559,7 @@ public class SqlDocumentQueryBuilder
 			return this;
 		}
 
-		this.orderBys = orderBys;
+		this.orderBys = orderBys != null ? orderBys : DocumentQueryOrderByList.EMPTY;
 		return this;
 	}
 

@@ -21,7 +21,7 @@ import de.metas.ui.web.view.ViewId;
 import de.metas.ui.web.view.ViewRowIdsOrderedSelection;
 import de.metas.ui.web.view.descriptor.SqlViewRowIdsConverter;
 import de.metas.ui.web.window.datatypes.DocumentIdsSelection;
-import de.metas.ui.web.window.model.DocumentQueryOrderBy;
+import de.metas.ui.web.window.model.DocumentQueryOrderByList;
 import de.metas.util.collections.PagedIterator.Page;
 
 /*
@@ -95,13 +95,13 @@ public class MockedHUEditorViewRepository implements HUEditorViewRepository
 	}
 
 	@Override
-	public ViewRowIdsOrderedSelection createSelection(final ViewEvaluationCtx viewEvalCtx, final ViewId viewId, final List<DocumentFilter> filters, final List<DocumentQueryOrderBy> orderBys, final SqlDocumentFilterConverterContext context)
+	public ViewRowIdsOrderedSelection createSelection(final ViewEvaluationCtx viewEvalCtx, final ViewId viewId, final List<DocumentFilter> filters, final DocumentQueryOrderByList orderBys, final SqlDocumentFilterConverterContext context)
 	{
 		throw new UnsupportedOperationException("not implemented");
 	}
 
 	@Override
-	public ViewRowIdsOrderedSelection createSelectionFromSelection(final ViewEvaluationCtx viewEvalCtx, final ViewRowIdsOrderedSelection fromSelection, final List<DocumentQueryOrderBy> orderBys)
+	public ViewRowIdsOrderedSelection createSelectionFromSelection(final ViewEvaluationCtx viewEvalCtx, final ViewRowIdsOrderedSelection fromSelection, final DocumentQueryOrderByList orderBys)
 	{
 		throw new UnsupportedOperationException("not implemented");
 	}

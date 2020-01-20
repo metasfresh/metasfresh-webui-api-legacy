@@ -1,7 +1,5 @@
 package de.metas.ui.web.window.model;
 
-import java.util.List;
-
 import org.adempiere.ad.expression.api.LogicExpressionResult;
 
 import com.google.common.base.MoreObjects;
@@ -72,7 +70,7 @@ public final class HighVolumeReadonlyIncludedDocumentsCollection implements IInc
 	}
 
 	@Override
-	public OrderedDocumentsList getDocuments(final List<DocumentQueryOrderBy> orderBys)
+	public OrderedDocumentsList getDocuments(final DocumentQueryOrderByList orderBys)
 	{
 		return DocumentQuery.builder(entityDescriptor)
 				.setParentDocument(parentDocument)

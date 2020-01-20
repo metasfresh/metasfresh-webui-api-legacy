@@ -40,7 +40,7 @@ import de.metas.ui.web.window.datatypes.LookupValuesList;
 import de.metas.ui.web.window.datatypes.json.JSONDocumentChangedEvent;
 import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
 import de.metas.ui.web.window.model.DocumentCollection;
-import de.metas.ui.web.window.model.DocumentQueryOrderBy;
+import de.metas.ui.web.window.model.DocumentQueryOrderByList;
 import de.metas.ui.web.window.model.DocumentSaveStatus;
 import de.metas.ui.web.window.model.DocumentValidStatus;
 import de.metas.ui.web.window.model.IDocumentChangesCollector.ReasonSupplier;
@@ -252,7 +252,7 @@ public final class DefaultView implements IEditableView
 	}
 
 	@Override
-	public List<DocumentQueryOrderBy> getDefaultOrderBys()
+	public DocumentQueryOrderByList getDefaultOrderBys()
 	{
 		final ViewRowIdsOrderedSelection defaultSelection = selectionsRef.getDefaultSelection();
 		return defaultSelection.getOrderBys();
@@ -466,11 +466,11 @@ public final class DefaultView implements IEditableView
 		return viewDataRepository.retrieveById(evalCtx, getViewId(), rowId);
 	}
 
-	private ViewRowIdsOrderedSelection getOrderedSelection(final List<DocumentQueryOrderBy> orderBys)
+	private ViewRowIdsOrderedSelection getOrderedSelection(final DocumentQueryOrderByList orderBysParam)
 	{
 		return selectionsRef.computeIfAbsent(
-				orderBys,
-				(defaultSelection, orderBysImmutable) -> viewDataRepository.createOrderedSelectionFromSelection(getViewEvaluationCtx(), defaultSelection, orderBysImmutable));
+				orderBysParam,
+				(defaultSelection, orderBys) -> viewDataRepository.createOrderedSelectionFromSelection(getViewEvaluationCtx(), defaultSelection, orderBys));
 	}
 
 	@Override

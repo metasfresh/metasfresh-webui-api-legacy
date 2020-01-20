@@ -12,7 +12,7 @@ import de.metas.ui.web.view.ViewId;
 import de.metas.ui.web.view.ViewRowIdsOrderedSelection;
 import de.metas.ui.web.view.descriptor.SqlViewRowIdsConverter;
 import de.metas.ui.web.window.datatypes.DocumentIdsSelection;
-import de.metas.ui.web.window.model.DocumentQueryOrderBy;
+import de.metas.ui.web.window.model.DocumentQueryOrderByList;
 import de.metas.util.collections.PagedIterator.Page;
 
 /*
@@ -41,9 +41,9 @@ public interface HUEditorViewRepository
 {
 	void invalidateCache();
 
-	ViewRowIdsOrderedSelection createSelection(ViewEvaluationCtx viewEvalCtx, ViewId viewId, List<DocumentFilter> filters, List<DocumentQueryOrderBy> orderBys, SqlDocumentFilterConverterContext context);
+	ViewRowIdsOrderedSelection createSelection(ViewEvaluationCtx viewEvalCtx, ViewId viewId, List<DocumentFilter> filters, DocumentQueryOrderByList orderBys, SqlDocumentFilterConverterContext context);
 
-	ViewRowIdsOrderedSelection createSelectionFromSelection(ViewEvaluationCtx viewEvalCtx, ViewRowIdsOrderedSelection fromSelection, List<DocumentQueryOrderBy> orderBys);
+	ViewRowIdsOrderedSelection createSelectionFromSelection(ViewEvaluationCtx viewEvalCtx, ViewRowIdsOrderedSelection fromSelection, DocumentQueryOrderByList orderBys);
 
 	void deleteSelection(ViewRowIdsOrderedSelection selection);
 

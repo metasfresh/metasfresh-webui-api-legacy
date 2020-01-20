@@ -162,7 +162,7 @@ public class HighVolumeReadWriteIncludedDocumentsCollection implements IIncluded
 	}
 
 	@Override
-	public OrderedDocumentsList getDocuments(final List<DocumentQueryOrderBy> orderBys)
+	public OrderedDocumentsList getDocuments(final DocumentQueryOrderByList orderBys)
 	{
 		final Map<DocumentId, Document> documentsWithChanges = new LinkedHashMap<>(getInnerDocumentsWithChanges());
 		final OrderedDocumentsList documents = DocumentQuery.builder(entityDescriptor)

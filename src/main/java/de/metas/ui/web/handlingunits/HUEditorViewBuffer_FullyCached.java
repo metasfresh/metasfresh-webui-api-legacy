@@ -27,7 +27,7 @@ import de.metas.ui.web.view.ViewId;
 import de.metas.ui.web.view.ViewRowsOrderBy;
 import de.metas.ui.web.window.datatypes.DocumentId;
 import de.metas.ui.web.window.datatypes.DocumentIdsSelection;
-import de.metas.ui.web.window.model.DocumentQueryOrderBy;
+import de.metas.ui.web.window.model.DocumentQueryOrderByList;
 import lombok.NonNull;
 
 /*
@@ -71,14 +71,14 @@ class HUEditorViewBuffer_FullyCached implements HUEditorViewBuffer
 	private final ExtendedMemorizingSupplier<CopyOnWriteArraySet<HuId>> huIdsSupplier;
 	private final ExtendedMemorizingSupplier<IndexedHUEditorRows> rowsSupplier = ExtendedMemorizingSupplier.of(() -> retrieveHUEditorRows());
 
-	private final ImmutableList<DocumentQueryOrderBy> defaultOrderBys;
+	private final DocumentQueryOrderByList defaultOrderBys;
 
 	HUEditorViewBuffer_FullyCached(
 			@NonNull final ViewId viewId,
 			@NonNull final HUEditorViewRepository huEditorRepo,
 			final List<DocumentFilter> stickyFilters,
 			final List<DocumentFilter> filters,
-			final List<DocumentQueryOrderBy> orderBys,
+			final DocumentQueryOrderByList orderBys,
 			@NonNull final SqlDocumentFilterConverterContext context)
 	{
 		this.viewId = viewId;
@@ -103,7 +103,7 @@ class HUEditorViewBuffer_FullyCached implements HUEditorViewBuffer
 
 		huIdsSupplier = ExtendedMemorizingSupplier.of(() -> new CopyOnWriteArraySet<>(huEditorRepo.retrieveHUIdsEffective(this.huIdsFilterData, filtersAll, context)));
 
-		this.defaultOrderBys = orderBys != null ? ImmutableList.copyOf(orderBys) : ImmutableList.of();
+		this.defaultOrderBys = orderBys != null ? orderBys : DocumentQueryOrderByList.EMPTY;
 	}
 
 	@Override

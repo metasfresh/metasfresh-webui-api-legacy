@@ -72,7 +72,7 @@ import de.metas.ui.web.window.model.Document;
 import de.metas.ui.web.window.model.DocumentChangeLogService;
 import de.metas.ui.web.window.model.DocumentCollection;
 import de.metas.ui.web.window.model.DocumentCollection.DocumentPrint;
-import de.metas.ui.web.window.model.DocumentQueryOrderBy;
+import de.metas.ui.web.window.model.DocumentQueryOrderByList;
 import de.metas.ui.web.window.model.DocumentReference;
 import de.metas.ui.web.window.model.DocumentReferencesService;
 import de.metas.ui.web.window.model.IDocumentChangesCollector;
@@ -213,8 +213,7 @@ public class WindowRestController
 	{
 		final WindowId windowId = WindowId.fromJson(windowIdStr);
 		final DocumentPath documentPath = DocumentPath.rootDocumentPath(windowId, documentIdStr);
-		final List<DocumentQueryOrderBy> orderBys = ImmutableList.of();
-		return getData(documentPath, fieldsListStr, advanced, orderBys);
+		return getData(documentPath, fieldsListStr, advanced, DocumentQueryOrderByList.EMPTY);
 	}
 
 	@GetMapping("/{windowId}/{documentId}/{tabId}")
@@ -230,7 +229,7 @@ public class WindowRestController
 		final DocumentId documentId = DocumentId.of(documentIdStr);
 		final DetailId tabId = DetailId.fromJson(tabIdStr);
 		final DocumentPath documentPath = DocumentPath.includedDocumentPath(windowId, documentId, tabId);
-		final List<DocumentQueryOrderBy> orderBys = DocumentQueryOrderBy.parseOrderBysList(orderBysListStr);
+		final DocumentQueryOrderByList orderBys = DocumentQueryOrderByList.parse(orderBysListStr);
 		return getData(documentPath, fieldsListStr, advanced, orderBys);
 	}
 
@@ -246,11 +245,10 @@ public class WindowRestController
 	{
 		final WindowId windowId = WindowId.fromJson(windowIdStr);
 		final DocumentPath documentPath = DocumentPath.includedDocumentPath(windowId, documentIdStr, tabIdStr, rowIdStr);
-		final List<DocumentQueryOrderBy> orderBys = ImmutableList.of();
-		return getData(documentPath, fieldsListStr, advanced, orderBys);
+		return getData(documentPath, fieldsListStr, advanced, DocumentQueryOrderByList.EMPTY);
 	}
 
-	private List<JSONDocument> getData(final DocumentPath documentPath, final String fieldsListStr, final boolean advanced, final List<DocumentQueryOrderBy> orderBys)
+	private List<JSONDocument> getData(final DocumentPath documentPath, final String fieldsListStr, final boolean advanced, final DocumentQueryOrderByList orderBys)
 	{
 		userSession.assertLoggedIn();
 

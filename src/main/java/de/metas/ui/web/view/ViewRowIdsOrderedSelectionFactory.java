@@ -6,7 +6,7 @@ import java.util.Set;
 import de.metas.ui.web.document.filter.DocumentFilter;
 import de.metas.ui.web.document.filter.sql.SqlDocumentFilterConverterContext;
 import de.metas.ui.web.window.datatypes.DocumentIdsSelection;
-import de.metas.ui.web.window.model.DocumentQueryOrderBy;
+import de.metas.ui.web.window.model.DocumentQueryOrderByList;
 
 /*
  * #%L
@@ -35,14 +35,17 @@ public interface ViewRowIdsOrderedSelectionFactory
 	ViewRowIdsOrderedSelection createOrderedSelection(ViewEvaluationCtx viewEvalCtx,
 			ViewId viewId,
 			List<DocumentFilter> filters,
-			final List<DocumentQueryOrderBy> orderBys, 
+			final DocumentQueryOrderByList orderBys, 
 			final boolean applySecurityRestrictions,
 			SqlDocumentFilterConverterContext context);
 
 	/**
 	 * @return a new {@link ViewRowIdsOrderedSelection} from a given <code>fromSelection</code> ordered by <code>orderBys</code>
 	 */
-	ViewRowIdsOrderedSelection createOrderedSelectionFromSelection(ViewEvaluationCtx viewEvalCtx, ViewRowIdsOrderedSelection fromSelection, List<DocumentQueryOrderBy> orderBys);
+	ViewRowIdsOrderedSelection createOrderedSelectionFromSelection(
+			ViewEvaluationCtx viewEvalCtx,
+			ViewRowIdsOrderedSelection fromSelection,
+			DocumentQueryOrderByList orderBys);
 
 	String getSqlWhereClause(ViewId viewId, DocumentIdsSelection rowIds);
 

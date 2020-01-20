@@ -19,8 +19,6 @@ import org.adempiere.exceptions.AdempiereException;
 import org.compiere.util.DB;
 import org.slf4j.Logger;
 
-import com.google.common.collect.ImmutableList;
-
 import de.metas.logging.LogManager;
 import de.metas.security.IUserRolePermissions;
 import de.metas.security.impl.AccessSqlStringExpression;
@@ -37,6 +35,7 @@ import de.metas.ui.web.view.ViewId;
 import de.metas.ui.web.window.datatypes.DocumentId;
 import de.metas.ui.web.window.datatypes.DocumentIdsSelection;
 import de.metas.ui.web.window.model.DocumentQueryOrderBy;
+import de.metas.ui.web.window.model.DocumentQueryOrderByList;
 import de.metas.ui.web.window.model.sql.SqlDocumentOrderByBuilder;
 import de.metas.ui.web.window.model.sql.SqlDocumentOrderByBuilder.SqlOrderByBindings;
 import de.metas.ui.web.window.model.sql.SqlOptions;
@@ -199,7 +198,7 @@ public final class SqlViewSelectionQueryBuilder
 			final ViewEvaluationCtx viewEvalCtx,
 			final ViewId newViewId,
 			final List<DocumentFilter> filters,
-			final List<DocumentQueryOrderBy> orderBys,
+			final DocumentQueryOrderByList orderBys,
 			final int queryLimit,
 			final SqlDocumentFilterConverterContext context)
 	{
@@ -220,7 +219,7 @@ public final class SqlViewSelectionQueryBuilder
 			final ViewEvaluationCtx viewEvalCtx,
 			final ViewId newViewId,
 			final List<DocumentFilter> filters,
-			final List<DocumentQueryOrderBy> orderBys,
+			final DocumentQueryOrderByList orderBys,
 			final int queryLimit,
 			final SqlDocumentFilterConverterContext context)
 	{
@@ -380,7 +379,10 @@ public final class SqlViewSelectionQueryBuilder
 		return SqlAndParams.of(sql, sqlParams);
 	}
 
-	public SqlAndParams buildSqlCreateSelectionFromSelectionLines(final ViewEvaluationCtx viewEvalCtx, final ViewId newViewId, final List<DocumentQueryOrderBy> orderBys)
+	public SqlAndParams buildSqlCreateSelectionFromSelectionLines(
+			final ViewEvaluationCtx viewEvalCtx,
+			final ViewId newViewId,
+			final DocumentQueryOrderByList orderBys)
 	{
 		final String lineTableName = getTableName();
 		final String lineTableAlias = getTableAlias();
@@ -407,10 +409,10 @@ public final class SqlViewSelectionQueryBuilder
 			}
 		};
 
-		final List<DocumentQueryOrderBy> orderBysEffective = orderBys.stream()
+		final DocumentQueryOrderByList orderBysEffective = orderBys.stream()
 				.flatMap(this::flatMapEffectiveFieldNames)
 				.filter(orderBy -> keyColumnNamesMap.isKeyPartFieldName(orderBy.getFieldName()) || isGroupBy(orderBy.getFieldName()) || isAggregated(orderBy.getFieldName()))
-				.collect(ImmutableList.toImmutableList());
+				.collect(DocumentQueryOrderByList.toDocumentQueryOrderByList());
 
 		final IStringExpression sqlOrderByExpr = SqlDocumentOrderByBuilder.newInstance(sqlOrderByBindings).buildSqlOrderBy(orderBysEffective);
 		final String sqlOrderBy;
@@ -496,14 +498,14 @@ public final class SqlViewSelectionQueryBuilder
 	public SqlAndParams buildSqlCreateSelectionFromSelection(final ViewEvaluationCtx viewEvalCtx,
 			final ViewId newViewId,
 			final String fromSelectionId,
-			final List<DocumentQueryOrderBy> orderBys)
+			final DocumentQueryOrderByList orderBys)
 	{
 		final String sqlTableAlias = getTableAlias();
 		final SqlViewKeyColumnNamesMap keyColumnNamesMap = getSqlViewKeyColumnNamesMap();
 
-		final List<DocumentQueryOrderBy> orderBysEffective = orderBys.stream()
+		final DocumentQueryOrderByList orderBysEffective = orderBys.stream()
 				.flatMap(this::flatMapEffectiveFieldNames)
-				.collect(ImmutableList.toImmutableList());
+				.collect(DocumentQueryOrderByList.toDocumentQueryOrderByList());
 		final String sqlOrderBys = replaceTableNameWithTableAlias(
 				SqlDocumentOrderByBuilder.newInstance(fieldName -> ConstantStringExpression.of(sqlTableAlias + "." + fieldName))
 						.buildSqlOrderBy(orderBysEffective)
@@ -594,7 +596,8 @@ public final class SqlViewSelectionQueryBuilder
 	 *	SELECT ... FROM T_WEBUI_ViewSelectionLine sl INNER JOIN ourTable on (Line_ID)  WHERE sel.UUID=[fromUUID]
 	 *         </pre>
 	 */
-	public SqlAndParams buildSqlCreateSelectionLinesFromSelectionLines(final ViewEvaluationCtx viewEvalCtx,
+	public SqlAndParams buildSqlCreateSelectionLinesFromSelectionLines(
+			final ViewEvaluationCtx viewEvalCtx,
 			final ViewId newViewId,
 			final String fromSelectionId)
 	{

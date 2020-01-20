@@ -23,7 +23,7 @@ import de.metas.ui.web.window.datatypes.DocumentId;
 import de.metas.ui.web.window.datatypes.DocumentIdsSelection;
 import de.metas.ui.web.window.datatypes.DocumentPath;
 import de.metas.ui.web.window.datatypes.LookupValuesList;
-import de.metas.ui.web.window.model.DocumentQueryOrderBy;
+import de.metas.ui.web.window.model.DocumentQueryOrderByList;
 import de.metas.ui.web.window.model.sql.SqlOptions;
 import lombok.NonNull;
 
@@ -167,7 +167,7 @@ public interface IView
 	 */
 	List<DocumentFilter> getFilters();
 
-	List<DocumentQueryOrderBy> getDefaultOrderBys();
+	DocumentQueryOrderByList getDefaultOrderBys();
 
 	default TableRecordReference getTableRecordReferenceOrNull(@NonNull final DocumentId rowId)
 	{

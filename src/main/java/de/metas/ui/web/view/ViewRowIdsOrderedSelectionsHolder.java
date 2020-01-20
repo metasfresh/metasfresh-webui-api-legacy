@@ -1,6 +1,5 @@
 package de.metas.ui.web.view;
 
-import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.UnaryOperator;
 
@@ -14,7 +13,7 @@ import com.google.common.collect.Iterables;
 
 import de.metas.ui.web.document.filter.DocumentFilter;
 import de.metas.ui.web.document.filter.sql.SqlDocumentFilterConverterContext;
-import de.metas.ui.web.window.model.DocumentQueryOrderBy;
+import de.metas.ui.web.window.model.DocumentQueryOrderByList;
 import lombok.NonNull;
 
 /*
@@ -111,7 +110,7 @@ final class ViewRowIdsOrderedSelectionsHolder
 	}
 
 	public ViewRowIdsOrderedSelection computeIfAbsent(
-			@Nullable final List<DocumentQueryOrderBy> orderBys,
+			@Nullable final DocumentQueryOrderByList orderBys,
 			@NonNull final ViewRowIdsOrderedSelections.ViewRowIdsOrderedSelectionFactory factory)
 	{
 		return selectionsRef.get().computeIfAbsent(orderBys, factory);

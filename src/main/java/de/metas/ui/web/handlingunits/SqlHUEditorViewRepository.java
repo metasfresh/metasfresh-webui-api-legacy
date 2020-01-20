@@ -73,7 +73,7 @@ import de.metas.ui.web.window.datatypes.DocumentId;
 import de.metas.ui.web.window.datatypes.DocumentIdsSelection;
 import de.metas.ui.web.window.datatypes.WindowId;
 import de.metas.ui.web.window.datatypes.json.JSONLookupValue;
-import de.metas.ui.web.window.model.DocumentQueryOrderBy;
+import de.metas.ui.web.window.model.DocumentQueryOrderByList;
 import de.metas.ui.web.window.model.sql.SqlOptions;
 import de.metas.util.Check;
 import de.metas.util.GuavaCollectors;
@@ -609,7 +609,7 @@ public class SqlHUEditorViewRepository implements HUEditorViewRepository
 			@NonNull final ViewEvaluationCtx viewEvalCtx,
 			final ViewId viewId,
 			final List<DocumentFilter> filters,
-			final List<DocumentQueryOrderBy> orderBys,
+			final DocumentQueryOrderByList orderBys,
 			final SqlDocumentFilterConverterContext context)
 	{
 		final boolean applySecurityRestrictions = true;
@@ -620,7 +620,7 @@ public class SqlHUEditorViewRepository implements HUEditorViewRepository
 	public ViewRowIdsOrderedSelection createSelectionFromSelection(
 			@NonNull final ViewEvaluationCtx viewEvalCtx,
 			final ViewRowIdsOrderedSelection fromSelection,
-			final List<DocumentQueryOrderBy> orderBys)
+			final DocumentQueryOrderByList orderBys)
 	{
 		return viewSelectionFactory.createOrderedSelectionFromSelection(viewEvalCtx, fromSelection, orderBys);
 	}

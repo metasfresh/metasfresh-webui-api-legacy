@@ -40,7 +40,7 @@ import de.metas.ui.web.window.datatypes.DocumentId;
 import de.metas.ui.web.window.datatypes.DocumentIdsSelection;
 import de.metas.ui.web.window.datatypes.DocumentPath;
 import de.metas.ui.web.window.datatypes.LookupValuesList;
-import de.metas.ui.web.window.model.DocumentQueryOrderBy;
+import de.metas.ui.web.window.model.DocumentQueryOrderByList;
 import de.metas.ui.web.window.model.sql.SqlOptions;
 import lombok.Builder;
 import lombok.NonNull;
@@ -175,8 +175,8 @@ public class PickingSlotsClearingView implements IView, IViewRowOverrides
 
 	@Override
 	public ViewResult getPage(
-			final int firstRow, 
-			final int pageLength, 
+			final int firstRow,
+			final int pageLength,
 			@NonNull final ViewRowsOrderBy orderBys)
 	{
 		final List<PickingSlotRow> pageRows = rows.getPage(firstRow, pageLength);
@@ -238,9 +238,9 @@ public class PickingSlotsClearingView implements IView, IViewRowOverrides
 	}
 
 	@Override
-	public List<DocumentQueryOrderBy> getDefaultOrderBys()
+	public DocumentQueryOrderByList getDefaultOrderBys()
 	{
-		return ImmutableList.of();
+		return DocumentQueryOrderByList.EMPTY;
 	}
 
 	@Override

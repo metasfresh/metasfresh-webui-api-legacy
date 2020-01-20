@@ -46,12 +46,12 @@ import de.metas.util.Check;
  */
 public final class DocumentQuery
 {
-	public static final Builder builder(final DocumentEntityDescriptor entityDescriptor)
+	public static Builder builder(final DocumentEntityDescriptor entityDescriptor)
 	{
 		return new Builder(entityDescriptor);
 	}
 
-	public static final Builder ofRecordId(final DocumentEntityDescriptor entityDescriptor, final DocumentId recordId)
+	public static Builder ofRecordId(final DocumentEntityDescriptor entityDescriptor, final DocumentId recordId)
 	{
 		Check.assumeNotNull(recordId, "Parameter recordId is not null");
 		return builder(entityDescriptor)
@@ -66,7 +66,7 @@ public final class DocumentQuery
 	private final List<DocumentFilter> filters;
 
 	private final boolean noSorting;
-	private final List<DocumentQueryOrderBy> orderBys;
+	private final DocumentQueryOrderByList orderBys;
 
 	private final int firstRow;
 	private final int pageLength;
@@ -141,7 +141,7 @@ public final class DocumentQuery
 		return noSorting;
 	}
 
-	public List<DocumentQueryOrderBy> getOrderBys()
+	public DocumentQueryOrderByList getOrderBys()
 	{
 		return orderBys;
 	}
@@ -169,7 +169,7 @@ public final class DocumentQuery
 		public List<DocumentFilter> filters = null;
 
 		private boolean _noSorting = false; // always false by default
-		public List<DocumentQueryOrderBy> _orderBys = null;
+		public ArrayList<DocumentQueryOrderBy> _orderBys = null;
 
 		private int firstRow = -1;
 		private int pageLength = -1;
@@ -213,14 +213,13 @@ public final class DocumentQuery
 			final DocumentsRepository documentsRepository = getDocumentsRepository();
 			return documentsRepository.retrieveParentDocumentId(parentEntityDescriptor, query);
 		}
-		
+
 		public int retrieveLastLineNo()
 		{
 			final DocumentQuery query = build();
 			final DocumentsRepository documentsRepository = getDocumentsRepository();
 			return documentsRepository.retrieveLastLineNo(query);
 		}
-
 
 		private DocumentsRepository getDocumentsRepository()
 		{
@@ -290,31 +289,25 @@ public final class DocumentQuery
 			_orderBys.add(orderBy);
 			return this;
 		}
-		
-		public Builder setOrderBys(final List<DocumentQueryOrderBy> orderBys)
+
+		public Builder setOrderBys(final DocumentQueryOrderByList orderBys)
 		{
-			if(orderBys == null || orderBys.isEmpty())
+			if (orderBys == null || orderBys.isEmpty())
 			{
 				_orderBys = null;
 			}
 			else
 			{
-				_orderBys = new ArrayList<>(orderBys);
+				_orderBys = new ArrayList<>(orderBys.toList());
 			}
 			return this;
 		}
 
-		private List<DocumentQueryOrderBy> getOrderBysEffective()
+		private DocumentQueryOrderByList getOrderBysEffective()
 		{
-			if (_noSorting)
-			{
-				return ImmutableList.of();
-			}
-			if (_orderBys == null || _orderBys.isEmpty())
-			{
-				return ImmutableList.of();
-			}
-			return ImmutableList.copyOf(_orderBys);
+			return _noSorting
+					? DocumentQueryOrderByList.EMPTY
+					: DocumentQueryOrderByList.ofList(_orderBys);
 		}
 
 		public Builder setFirstRow(final int firstRow)

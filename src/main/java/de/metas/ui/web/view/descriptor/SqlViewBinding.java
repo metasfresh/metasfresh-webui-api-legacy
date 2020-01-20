@@ -36,6 +36,7 @@ import de.metas.ui.web.view.descriptor.SqlViewRowFieldBinding.SqlViewRowFieldLoa
 import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
 import de.metas.ui.web.window.descriptor.sql.SqlEntityBinding;
 import de.metas.ui.web.window.model.DocumentQueryOrderBy;
+import de.metas.ui.web.window.model.DocumentQueryOrderByList;
 import de.metas.util.Check;
 import de.metas.util.GuavaCollectors;
 import lombok.Getter;
@@ -79,7 +80,7 @@ public class SqlViewBinding implements SqlEntityBinding
 	private final List<SqlViewRowFieldLoader> rowFieldLoaders;
 	private final ViewRowCustomizer rowCustomizer;
 
-	private final ImmutableList<DocumentQueryOrderBy> defaultOrderBys;
+	private final DocumentQueryOrderByList defaultOrderBys;
 	private final OrderByFieldNameAliasMap orderByFieldNameAliasMap;
 
 	private final DocumentFilterDescriptorsProvider filterDescriptors;
@@ -144,7 +145,7 @@ public class SqlViewBinding implements SqlEntityBinding
 		this.rowCustomizer = builder.getRowCustomizer();
 
 		orderByFieldNameAliasMap = builder.buildOrderByFieldNameAliasMap();
-		defaultOrderBys = ImmutableList.copyOf(builder.getDefaultOrderBys());
+		defaultOrderBys = builder.getDefaultOrderBys();
 
 		filterDescriptors = builder.getViewFilterDescriptors();
 		filterConverters = builder.buildViewFilterConverters();
@@ -253,7 +254,7 @@ public class SqlViewBinding implements SqlEntityBinding
 		return rowIdsConverter;
 	}
 
-	public ImmutableList<DocumentQueryOrderBy> getDefaultOrderBys()
+	public DocumentQueryOrderByList getDefaultOrderBys()
 	{
 		return defaultOrderBys;
 	}
@@ -487,7 +488,7 @@ public class SqlViewBinding implements SqlEntityBinding
 			return _fieldsByFieldName;
 		}
 
-		public final Builder field(@NonNull final SqlViewRowFieldBinding field)
+		public Builder field(@NonNull final SqlViewRowFieldBinding field)
 		{
 			_fieldsByFieldName.put(field.getFieldName(), field);
 			return this;
@@ -499,9 +500,9 @@ public class SqlViewBinding implements SqlEntityBinding
 			return this;
 		}
 
-		public Builder defaultOrderBys(final List<DocumentQueryOrderBy> defaultOrderBys)
+		public Builder defaultOrderBys(final DocumentQueryOrderByList defaultOrderBys)
 		{
-			this.defaultOrderBys = defaultOrderBys != null ? new ArrayList<>(defaultOrderBys) : null;
+			this.defaultOrderBys = defaultOrderBys != null ? new ArrayList<>(defaultOrderBys.toList()) : null;
 			return this;
 		}
 
@@ -515,9 +516,9 @@ public class SqlViewBinding implements SqlEntityBinding
 			return this;
 		}
 
-		private List<DocumentQueryOrderBy> getDefaultOrderBys()
+		private DocumentQueryOrderByList getDefaultOrderBys()
 		{
-			return defaultOrderBys == null ? ImmutableList.of() : defaultOrderBys;
+			return DocumentQueryOrderByList.ofList(defaultOrderBys);
 		}
 
 		private OrderByFieldNameAliasMap buildOrderByFieldNameAliasMap()

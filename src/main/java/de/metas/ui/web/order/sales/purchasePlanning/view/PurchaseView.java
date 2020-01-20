@@ -26,7 +26,7 @@ import de.metas.ui.web.window.datatypes.DocumentIdsSelection;
 import de.metas.ui.web.window.datatypes.DocumentPath;
 import de.metas.ui.web.window.datatypes.LookupValuesList;
 import de.metas.ui.web.window.datatypes.json.JSONDocumentChangedEvent;
-import de.metas.ui.web.window.model.DocumentQueryOrderBy;
+import de.metas.ui.web.window.model.DocumentQueryOrderByList;
 import de.metas.ui.web.window.model.sql.SqlOptions;
 import lombok.Builder;
 import lombok.NonNull;
@@ -192,9 +192,9 @@ public class PurchaseView implements IEditableView
 	}
 
 	@Override
-	public List<DocumentQueryOrderBy> getDefaultOrderBys()
+	public DocumentQueryOrderByList getDefaultOrderBys()
 	{
-		return ImmutableList.of();
+		return DocumentQueryOrderByList.EMPTY;
 	}
 
 	@Override

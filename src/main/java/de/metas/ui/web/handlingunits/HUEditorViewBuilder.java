@@ -21,6 +21,7 @@ import de.metas.ui.web.view.json.JSONViewDataType;
 import de.metas.ui.web.window.datatypes.DocumentId;
 import de.metas.ui.web.window.datatypes.DocumentPath;
 import de.metas.ui.web.window.model.DocumentQueryOrderBy;
+import de.metas.ui.web.window.model.DocumentQueryOrderByList;
 import lombok.NonNull;
 
 /*
@@ -62,7 +63,7 @@ public final class HUEditorViewBuilder
 	private List<DocumentFilter> filters;
 	private DocumentFilterDescriptorsProvider filterDescriptors = NullDocumentFilterDescriptorsProvider.instance;
 
-	private List<DocumentQueryOrderBy> orderBys = null;
+	private ArrayList<DocumentQueryOrderBy> orderBys = null;
 
 	private LinkedHashMap<String, Object> parameters;
 	private HUEditorViewRepository huEditorViewRepository;
@@ -233,9 +234,9 @@ public final class HUEditorViewBuilder
 		return this;
 	}
 
-	public HUEditorViewBuilder orderBys(@NonNull final List<DocumentQueryOrderBy> orderBys)
+	public HUEditorViewBuilder orderBys(@NonNull final DocumentQueryOrderByList orderBys)
 	{
-		this.orderBys = new ArrayList<>(orderBys);
+		this.orderBys = new ArrayList<>(orderBys.toList());
 		return this;
 	}
 
@@ -245,9 +246,9 @@ public final class HUEditorViewBuilder
 		return this;
 	}
 
-	private ImmutableList<DocumentQueryOrderBy> getOrderBys()
+	private DocumentQueryOrderByList getOrderBys()
 	{
-		return orderBys != null ? ImmutableList.copyOf(orderBys) : ImmutableList.of();
+		return DocumentQueryOrderByList.ofList(orderBys);
 	}
 
 	public HUEditorViewBuilder setParameter(final String name, final Object value)

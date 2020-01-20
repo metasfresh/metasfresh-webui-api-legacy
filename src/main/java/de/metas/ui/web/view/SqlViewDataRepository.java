@@ -87,7 +87,7 @@ class SqlViewDataRepository implements IViewDataRepository
 	private final SqlViewSelectData sqlViewSelect;
 	private final ViewRowIdsOrderedSelectionFactory viewRowIdsOrderedSelectionFactory;
 	private final DocumentFilterDescriptorsProvider viewFilterDescriptors;
-	private final List<DocumentQueryOrderBy> defaultOrderBys;
+	private final DocumentQueryOrderByList defaultOrderBys;
 
 	private final boolean hasIncludedRows;
 	private final ImmutableMap<String, SqlViewRowFieldLoader> rowFieldLoaders;
@@ -197,9 +197,10 @@ class SqlViewDataRepository implements IViewDataRepository
 	}
 
 	@Override
-	public ViewRowIdsOrderedSelection createOrderedSelectionFromSelection(final ViewEvaluationCtx viewEvalCtx,
+	public ViewRowIdsOrderedSelection createOrderedSelectionFromSelection(
+			final ViewEvaluationCtx viewEvalCtx,
 			final ViewRowIdsOrderedSelection fromSelection,
-			final List<DocumentQueryOrderBy> orderBys)
+			final DocumentQueryOrderByList orderBys)
 	{
 		return viewRowIdsOrderedSelectionFactory.createOrderedSelectionFromSelection(viewEvalCtx, fromSelection, orderBys);
 	}

@@ -1,11 +1,10 @@
 package de.metas.ui.web.window.model.sql;
 
-import java.util.List;
-
 import org.adempiere.ad.expression.api.IStringExpression;
 
 import de.metas.ui.web.window.descriptor.sql.SqlEntityBinding;
 import de.metas.ui.web.window.model.DocumentQueryOrderBy;
+import de.metas.ui.web.window.model.DocumentQueryOrderByList;
 import lombok.NonNull;
 
 /*
@@ -43,7 +42,7 @@ public class SqlDocumentOrderByBuilder
 	}
 
 	@FunctionalInterface
-	public static interface SqlOrderByBindings
+	public interface SqlOrderByBindings
 	{
 		IStringExpression getFieldOrderBy(String fieldName);
 	}
@@ -58,7 +57,7 @@ public class SqlDocumentOrderByBuilder
 	/**
 	 * @return SQL order by (e.g. Column1 ASC, Column2 DESC)
 	 */
-	public IStringExpression buildSqlOrderBy(final List<DocumentQueryOrderBy> orderBys)
+	public IStringExpression buildSqlOrderBy(final DocumentQueryOrderByList orderBys)
 	{
 		if (orderBys.isEmpty())
 		{

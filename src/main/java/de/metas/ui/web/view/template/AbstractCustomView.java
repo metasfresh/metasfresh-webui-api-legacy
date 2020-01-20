@@ -34,7 +34,7 @@ import de.metas.ui.web.window.datatypes.DocumentIdsSelection;
 import de.metas.ui.web.window.datatypes.DocumentPath;
 import de.metas.ui.web.window.datatypes.LookupValuesList;
 import de.metas.ui.web.window.datatypes.json.JSONDocumentChangedEvent;
-import de.metas.ui.web.window.model.DocumentQueryOrderBy;
+import de.metas.ui.web.window.model.DocumentQueryOrderByList;
 import de.metas.ui.web.window.model.sql.SqlOptions;
 import de.metas.util.Check;
 import lombok.AccessLevel;
@@ -214,9 +214,9 @@ public abstract class AbstractCustomView<T extends IViewRow> implements IView
 	 * Just returns an empty list.
 	 */
 	@Override
-	public List<DocumentQueryOrderBy> getDefaultOrderBys()
+	public DocumentQueryOrderByList getDefaultOrderBys()
 	{
-		return ImmutableList.of();
+		return DocumentQueryOrderByList.EMPTY;
 	}
 
 	/**

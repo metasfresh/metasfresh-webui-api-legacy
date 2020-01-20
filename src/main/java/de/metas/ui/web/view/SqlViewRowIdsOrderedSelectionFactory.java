@@ -29,7 +29,7 @@ import de.metas.ui.web.view.descriptor.SqlViewSelectionQueryBuilder.SqlCreateSel
 import de.metas.ui.web.window.datatypes.DocumentId;
 import de.metas.ui.web.window.datatypes.DocumentIdsSelection;
 import de.metas.ui.web.window.datatypes.WindowId;
-import de.metas.ui.web.window.model.DocumentQueryOrderBy;
+import de.metas.ui.web.window.model.DocumentQueryOrderByList;
 import de.metas.util.Services;
 import lombok.NonNull;
 
@@ -87,7 +87,7 @@ public class SqlViewRowIdsOrderedSelectionFactory implements ViewRowIdsOrderedSe
 			final ViewEvaluationCtx viewEvalCtx,
 			final ViewId viewId,
 			final List<DocumentFilter> filters,
-			final List<DocumentQueryOrderBy> orderBys,
+			final DocumentQueryOrderByList orderBys,
 			final boolean applySecurityRestrictions,
 			final SqlDocumentFilterConverterContext context)
 	{
@@ -133,7 +133,10 @@ public class SqlViewRowIdsOrderedSelectionFactory implements ViewRowIdsOrderedSe
 	}
 
 	@Override
-	public ViewRowIdsOrderedSelection createOrderedSelectionFromSelection(final ViewEvaluationCtx viewEvalCtx, final ViewRowIdsOrderedSelection fromSelection, final List<DocumentQueryOrderBy> orderBys)
+	public ViewRowIdsOrderedSelection createOrderedSelectionFromSelection(
+			final ViewEvaluationCtx viewEvalCtx, 
+			final ViewRowIdsOrderedSelection fromSelection, 
+			final DocumentQueryOrderByList orderBys)
 	{
 		final WindowId windowId = fromSelection.getWindowId();
 		final String fromSelectionId = fromSelection.getSelectionId();

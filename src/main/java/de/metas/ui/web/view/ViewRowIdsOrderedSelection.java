@@ -1,13 +1,9 @@
 package de.metas.ui.web.view;
 
-import java.util.List;
-
 import javax.annotation.Nullable;
 
-import com.google.common.collect.ImmutableList;
-
 import de.metas.ui.web.window.datatypes.WindowId;
-import de.metas.ui.web.window.model.DocumentQueryOrderBy;
+import de.metas.ui.web.window.model.DocumentQueryOrderByList;
 import lombok.Builder;
 import lombok.NonNull;
 import lombok.Value;
@@ -39,7 +35,7 @@ public final class ViewRowIdsOrderedSelection
 {
 	ViewId viewId;
 	long size;
-	ImmutableList<DocumentQueryOrderBy> orderBys;
+	DocumentQueryOrderByList orderBys;
 
 	int queryLimit;
 	boolean queryLimitHit;
@@ -48,12 +44,12 @@ public final class ViewRowIdsOrderedSelection
 	private ViewRowIdsOrderedSelection(
 			@NonNull ViewId viewId,
 			long size,
-			@Nullable List<DocumentQueryOrderBy> orderBys,
+			@Nullable DocumentQueryOrderByList orderBys,
 			int queryLimit)
 	{
 		this.viewId = viewId;
 		this.size = size;
-		this.orderBys = orderBys == null ? ImmutableList.of() : ImmutableList.copyOf(orderBys);
+		this.orderBys = orderBys != null ? orderBys : DocumentQueryOrderByList.EMPTY;
 		this.queryLimit = queryLimit;
 
 		this.queryLimitHit = queryLimit > 0

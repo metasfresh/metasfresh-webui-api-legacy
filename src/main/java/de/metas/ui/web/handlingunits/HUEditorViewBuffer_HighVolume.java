@@ -31,7 +31,7 @@ import de.metas.ui.web.view.ViewRowsOrderBy;
 import de.metas.ui.web.window.datatypes.DocumentId;
 import de.metas.ui.web.window.datatypes.DocumentIdsSelection;
 import de.metas.ui.web.window.datatypes.json.JSONOptions;
-import de.metas.ui.web.window.model.DocumentQueryOrderBy;
+import de.metas.ui.web.window.model.DocumentQueryOrderByList;
 import de.metas.util.collections.IteratorUtils;
 import de.metas.util.collections.PagedIterator.PageFetcher;
 import lombok.NonNull;
@@ -70,7 +70,7 @@ public class HUEditorViewBuffer_HighVolume implements HUEditorViewBuffer
 
 	private Supplier<ViewRowIdsOrderedSelection> defaultSelectionFactory;
 	private final SynchronizedMutable<ViewRowIdsOrderedSelection> defaultSelectionRef;
-	private final transient ConcurrentHashMap<ImmutableList<DocumentQueryOrderBy>, ViewRowIdsOrderedSelection> selectionsByOrderBys = new ConcurrentHashMap<>();
+	private final transient ConcurrentHashMap<DocumentQueryOrderByList, ViewRowIdsOrderedSelection> selectionsByOrderBys = new ConcurrentHashMap<>();
 
 	private final CCache<DocumentId, HUEditorRow> cache_huRowsById = CCache.newLRUCache(I_M_HU.Table_Name + "#HUEditorRows#by#Id", 100, 2);
 
@@ -79,7 +79,7 @@ public class HUEditorViewBuffer_HighVolume implements HUEditorViewBuffer
 			final HUEditorViewRepository huEditorRepo,
 			final List<DocumentFilter> stickyFilters,
 			final List<DocumentFilter> filters,
-			final List<DocumentQueryOrderBy> orderBys,
+			final DocumentQueryOrderByList orderBys,
 			final SqlDocumentFilterConverterContext context)
 	{
 		this.viewEvaluationCtx = ViewEvaluationCtx.newInstanceFromCurrentContext();
@@ -105,7 +105,7 @@ public class HUEditorViewBuffer_HighVolume implements HUEditorViewBuffer
 		return defaultSelectionRef.computeIfNull(defaultSelectionFactory);
 	}
 
-	private ViewRowIdsOrderedSelection getSelection(final List<DocumentQueryOrderBy> orderBys)
+	private ViewRowIdsOrderedSelection getSelection(final DocumentQueryOrderByList orderBys)
 	{
 		final ViewRowIdsOrderedSelection defaultSelection = getDefaultSelection();
 
@@ -114,14 +114,14 @@ public class HUEditorViewBuffer_HighVolume implements HUEditorViewBuffer
 			return defaultSelection;
 		}
 
-		if (Objects.equals(defaultSelection.getOrderBys(), orderBys))
+		if (DocumentQueryOrderByList.equals(defaultSelection.getOrderBys(), orderBys))
 		{
 			return defaultSelection;
 		}
 
 		return selectionsByOrderBys.computeIfAbsent(
-				ImmutableList.copyOf(orderBys),
-				orderBysImmutable -> huEditorRepo.createSelectionFromSelection(getViewEvaluationCtx(), defaultSelection, orderBysImmutable));
+				orderBys,
+				k -> huEditorRepo.createSelectionFromSelection(getViewEvaluationCtx(), defaultSelection, orderBys));
 	}
 
 	/** @return true if selection was really changed */
@@ -234,7 +234,7 @@ public class HUEditorViewBuffer_HighVolume implements HUEditorViewBuffer
 		final ImmutableSet<HUEditorRowId> onlyRowIds = filter.getOnlyRowIds();
 		if (onlyRowIds.isEmpty())
 		{
-			final List<DocumentQueryOrderBy> defaultOrderBys = getDefaultSelection().getOrderBys();
+			final DocumentQueryOrderByList defaultOrderBys = getDefaultSelection().getOrderBys();
 			huEditorRowIds = streamHUIdsByPage(0, Integer.MAX_VALUE, defaultOrderBys)
 					.map(HUEditorRowId::ofTopLevelHU);
 		}
@@ -272,14 +272,14 @@ public class HUEditorViewBuffer_HighVolume implements HUEditorViewBuffer
 				.stream();
 	}
 
-	private PageFetcher<HuId> huIdsPageFetcher(final List<DocumentQueryOrderBy> orderBys)
+	private PageFetcher<HuId> huIdsPageFetcher(final DocumentQueryOrderByList orderBys)
 	{
 		final ViewEvaluationCtx viewEvalCtx = getViewEvaluationCtx();
 		final ViewRowIdsOrderedSelection selection = getSelection(orderBys);
 		return (firstRow, maxRows) -> huEditorRepo.retrieveHUIdsPage(viewEvalCtx, selection, firstRow, maxRows);
 	}
 
-	private Stream<HuId> streamHUIdsByPage(final int firstRow, final int maxRows, final List<DocumentQueryOrderBy> orderBys)
+	private Stream<HuId> streamHUIdsByPage(final int firstRow, final int maxRows, final DocumentQueryOrderByList orderBys)
 	{
 		return IteratorUtils.<HuId> newPagedIterator()
 				.firstRow(firstRow)
