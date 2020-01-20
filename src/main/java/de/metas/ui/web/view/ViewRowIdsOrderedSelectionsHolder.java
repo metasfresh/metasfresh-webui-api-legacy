@@ -1,9 +1,8 @@
 package de.metas.ui.web.view;
 
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.UnaryOperator;
-
-import javax.annotation.Nullable;
+import java.util.function.Supplier;
 
 import org.adempiere.util.lang.ExtendedMemorizingSupplier;
 
@@ -11,7 +10,9 @@ import com.google.common.collect.ImmutableSet;
 
 import de.metas.ui.web.document.filter.DocumentFilterList;
 import de.metas.ui.web.document.filter.sql.SqlDocumentFilterConverterContext;
+import de.metas.ui.web.window.datatypes.DocumentId;
 import de.metas.ui.web.window.model.DocumentQueryOrderByList;
+import lombok.Builder;
 import lombok.NonNull;
 
 /*
@@ -39,49 +40,53 @@ import lombok.NonNull;
 final class ViewRowIdsOrderedSelectionsHolder
 {
 	private final IViewDataRepository viewDataRepository;
+
 	private final ViewId viewId;
 	private final boolean applySecurityRestrictions;
-	private final DocumentFilterList stickyFilters;
-	private final DocumentFilterList filters;
-	private final ViewEvaluationCtx viewEvaluationCtx;
+	private final DocumentFilterList allFilters;
+	private final Supplier<ViewEvaluationCtx> viewEvaluationCtxSupplier;
 
-	private final AtomicBoolean defaultSelectionDeleteBeforeCreate = new AtomicBoolean(false);
+	private final AtomicBoolean selectionDeleteBeforeCreate = new AtomicBoolean(false);
 	private final ExtendedMemorizingSupplier<ViewRowIdsOrderedSelections> selectionsRef;
 
-	@lombok.Builder
+	@Builder
 	private ViewRowIdsOrderedSelectionsHolder(
 			@NonNull final IViewDataRepository viewDataRepository,
 			@NonNull final ViewId viewId,
 			final boolean applySecurityRestrictions,
 			@NonNull final DocumentFilterList stickyFilters,
 			@NonNull final DocumentFilterList filters,
-			@NonNull final ViewEvaluationCtx viewEvaluationCtx)
+			@NonNull final Supplier<ViewEvaluationCtx> viewEvaluationCtxSupplier)
 	{
 		this.viewDataRepository = viewDataRepository;
 		this.viewId = viewId;
 		this.applySecurityRestrictions = applySecurityRestrictions;
-		this.stickyFilters = stickyFilters;
-		this.filters = filters;
-		this.viewEvaluationCtx = viewEvaluationCtx;
+		this.allFilters = stickyFilters.mergeWith(filters);
+		this.viewEvaluationCtxSupplier = viewEvaluationCtxSupplier;
 
 		selectionsRef = ExtendedMemorizingSupplier.of(this::createViewRowIdsOrderedSelections);
 	}
 
 	private ViewRowIdsOrderedSelections createViewRowIdsOrderedSelections()
 	{
-		if (defaultSelectionDeleteBeforeCreate.get())
+		if (selectionDeleteBeforeCreate.get())
 		{
 			viewDataRepository.deleteSelection(viewId);
 		}
 
 		final ViewRowIdsOrderedSelection defaultSelection = viewDataRepository.createOrderedSelection(
-				viewEvaluationCtx,
+				getViewEvaluationCtx(),
 				viewId,
-				stickyFilters.mergeWith(filters),
+				allFilters,
 				applySecurityRestrictions,
 				SqlDocumentFilterConverterContext.EMPTY);
 
 		return new ViewRowIdsOrderedSelections(defaultSelection);
+	}
+
+	private ViewEvaluationCtx getViewEvaluationCtx()
+	{
+		return viewEvaluationCtxSupplier.get();
 	}
 
 	public ViewRowIdsOrderedSelection getDefaultSelection()
@@ -89,28 +94,26 @@ final class ViewRowIdsOrderedSelectionsHolder
 		return selectionsRef.get().getDefaultSelection();
 	}
 
-	public ImmutableSet<String> forgetCurrentSelections()
+	public void forgetCurrentSelections()
 	{
+		selectionDeleteBeforeCreate.set(true);
 		final ViewRowIdsOrderedSelections selections = selectionsRef.forget();
-		return selections != null
-				? selections.getSelectionIds()
-				: ImmutableSet.of();
+		if (selections != null)
+		{
+			final ImmutableSet<String> selectionIds = selections.getSelectionIds();
+			viewDataRepository.scheduleDeleteSelections(selectionIds);
+		}
 	}
 
-	public void setDeleteBeforeCreate(final boolean deleteBeforeCreate)
+	public void removeRowIdsNotMatchingFilters(final Set<DocumentId> rowIds)
 	{
-		defaultSelectionDeleteBeforeCreate.set(true);
+		selectionsRef.get().computeDefaultSelection(defaultSelection -> viewDataRepository.removeRowIdsNotMatchingFilters(defaultSelection, allFilters, rowIds));
 	}
 
-	public ViewRowIdsOrderedSelection computeDefaultSelection(@NonNull final UnaryOperator<ViewRowIdsOrderedSelection> mapper)
+	public ViewRowIdsOrderedSelection getOrderedSelection(final DocumentQueryOrderByList orderBysParam)
 	{
-		return selectionsRef.get().computeDefaultSelection(mapper);
-	}
-
-	public ViewRowIdsOrderedSelection computeIfAbsent(
-			@Nullable final DocumentQueryOrderByList orderBys,
-			@NonNull final ViewRowIdsOrderedSelections.ViewRowIdsOrderedSelectionFactory factory)
-	{
-		return selectionsRef.get().computeIfAbsent(orderBys, factory);
+		return selectionsRef.get().computeIfAbsent(
+				orderBysParam,
+				(defaultSelection, orderBys) -> viewDataRepository.createOrderedSelectionFromSelection(getViewEvaluationCtx(), defaultSelection, orderBys));
 	}
 }

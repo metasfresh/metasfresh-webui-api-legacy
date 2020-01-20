@@ -49,7 +49,7 @@ public class SqlViewSelectionToDeleteHelper
 
 		final String sqlInsertInto = "INSERT INTO " + I_T_WEBUI_ViewSelection_ToDelete.Table_Name + "("
 				+ I_T_WEBUI_ViewSelection_ToDelete.COLUMNNAME_View_UUID
-				+ ")";
+				+ ") VALUES ";
 
 		StringBuilder sql = new StringBuilder();
 		sql.append(sqlInsertInto);
@@ -58,9 +58,10 @@ public class SqlViewSelectionToDeleteHelper
 		{
 			counter++;
 			if (counter > 1)
-				sql.append(" UNION ");
-			sql.append("SELECT ");
-			sql.append(DB.TO_STRING(viewId));
+			{
+				sql.append(", ");
+			}
+			sql.append("(").append(DB.TO_STRING(viewId)).append(")");
 
 			if (counter >= 1000)
 			{

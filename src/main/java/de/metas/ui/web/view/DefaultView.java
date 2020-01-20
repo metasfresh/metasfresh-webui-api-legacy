@@ -160,7 +160,7 @@ public final class DefaultView implements IEditableView
 					.applySecurityRestrictions(builder.isApplySecurityRestrictions())
 					.stickyFilters(stickyFilters)
 					.filters(filters)
-					.viewEvaluationCtx(viewEvaluationCtx)
+					.viewEvaluationCtxSupplier(this::getViewEvaluationCtx)
 					.build();
 		}
 
@@ -307,8 +307,7 @@ public final class DefaultView implements IEditableView
 			return; // already closed
 		}
 
-		final ImmutableSet<String> selectionIds = selectionsRef.forgetCurrentSelections();
-		viewDataRepository.scheduleDeleteSelections(selectionIds);
+		selectionsRef.forgetCurrentSelections();
 
 		logger.debug("View closed with reason={}: {}", reason, this);
 	}
@@ -328,12 +327,7 @@ public final class DefaultView implements IEditableView
 	@Override
 	public void invalidateSelection()
 	{
-		selectionsRef.setDeleteBeforeCreate(true);
-		final ImmutableSet<String> selectionIds = selectionsRef.forgetCurrentSelections();
-		if (!selectionIds.isEmpty())
-		{
-			viewDataRepository.scheduleDeleteSelections(selectionIds);
-		}
+		selectionsRef.forgetCurrentSelections();
 
 		invalidateAll();
 
@@ -470,9 +464,7 @@ public final class DefaultView implements IEditableView
 
 	private ViewRowIdsOrderedSelection getOrderedSelection(final DocumentQueryOrderByList orderBysParam)
 	{
-		return selectionsRef.computeIfAbsent(
-				orderBysParam,
-				(defaultSelection, orderBys) -> viewDataRepository.createOrderedSelectionFromSelection(getViewEvaluationCtx(), defaultSelection, orderBys));
+		return selectionsRef.getOrderedSelection(orderBysParam);
 	}
 
 	@Override
@@ -591,13 +583,7 @@ public final class DefaultView implements IEditableView
 			return;
 		}
 
-		changedRowIdsToCheck.process(rowIds -> checkChangedRows(rowIds));
-	}
-
-	private ViewRowIdsOrderedSelection checkChangedRows(final Set<DocumentId> rowIds)
-	{
-		return selectionsRef
-				.computeDefaultSelection(defaultSelection -> viewDataRepository.removeRowIdsNotMatchingFilters(defaultSelection, getAllFilters(), rowIds));
+		changedRowIdsToCheck.process(selectionsRef::removeRowIdsNotMatchingFilters);
 	}
 
 	@Override
