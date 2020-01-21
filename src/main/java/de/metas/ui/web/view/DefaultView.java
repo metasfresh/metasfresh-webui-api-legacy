@@ -51,6 +51,7 @@ import de.metas.util.NumberUtils;
 import de.metas.util.Services;
 import de.metas.util.collections.IteratorUtils;
 import de.metas.util.collections.PagedIterator.Page;
+import lombok.Getter;
 import lombok.NonNull;
 
 /*
@@ -78,8 +79,6 @@ import lombok.NonNull;
 /**
  * Default {@link IView} implementation.
  *
- * @author metas-dev <dev@metasfresh.com>
- *
  */
 public final class DefaultView implements IEditableView
 {
@@ -95,16 +94,24 @@ public final class DefaultView implements IEditableView
 
 	private static final Logger logger = LogManager.getLogger(DefaultView.class);
 
+	@Getter
 	private final IViewDataRepository viewDataRepository;
 
+	@Getter
 	private final ViewId viewId;
 	private final AtomicBoolean closed = new AtomicBoolean(false);
+	@Getter
 	private final ViewId parentViewId;
+	@Getter
 	private final DocumentId parentRowId;
+	@Getter
 	private final JSONViewDataType viewType;
+	@Getter
 	private final ViewProfileId profileId;
+	@Getter
 	private final ImmutableSet<DocumentPath> referencingDocumentPaths;
 
+	@Getter
 	private final ViewEvaluationCtx viewEvaluationCtx;
 	private final ViewRowIdsOrderedSelectionsHolder selectionsRef;
 
@@ -112,14 +119,16 @@ public final class DefaultView implements IEditableView
 	// Filters
 	private final DocumentFilterDescriptorsProvider viewFilterDescriptors;
 	/** Sticky filters (i.e. active filters which cannot be changed) */
+	@Getter
 	private final DocumentFilterList stickyFilters;
 	/** Regular filters */
+	@Getter
 	private final DocumentFilterList filters;
-	private transient DocumentFilterList _allFilters;
+	private transient DocumentFilterList _allFilters; // lazy
 
 	//
 	// Misc
-	private transient String _toString;
+	private transient String _toString; // lazy
 
 	//
 	// Caching
@@ -167,11 +176,10 @@ public final class DefaultView implements IEditableView
 
 		//
 		// Cache
-		cache_rowsById = CCache.newLRUCache( //
-				viewDataRepository.getTableName() + "#rowById#viewId=" + viewId.getViewId() // cache name
-				, 100 // maxSize
-				, 2 // expireAfterMinutes
-		);
+		cache_rowsById = CCache.newLRUCache(
+				viewDataRepository.getTableName() + "#rowById#viewId=" + viewId, // cache name
+				100, // maxSize
+				2); // expireAfterMinutes
 
 		logger.debug("View created: {}", this);
 	}
@@ -179,11 +187,12 @@ public final class DefaultView implements IEditableView
 	@Override
 	public String toString()
 	{
-		if (_toString == null)
+		String toString = _toString;
+		if (toString == null)
 		{
 			final ViewRowIdsOrderedSelection defaultSelection = selectionsRef.getDefaultSelection();
 			// NOTE: keep it short
-			_toString = MoreObjects.toStringHelper(this)
+			toString = _toString = MoreObjects.toStringHelper(this)
 					.omitNullValues()
 					.add("viewId", defaultSelection.getViewId())
 					.add("tableName", viewDataRepository.getTableName())
@@ -191,49 +200,13 @@ public final class DefaultView implements IEditableView
 					.add("defaultSelection", defaultSelection)
 					.toString();
 		}
-		return _toString;
-	}
-
-	@Override
-	public ViewId getParentViewId()
-	{
-		return parentViewId;
-	}
-
-	@Override
-	public DocumentId getParentRowId()
-	{
-		return parentRowId;
-	}
-
-	@Override
-	public ViewId getViewId()
-	{
-		return viewId;
-	}
-
-	@Override
-	public JSONViewDataType getViewType()
-	{
-		return viewType;
-	}
-
-	@Override
-	public ViewProfileId getProfileId()
-	{
-		return profileId;
+		return toString;
 	}
 
 	@Override
 	public ITranslatableString getDescription()
 	{
 		return TranslatableStrings.empty();
-	}
-
-	@Override
-	public ImmutableSet<DocumentPath> getReferencingDocumentPaths()
-	{
-		return referencingDocumentPaths;
 	}
 
 	/**
@@ -273,24 +246,12 @@ public final class DefaultView implements IEditableView
 		return defaultSelection.isQueryLimitHit();
 	}
 
-	@Override
-	public DocumentFilterList getStickyFilters()
-	{
-		return stickyFilters;
-	}
-
-	@Override
-	public DocumentFilterList getFilters()
-	{
-		return filters;
-	}
-
 	public DocumentFilterDescriptorsProvider getFilterDescriptors()
 	{
 		return viewDataRepository.getViewFilterDescriptors();
 	}
 
-	public DocumentFilterList getAllFilters()
+	private DocumentFilterList getAllFilters()
 	{
 		DocumentFilterList allFilters = _allFilters;
 		if (allFilters == null)
@@ -342,11 +303,6 @@ public final class DefaultView implements IEditableView
 		{
 			throw new IllegalStateException("View already closed: " + getViewId());
 		}
-	}
-
-	private ViewEvaluationCtx getViewEvaluationCtx()
-	{
-		return viewEvaluationCtx;
 	}
 
 	@Override
