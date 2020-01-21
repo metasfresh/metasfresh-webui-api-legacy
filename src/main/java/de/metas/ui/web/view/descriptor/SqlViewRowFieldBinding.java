@@ -8,6 +8,7 @@ import org.adempiere.ad.expression.api.impl.ConstantStringExpression;
 
 import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
 import de.metas.ui.web.window.descriptor.sql.SqlEntityFieldBinding;
+import de.metas.ui.web.window.descriptor.sql.SqlSelectDisplayValue;
 import lombok.Builder;
 import lombok.NonNull;
 import lombok.Value;
@@ -56,8 +57,7 @@ public class SqlViewRowFieldBinding implements SqlEntityFieldBinding
 	private final Class<?> sqlValueClass;
 	/** i.e. columnName/columnSql AS columnName */
 	private final String sqlSelectValue;
-	private final IStringExpression sqlSelectDisplayValue;
-	private final boolean usingDisplayColumn;
+	private final SqlSelectDisplayValue sqlSelectDisplayValue;
 
 	private final IStringExpression sqlOrderBy;
 
@@ -74,8 +74,7 @@ public class SqlViewRowFieldBinding implements SqlEntityFieldBinding
 			//
 			final Class<?> sqlValueClass,
 			final String sqlSelectValue,
-			final IStringExpression sqlSelectDisplayValue,
-			final boolean usingDisplayColumn, //
+			final SqlSelectDisplayValue sqlSelectDisplayValue,
 			//
 			final IStringExpression sqlOrderBy,
 			@NonNull final SqlViewRowFieldLoader fieldLoader)
@@ -89,8 +88,7 @@ public class SqlViewRowFieldBinding implements SqlEntityFieldBinding
 
 		this.sqlValueClass = sqlValueClass != null ? sqlValueClass : widgetType.getValueClass();
 		this.sqlSelectValue = sqlSelectValue != null ? sqlSelectValue : this.columnSql;
-		this.sqlSelectDisplayValue = sqlSelectDisplayValue != null ? sqlSelectDisplayValue : IStringExpression.NULL;
-		this.usingDisplayColumn = usingDisplayColumn;
+		this.sqlSelectDisplayValue = sqlSelectDisplayValue;
 
 		this.sqlOrderBy = sqlOrderBy != null ? sqlOrderBy : ConstantStringExpression.of(this.columnSql);
 		this.fieldLoader = fieldLoader;

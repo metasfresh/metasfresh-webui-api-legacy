@@ -7,7 +7,6 @@ import java.time.ZonedDateTime;
 import java.util.Optional;
 
 import org.adempiere.ad.expression.api.IStringExpression;
-import org.adempiere.ad.expression.api.NullStringExpression;
 import org.adempiere.ad.expression.api.impl.ConstantStringExpression;
 
 import com.google.common.base.MoreObjects;
@@ -87,13 +86,10 @@ public class SqlDocumentFieldDataBindingDescriptor implements DocumentFieldDataB
 	private final Class<?> valueClass;
 	private final DocumentFieldValueLoader documentFieldValueLoader;
 
-	private final boolean usingDisplayColumn;
-	private final String displayColumnName;
-	private final IStringExpression displayColumnSqlExpression;
 	private final Boolean numericKey;
 	//
 	private final String sqlSelectValue;
-	private final IStringExpression sqlSelectDisplayValue;
+	private final SqlSelectDisplayValue sqlSelectDisplayValue;
 
 	private final int defaultOrderByPriority;
 	private final boolean defaultOrderByAscending;
@@ -115,13 +111,10 @@ public class SqlDocumentFieldDataBindingDescriptor implements DocumentFieldDataB
 		documentFieldValueLoader = builder.getDocumentFieldValueLoader();
 		Check.assumeNotNull(documentFieldValueLoader, "Parameter documentFieldValueLoader is not null");
 
-		usingDisplayColumn = builder.isUsingDisplayColumn();
-		displayColumnName = builder.getDisplayColumnName();
-		displayColumnSqlExpression = builder.getDisplayColumnSqlExpression();
 		numericKey = builder.getNumericKey();
 		//
 		sqlSelectValue = builder.buildSqlSelectValue();
-		sqlSelectDisplayValue = builder.buildSqlSelectDisplayValue();
+		sqlSelectDisplayValue = builder._sqlSelectDisplayValue;
 
 		// ORDER BY
 		{
@@ -171,7 +164,7 @@ public class SqlDocumentFieldDataBindingDescriptor implements DocumentFieldDataB
 		return sqlSelectValue;
 	}
 
-	public IStringExpression getSqlSelectDisplayValue()
+	public SqlSelectDisplayValue getSqlSelectDisplayValue()
 	{
 		return sqlSelectDisplayValue;
 	}
@@ -212,21 +205,6 @@ public class SqlDocumentFieldDataBindingDescriptor implements DocumentFieldDataB
 		return keyColumn;
 	}
 
-	public boolean isUsingDisplayColumn()
-	{
-		return usingDisplayColumn;
-	}
-
-	public String getDisplayColumnName()
-	{
-		return displayColumnName;
-	}
-
-	public IStringExpression getDisplayColumnSqlExpression()
-	{
-		return displayColumnSqlExpression;
-	}
-
 	public boolean isNumericKey()
 	{
 		return numericKey != null && numericKey;
@@ -250,19 +228,13 @@ public class SqlDocumentFieldDataBindingDescriptor implements DocumentFieldDataB
 		return defaultOrderByAscending;
 	}
 
-	public final IStringExpression buildSqlOrderBy(final boolean ascending)
-	{
-		final String sqlOrderByColumnName = isUsingDisplayColumn() ? getDisplayColumnName() : getColumnName();
-		return IStringExpression.composer()
-				.append(sqlOrderByColumnName).append(ascending ? " ASC" : " DESC")
-				.build();
-	}
-
 	@Override
 	public IStringExpression getSqlOrderBy()
 	{
-		final IStringExpression orderByExpr = isUsingDisplayColumn() ? getDisplayColumnSqlExpression() : ConstantStringExpression.ofNullable(getColumnSql());
-		return orderByExpr;
+		final SqlSelectDisplayValue sqlSelectDisplayValue = getSqlSelectDisplayValue();
+		return sqlSelectDisplayValue != null
+				? sqlSelectDisplayValue.toStringExpression()
+				: ConstantStringExpression.ofNullable(getColumnSql());
 	}
 
 	public static final class Builder
@@ -287,11 +259,7 @@ public class SqlDocumentFieldDataBindingDescriptor implements DocumentFieldDataB
 		private int orderByPriority = 0;
 
 		// Built values
-		private boolean _usingDisplayColumn;
-		private String _displayColumnName;
-		// private String _descriptionColumnName;
-
-		private IStringExpression _displayColumnSqlExpression;
+		private SqlSelectDisplayValue _sqlSelectDisplayValue;
 		private Boolean _numericKey;
 		private DocumentFieldValueLoader _documentFieldValueLoader;
 
@@ -308,49 +276,30 @@ public class SqlDocumentFieldDataBindingDescriptor implements DocumentFieldDataB
 					&& sqlColumnName != null // in case of Labels, sqlColumnName is null
 					&& _lookupDescriptor instanceof ISqlLookupDescriptor)
 			{
-				_usingDisplayColumn = true;
-
-				final String sqlTableAlias = getTableAlias();
-
-				_displayColumnName = sqlColumnName + "$Display";
-				_displayColumnSqlExpression = extractDisplayColumnSqlExpression(_lookupDescriptor, sqlTableAlias, sqlColumnName);
 				_numericKey = _lookupDescriptor.isNumericKey();
+				_sqlSelectDisplayValue = buildSqlSelectDisplayValue();
 			}
 			else
 			{
-				_usingDisplayColumn = false;
-				_displayColumnName = null;
-				_displayColumnSqlExpression = NullStringExpression.instance;
 				_numericKey = null;
+				_sqlSelectDisplayValue = null;
 			}
 
 			return new SqlDocumentFieldDataBindingDescriptor(this);
 		}
 
-		private static IStringExpression extractDisplayColumnSqlExpression(
-				final LookupDescriptor lookupDescriptor,
-				final String sqlTableAlias,
-				final String sqlColumnName)
+		private SqlSelectDisplayValue buildSqlSelectDisplayValue()
 		{
-			if (lookupDescriptor == null)
-			{
-				return ConstantStringExpression.of(sqlColumnName);
-			}
+			final ISqlLookupDescriptor sqlLookupDescriptor = _lookupDescriptor != null
+					? _lookupDescriptor.castOrNull(ISqlLookupDescriptor.class)
+					: null;
 
-			final ISqlLookupDescriptor sqlLookupDescriptor = lookupDescriptor.castOrNull(ISqlLookupDescriptor.class);
-			if (sqlLookupDescriptor == null)
-			{
-				return ConstantStringExpression.of(sqlColumnName);
-			}
-
-			final String sqlColumnNameFQ = sqlTableAlias + "." + sqlColumnName;
-			final IStringExpression displayColumnSqlExpression = sqlLookupDescriptor.getSqlForFetchingLookupByIdExpression(sqlColumnNameFQ);
-			if (displayColumnSqlExpression == null || displayColumnSqlExpression.isNullExpression())
-			{
-				return ConstantStringExpression.of(sqlColumnName);
-			}
-
-			return displayColumnSqlExpression;
+			return SqlSelectDisplayValue.builder()
+					.joinOnTableNameOrAlias(getTableAlias())
+					.joinOnColumnName(getColumnName())
+					.sqlExpression(sqlLookupDescriptor.getSqlForFetchingLookupByIdExpression())
+					.columnNameAlias(getColumnName() + "$Display")
+					.build();
 		}
 
 		private String buildSqlSelectValue()
@@ -380,28 +329,17 @@ public class SqlDocumentFieldDataBindingDescriptor implements DocumentFieldDataB
 			}
 		}
 
-		private IStringExpression buildSqlSelectDisplayValue()
-		{
-			if (!isUsingDisplayColumn())
-			{
-				return IStringExpression.NULL;
-			}
-
-			final IStringExpression displayColumnSqlExpression = getDisplayColumnSqlExpression();
-			final String displayColumnName = getDisplayColumnName();
-			return IStringExpression.composer()
-					.append("(").append(displayColumnSqlExpression).append(") AS ").append(displayColumnName)
-					.build();
-		}
-
 		private DocumentFieldValueLoader getDocumentFieldValueLoader()
 		{
 			if (_documentFieldValueLoader == null)
 			{
+				final String displayColumnName = _sqlSelectDisplayValue != null
+						? _sqlSelectDisplayValue.getColumnNameAlias()
+						: null;
+
 				_documentFieldValueLoader = createDocumentFieldValueLoader(
 						getColumnName(),
-						isUsingDisplayColumn() ? getDisplayColumnName() : null/* displayColumnName */,
-						// isUsingDisplayColumn() ? getDescriptionColumnName() : null/* descriptionColumnName */,
+						displayColumnName,
 						getValueClass(),
 						getWidgetType(),
 						encrypted,
@@ -614,26 +552,6 @@ public class SqlDocumentFieldDataBindingDescriptor implements DocumentFieldDataB
 		{
 			this._lookupDescriptor = lookupDescriptor;
 			return this;
-		}
-
-		private boolean isUsingDisplayColumn()
-		{
-			return _usingDisplayColumn;
-		}
-
-		private String getDisplayColumnName()
-		{
-			return _displayColumnName;
-		}
-
-		// private String getDescriptionColumnName()
-		// {
-		// return _descriptionColumnName;
-		// }
-
-		public IStringExpression getDisplayColumnSqlExpression()
-		{
-			return _displayColumnSqlExpression;
 		}
 
 		public Boolean getNumericKey()

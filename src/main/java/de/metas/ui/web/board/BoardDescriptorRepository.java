@@ -278,7 +278,7 @@ public class BoardDescriptorRepository
 		final DocumentFieldDescriptor documentField = documentEntityDescriptor.getField(fieldName);
 		final SqlDocumentFieldDataBindingDescriptor fieldBinding = documentField.getDataBindingNotNull(SqlDocumentFieldDataBindingDescriptor.class);
 		final DocumentFieldWidgetType widgetType = documentField.getWidgetType();
-		final boolean isDisplayColumnAvailable = fieldBinding.isUsingDisplayColumn();
+		final boolean isDisplayColumnAvailable = fieldBinding.getSqlSelectDisplayValue() != null;
 
 		final ImmutableSet<String> sqlSelectValues;
 		final BoardFieldLoader fieldLoader;
@@ -480,7 +480,7 @@ public class BoardDescriptorRepository
 
 					if (cardField.isUsingDisplayColumn())
 					{
-						sqlSelectDisplayNamesList.add(cardField.getSqlSelectDisplayValue());
+						sqlSelectDisplayNamesList.add(cardField.getSqlSelectDisplayValue().toStringExpressionWithColumnNameAlias());
 					}
 				});
 

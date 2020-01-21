@@ -334,10 +334,10 @@ public final class SqlDocumentEntityDataBindingDescriptor implements DocumentEnt
 
 				//
 				// Display column, if any
-				if (sqlField.isUsingDisplayColumn())
+				if (sqlField.getSqlSelectDisplayValue() != null)
 				{
-					final IStringExpression sqlSelectDisplayValue = sqlField.getSqlSelectDisplayValue();
-					sqlSelectDisplayNamesList.add(sqlSelectDisplayValue);
+					final SqlSelectDisplayValue sqlSelectDisplayValue = sqlField.getSqlSelectDisplayValue();
+					sqlSelectDisplayNamesList.add(sqlSelectDisplayValue.toStringExpressionWithColumnNameAlias());
 				}
 			}
 

@@ -5,12 +5,18 @@ import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import javax.annotation.Nullable;
+
 import org.adempiere.ad.expression.api.IExpressionEvaluator.OnVariableNotFound;
 import org.adempiere.ad.expression.api.IStringExpression;
 import org.adempiere.ad.expression.api.impl.CompositeStringExpression;
+import org.adempiere.exceptions.AdempiereException;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Maps;
 
 import de.metas.ui.web.base.model.I_T_WEBUI_ViewSelection;
 import de.metas.ui.web.base.model.I_T_WEBUI_ViewSelectionLine;
@@ -18,6 +24,7 @@ import de.metas.ui.web.view.ViewEvaluationCtx;
 import de.metas.ui.web.view.ViewId;
 import de.metas.ui.web.window.datatypes.DocumentId;
 import de.metas.ui.web.window.datatypes.DocumentIdsSelection;
+import de.metas.ui.web.window.descriptor.sql.SqlSelectDisplayValue;
 import de.metas.util.Check;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -59,7 +66,12 @@ public class SqlViewSelectData
 	public static final String COLUMNNAME_Paging_Parent_Prefix = COLUMNNAME_Paging_Prefix + "parent_";
 	public static final String COLUMNNAME_IsRecordMissing = COLUMNNAME_Paging_Prefix + "IsRecordMissing";
 
+	private final String sqlTableName;
+	// private final String sqlTableAlias;
 	private final SqlViewKeyColumnNamesMap keyColumnNamesMap;
+	private final ImmutableSet<String> displayFieldNames;
+	private final ImmutableMap<String, SqlViewRowFieldBinding> fieldsByFieldName;
+
 	@Getter(AccessLevel.PRIVATE)
 	private final IStringExpression sqlSelectByPage;
 	@Getter(AccessLevel.PRIVATE)
@@ -70,14 +82,19 @@ public class SqlViewSelectData
 
 	@Builder
 	private SqlViewSelectData(
-			final String sqlTableName,
-			final String sqlTableAlias,
+			@NonNull final String sqlTableName,
+			@NonNull final String sqlTableAlias,
 			@NonNull final SqlViewKeyColumnNamesMap keyColumnNamesMap,
-			final Collection<String> displayFieldNames,
-			final Collection<SqlViewRowFieldBinding> allFields,
-			final SqlViewGroupingBinding groupingBinding)
+			@NonNull final Collection<String> displayFieldNames,
+			@NonNull final Collection<SqlViewRowFieldBinding> allFields,
+			@Nullable final SqlViewGroupingBinding groupingBinding)
 	{
+		this.sqlTableName = sqlTableName;
+		// this.sqlTableAlias = sqlTableAlias;
 		this.keyColumnNamesMap = keyColumnNamesMap;
+		this.displayFieldNames = ImmutableSet.copyOf(displayFieldNames);
+		this.fieldsByFieldName = Maps.uniqueIndex(allFields, SqlViewRowFieldBinding::getFieldName);
+
 		final IStringExpression sqlSelect = buildSqlSelect(sqlTableName, sqlTableAlias, keyColumnNamesMap, displayFieldNames, allFields, groupingBinding);
 
 		sqlSelectByPage = sqlSelect.toComposer()
@@ -169,9 +186,9 @@ public class SqlViewSelectData
 			// Collect the SQL select for displayed value,
 			// * if there is one
 			// * and if it was required by caller (i.e. present in fieldNames list)
-			if (field.isUsingDisplayColumn() && displayFieldNames.contains(field.getFieldName()))
+			if (field.getSqlSelectDisplayValue() != null && displayFieldNames.contains(field.getFieldName()))
 			{
-				sqlSelectDisplayNamesList.add(field.getSqlSelectDisplayValue());
+				sqlSelectDisplayNamesList.add(field.getSqlSelectDisplayValue().toStringExpressionWithColumnNameAlias());
 			}
 		});
 
@@ -220,7 +237,7 @@ public class SqlViewSelectData
 		final List<String> sqlGroupBys = new ArrayList<>();
 		allFields.forEach(field -> {
 			final String fieldName = field.getFieldName();
-			final boolean usingDisplayColumn = field.isUsingDisplayColumn() && displayFieldNames.contains(fieldName);
+			final boolean usingDisplayColumn = field.getSqlSelectDisplayValue() != null && displayFieldNames.contains(fieldName);
 
 			//
 			if (keyColumnNamesMap.isKeyPartFieldName(field.getColumnName()))
@@ -236,8 +253,8 @@ public class SqlViewSelectData
 
 				if (usingDisplayColumn)
 				{
-					final IStringExpression sqlSelectDisplayValue = field.getSqlSelectDisplayValue(); // TODO: introduce columnSql as parameter
-					sqlSelectDisplayNamesList.add(sqlSelectDisplayValue);
+					final SqlSelectDisplayValue sqlSelectDisplayValue = field.getSqlSelectDisplayValue(); // TODO: introduce columnSql as parameter
+					sqlSelectDisplayNamesList.add(sqlSelectDisplayValue.toStringExpressionWithColumnNameAlias());
 				}
 			}
 			else
@@ -324,9 +341,9 @@ public class SqlViewSelectData
 			// Collect the SQL select for displayed value,
 			// * if there is one
 			// * and if it was required by caller (i.e. present in fieldNames list)
-			if (field.isUsingDisplayColumn() && displayFieldNames.contains(field.getFieldName()))
+			if (field.getSqlSelectDisplayValue() != null && displayFieldNames.contains(field.getFieldName()))
 			{
-				sqlSelectDisplayNamesList.add(field.getSqlSelectDisplayValue());
+				sqlSelectDisplayNamesList.add(field.getSqlSelectDisplayValue().toStringExpressionWithColumnNameAlias());
 			}
 		});
 

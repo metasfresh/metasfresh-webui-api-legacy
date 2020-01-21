@@ -278,6 +278,7 @@ public final class SqlLookupDescriptor implements ISqlLookupDescriptor
 		return sqlForFetchingExpression;
 	}
 
+	@Override
 	public IStringExpression getSqlForFetchingLookupByIdExpression()
 	{
 		return sqlForFetchingLookupByIdExpression;
