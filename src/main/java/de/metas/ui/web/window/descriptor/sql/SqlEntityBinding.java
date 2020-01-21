@@ -44,7 +44,7 @@ public interface SqlEntityBinding
 	SqlEntityFieldBinding getFieldByFieldName(String fieldName);
 
 	/** @return SQL expression to be used when ordering by given field; if the field was not found and exception will be thrown */
-	default IStringExpression getFieldOrderBy(String fieldName)
+	default SqlOrderByValue getFieldOrderBy(String fieldName)
 	{
 		return getFieldByFieldName(fieldName).getSqlOrderBy();
 	}

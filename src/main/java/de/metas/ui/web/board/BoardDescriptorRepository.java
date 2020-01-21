@@ -284,7 +284,7 @@ public class BoardDescriptorRepository
 		final BoardFieldLoader fieldLoader;
 		if (widgetType == DocumentFieldWidgetType.Amount && documentEntityDescriptor.hasField(WindowConstants.FIELDNAME_C_Currency_ID))
 		{
-			sqlSelectValues = ImmutableSet.of(fieldBinding.getSqlSelectValue(), WindowConstants.FIELDNAME_C_Currency_ID);
+			sqlSelectValues = ImmutableSet.of(fieldBinding.getSqlSelectValue().toSqlStringWithColumnNameAlias(), WindowConstants.FIELDNAME_C_Currency_ID);
 			fieldLoader = (rs, adLanguage) -> {
 				final BigDecimal valueBD = rs.getBigDecimal(fieldBinding.getColumnName());
 				if (valueBD == null)
@@ -305,7 +305,7 @@ public class BoardDescriptorRepository
 		}
 		else
 		{
-			sqlSelectValues = ImmutableSet.of(fieldBinding.getSqlSelectValue());
+			sqlSelectValues = ImmutableSet.of(fieldBinding.getSqlSelectValue().toSqlStringWithColumnNameAlias());
 			final DocumentFieldValueLoader documentFieldValueLoader = fieldBinding.getDocumentFieldValueLoader();
 			final LookupDescriptor lookupDescriptor = documentField.getLookupDescriptor().orElse(null);
 			fieldLoader = (rs, adLanguage) -> documentFieldValueLoader.retrieveFieldValue(rs, isDisplayColumnAvailable, adLanguage, lookupDescriptor);
@@ -380,7 +380,7 @@ public class BoardDescriptorRepository
 					.append("SELECT ")
 					.append("\n  a." + I_WEBUI_Board_RecordAssignment.COLUMNNAME_WEBUI_Board_Lane_ID)
 					.append("\n, a." + I_WEBUI_Board_RecordAssignment.COLUMNNAME_Record_ID)
-					.append("\n, (").append(documentLookup.getSqlForFetchingLookupByIdExpression(keyColumnNameFQ)).append(") AS card$caption")
+					.append("\n, (").append(documentLookup.getSqlForFetchingLookupByIdExpression().toStringExpression(keyColumnNameFQ)).append(") AS card$caption")
 					//
 					.append("\n, u." + I_AD_User.COLUMNNAME_AD_User_ID + " AS card$user_id")
 					.append("\n, u." + I_AD_User.COLUMNNAME_Avatar_ID + " AS card$user_avatar_id")
@@ -443,7 +443,7 @@ public class BoardDescriptorRepository
 					.append("SELECT ")
 					.append("\n  NULL AS " + I_WEBUI_Board_RecordAssignment.COLUMNNAME_WEBUI_Board_Lane_ID)
 					.append("\n, " + keyColumnNameFQ + " AS " + I_WEBUI_Board_RecordAssignment.COLUMNNAME_Record_ID)
-					.append("\n, (").append(documentLookup.getSqlForFetchingLookupByIdExpression(keyColumnNameFQ)).append(") AS card$caption")
+					.append("\n, (").append(documentLookup.getSqlForFetchingLookupByIdExpression().toStringExpression(keyColumnNameFQ)).append(") AS card$caption")
 					//
 					.append("\n, u." + I_AD_User.COLUMNNAME_AD_User_ID + " AS card$user_id")
 					.append("\n, u." + I_AD_User.COLUMNNAME_Avatar_ID + " AS card$user_avatar_id")

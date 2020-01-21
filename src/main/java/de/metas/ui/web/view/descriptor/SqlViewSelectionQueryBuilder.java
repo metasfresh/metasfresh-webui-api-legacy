@@ -34,6 +34,8 @@ import de.metas.ui.web.view.ViewEvaluationCtx;
 import de.metas.ui.web.view.ViewId;
 import de.metas.ui.web.window.datatypes.DocumentId;
 import de.metas.ui.web.window.datatypes.DocumentIdsSelection;
+import de.metas.ui.web.window.descriptor.sql.SqlOrderByValue;
+import de.metas.ui.web.window.descriptor.sql.SqlSelectValue;
 import de.metas.ui.web.window.model.DocumentQueryOrderBy;
 import de.metas.ui.web.window.model.DocumentQueryOrderByList;
 import de.metas.ui.web.window.model.sql.SqlDocumentOrderByBuilder;
@@ -122,12 +124,12 @@ public final class SqlViewSelectionQueryBuilder
 		return _viewBinding.getFieldByFieldName(fieldName).isVirtualColumn();
 	}
 
-	private String getColumnSql(final String fieldName)
+	private SqlSelectValue getSqlSelectValue(final String fieldName)
 	{
-		return _viewBinding.getFieldByFieldName(fieldName).getColumnSql();
+		return _viewBinding.getFieldByFieldName(fieldName).getSqlSelectValue();
 	}
 
-	private IStringExpression getFieldOrderBy(final String fieldName)
+	private SqlOrderByValue getFieldOrderBy(final String fieldName)
 	{
 		return _viewBinding.getFieldOrderBy(fieldName);
 	}
@@ -240,7 +242,9 @@ public final class SqlViewSelectionQueryBuilder
 		// SELECT ... FROM ... WHERE 1=1
 		final List<Object> sqlParams = new ArrayList<>();
 		{
-			IStringExpression sqlOrderBy = SqlDocumentOrderByBuilder.newInstance(this::getFieldOrderBy).buildSqlOrderBy(orderBys);
+			IStringExpression sqlOrderBy = SqlDocumentOrderByBuilder.newInstance(this::getFieldOrderBy)
+					.joinOnTableNameOrAlias(sqlTableAlias)
+					.buildSqlOrderBy(orderBys);
 			if (sqlOrderBy == null || sqlOrderBy.isNullExpression())
 			{
 				sqlOrderBy = ConstantStringExpression.of(keyColumnNamesMap.getKeyColumnNamesCommaSeparated());
@@ -392,7 +396,7 @@ public final class SqlViewSelectionQueryBuilder
 		final SqlOrderByBindings sqlOrderByBindings = fieldName -> {
 			if (keyColumnNamesMap.isKeyPartFieldName(fieldName))
 			{
-				return ConstantStringExpression.of("sl." + keyColumnNamesMap.getWebuiSelectionColumnNameForKeyColumnName(fieldName));
+				return SqlOrderByValue.of("sl." + keyColumnNamesMap.getWebuiSelectionColumnNameForKeyColumnName(fieldName));
 			}
 			else if (isGroupBy(fieldName))
 			{
@@ -400,7 +404,7 @@ public final class SqlViewSelectionQueryBuilder
 			}
 			else if (isAggregated(fieldName))
 			{
-				return ConstantStringExpression.of(getSqlAggregatedColumn(fieldName));
+				return SqlOrderByValue.of(getSqlAggregatedColumn(fieldName));
 			}
 			else
 			{
@@ -414,7 +418,9 @@ public final class SqlViewSelectionQueryBuilder
 				.filter(orderBy -> keyColumnNamesMap.isKeyPartFieldName(orderBy.getFieldName()) || isGroupBy(orderBy.getFieldName()) || isAggregated(orderBy.getFieldName()))
 				.collect(DocumentQueryOrderByList.toDocumentQueryOrderByList());
 
-		final IStringExpression sqlOrderByExpr = SqlDocumentOrderByBuilder.newInstance(sqlOrderByBindings).buildSqlOrderBy(orderBysEffective);
+		final IStringExpression sqlOrderByExpr = SqlDocumentOrderByBuilder.newInstance(sqlOrderByBindings)
+				.joinOnTableNameOrAlias(lineTableAlias)
+				.buildSqlOrderBy(orderBysEffective);
 		final String sqlOrderBy;
 		if (sqlOrderByExpr == null || sqlOrderByExpr.isNullExpression())
 		{
@@ -507,7 +513,8 @@ public final class SqlViewSelectionQueryBuilder
 				.flatMap(this::flatMapEffectiveFieldNames)
 				.collect(DocumentQueryOrderByList.toDocumentQueryOrderByList());
 		final String sqlOrderBys = replaceTableNameWithTableAlias(
-				SqlDocumentOrderByBuilder.newInstance(fieldName -> ConstantStringExpression.of(sqlTableAlias + "." + fieldName))
+				SqlDocumentOrderByBuilder.newInstance(fieldName -> SqlOrderByValue.of(sqlTableAlias + "." + fieldName))
+						.joinOnTableNameOrAlias(sqlTableAlias)
 						.buildSqlOrderBy(orderBysEffective)
 						.evaluate(viewEvalCtx.toEvaluatee(), OnVariableNotFound.Fail));
 
@@ -529,7 +536,7 @@ public final class SqlViewSelectionQueryBuilder
 					{
 						sqlKeyColumnNames.append("\n, ");
 					}
-					sqlKeyColumnNames.append(getColumnSql(keyColumnName)).append(" AS ").append(keyColumnName);
+					sqlKeyColumnNames.append(getSqlSelectValue(keyColumnName).toSqlString()).append(" AS ").append(keyColumnName);
 				}
 
 				final StringBuilder sqlSourceTableBuilder = new StringBuilder();
@@ -539,7 +546,7 @@ public final class SqlViewSelectionQueryBuilder
 					final String fieldName = orderBy.getFieldName();
 					if (isVirtualColumn(fieldName))
 					{
-						final String columnSql = getColumnSql(fieldName);
+						final String columnSql = getSqlSelectValue(fieldName).toSqlString();
 						sqlSourceTableBuilder.append("\n, (").append(columnSql).append(") AS ").append(fieldName);
 					}
 					else

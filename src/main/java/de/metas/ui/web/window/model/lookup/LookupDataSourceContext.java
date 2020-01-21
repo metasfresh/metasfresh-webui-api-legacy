@@ -33,9 +33,9 @@ import de.metas.security.UserRolePermissionsKey;
 import de.metas.security.impl.AccessSqlStringExpression;
 import de.metas.ui.web.view.ViewId;
 import de.metas.ui.web.window.datatypes.LookupValue;
-import de.metas.ui.web.window.descriptor.sql.SqlLookupDescriptor;
+import de.metas.ui.web.window.descriptor.sql.SqlForFetchingLookupById;
+import de.metas.ui.web.window.descriptor.sql.SqlForFetchingLookups;
 import de.metas.ui.web.window.model.lookup.LookupValueFilterPredicates.LookupValueFilterPredicate;
-import de.metas.util.Check;
 import de.metas.util.NumberUtils;
 import de.metas.util.StringUtils;
 import lombok.EqualsAndHashCode;
@@ -95,8 +95,6 @@ public final class LookupDataSourceContext implements Evaluatee2, IValidationCon
 
 	public static final CtxName PARAM_Filter = CtxNames.parse("Filter");
 	public static final CtxName PARAM_FilterSql = CtxNames.parse("FilterSql");
-	public static final CtxName PARAM_Offset = CtxNames.ofNameAndDefaultValue("Offset", "0");
-	public static final CtxName PARAM_Limit = CtxNames.ofNameAndDefaultValue("Limit", "1000");
 	public static final CtxName PARAM_ViewId = CtxNames.parse("ViewId");
 	public static final CtxName PARAM_ViewSize = CtxNames.parse("ViewSize");
 
@@ -150,12 +148,12 @@ public final class LookupDataSourceContext implements Evaluatee2, IValidationCon
 
 	public int getLimit(final int defaultValue)
 	{
-		return get_ValueAsInt(PARAM_Limit.getName(), defaultValue);
+		return get_ValueAsInt(SqlForFetchingLookups.PARAM_Limit.getName(), defaultValue);
 	}
 
 	public int getOffset(final int defaultValue)
 	{
-		return get_ValueAsInt(PARAM_Offset.getName(), defaultValue);
+		return get_ValueAsInt(SqlForFetchingLookups.PARAM_Offset.getName(), defaultValue);
 	}
 
 	public String getAD_Language()
@@ -472,8 +470,8 @@ public final class LookupDataSourceContext implements Evaluatee2, IValidationCon
 		{
 			requiresParameter(PARAM_Filter);
 			requiresParameter(PARAM_FilterSql);
-			requiresParameter(PARAM_Limit);
-			requiresParameter(PARAM_Offset);
+			requiresParameter(SqlForFetchingLookups.PARAM_Limit);
+			requiresParameter(SqlForFetchingLookups.PARAM_Offset);
 			return this;
 		}
 
@@ -508,8 +506,8 @@ public final class LookupDataSourceContext implements Evaluatee2, IValidationCon
 		{
 			putValue(PARAM_Filter, filter);
 			putValue(PARAM_FilterSql, convertFilterToSql(filter));
-			putValue(PARAM_Offset, offset);
-			putValue(PARAM_Limit, limit);
+			putValue(SqlForFetchingLookups.PARAM_Offset, offset);
+			putValue(SqlForFetchingLookups.PARAM_Limit, limit);
 
 			return this;
 		}
@@ -536,21 +534,20 @@ public final class LookupDataSourceContext implements Evaluatee2, IValidationCon
 
 		protected Builder putFilterByIdParameterName(final String sqlId)
 		{
-			putValue(SqlLookupDescriptor.SQL_PARAM_KeyId, sqlId);
+			putValue(SqlForFetchingLookupById.SQL_PARAM_KeyId, sqlId);
 			return this;
 		}
 
-		public Builder putFilterById(final Object id)
+		public Builder putFilterById(@NonNull final Object id)
 		{
-			Check.assumeNotNull(id, "Parameter id is not null");
 			idToFilter = id;
 			return this;
 		}
 
 		public Builder putShowInactive(final boolean showInactive)
 		{
-			final String sqlShowInactive = showInactive ? SqlLookupDescriptor.SQL_PARAM_VALUE_ShowInactive_Yes : SqlLookupDescriptor.SQL_PARAM_VALUE_ShowInactive_No;
-			putValue(SqlLookupDescriptor.SQL_PARAM_ShowInactive, sqlShowInactive);
+			final String sqlShowInactive = showInactive ? SqlForFetchingLookupById.SQL_PARAM_VALUE_ShowInactive_Yes : SqlForFetchingLookupById.SQL_PARAM_VALUE_ShowInactive_No;
+			putValue(SqlForFetchingLookupById.SQL_PARAM_ShowInactive, sqlShowInactive);
 			return this;
 		}
 

@@ -25,6 +25,7 @@ import de.metas.ui.web.view.ViewId;
 import de.metas.ui.web.window.datatypes.DocumentId;
 import de.metas.ui.web.window.datatypes.DocumentIdsSelection;
 import de.metas.ui.web.window.descriptor.sql.SqlSelectDisplayValue;
+import de.metas.ui.web.window.descriptor.sql.SqlSelectValue;
 import de.metas.util.Check;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -67,7 +68,6 @@ public class SqlViewSelectData
 	public static final String COLUMNNAME_IsRecordMissing = COLUMNNAME_Paging_Prefix + "IsRecordMissing";
 
 	private final String sqlTableName;
-	// private final String sqlTableAlias;
 	private final SqlViewKeyColumnNamesMap keyColumnNamesMap;
 	private final ImmutableSet<String> displayFieldNames;
 	private final ImmutableMap<String, SqlViewRowFieldBinding> fieldsByFieldName;
@@ -90,7 +90,6 @@ public class SqlViewSelectData
 			@Nullable final SqlViewGroupingBinding groupingBinding)
 	{
 		this.sqlTableName = sqlTableName;
-		// this.sqlTableAlias = sqlTableAlias;
 		this.keyColumnNamesMap = keyColumnNamesMap;
 		this.displayFieldNames = ImmutableSet.copyOf(displayFieldNames);
 		this.fieldsByFieldName = Maps.uniqueIndex(allFields, SqlViewRowFieldBinding::getFieldName);
@@ -181,7 +180,7 @@ public class SqlViewSelectData
 		allFields.forEach(field -> {
 			// Collect the SQL select for internal value
 			// NOTE: we need to collect all fields because, even if the field is not needed it might be present in some where clause
-			sqlSelectValuesList.add(field.getSqlSelectValue());
+			sqlSelectValuesList.add(field.getSqlSelectValue().toSqlStringWithColumnNameAlias());
 
 			// Collect the SQL select for displayed value,
 			// * if there is one
@@ -246,10 +245,9 @@ public class SqlViewSelectData
 			}
 			else if (groupingBinding.isGroupBy(fieldName))
 			{
-				final String columnSql = field.getColumnSql();
-				final String sqlSelectValue = field.getSqlSelectValue();
-				sqlSelectValuesList.add(sqlSelectValue);
-				sqlGroupBys.add(columnSql);
+				final SqlSelectValue sqlSelectValue = field.getSqlSelectValue();
+				sqlSelectValuesList.add(sqlSelectValue.toSqlStringWithColumnNameAlias());
+				sqlGroupBys.add(sqlSelectValue.toSqlString());
 
 				if (usingDisplayColumn)
 				{
@@ -336,7 +334,7 @@ public class SqlViewSelectData
 		allFields.forEach(field -> {
 			// Collect the SQL select for internal value
 			// NOTE: we need to collect all fields because, even if the field is not needed it might be present in some where clause
-			sqlSelectValuesList.add(field.getSqlSelectValue());
+			sqlSelectValuesList.add(field.getSqlSelectValue().toSqlStringWithColumnNameAlias());
 
 			// Collect the SQL select for displayed value,
 			// * if there is one

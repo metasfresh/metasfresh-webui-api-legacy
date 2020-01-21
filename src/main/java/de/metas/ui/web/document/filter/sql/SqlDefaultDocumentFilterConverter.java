@@ -22,6 +22,7 @@ import de.metas.ui.web.window.datatypes.LookupValuesList;
 import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
 import de.metas.ui.web.window.descriptor.sql.SqlEntityBinding;
 import de.metas.ui.web.window.descriptor.sql.SqlEntityFieldBinding;
+import de.metas.ui.web.window.descriptor.sql.SqlSelectValue;
 import de.metas.ui.web.window.model.lookup.LabelsLookup;
 import de.metas.ui.web.window.model.sql.SqlDocumentsRepository;
 import de.metas.ui.web.window.model.sql.SqlOptions;
@@ -189,13 +190,13 @@ import lombok.NonNull;
 
 	private String extractColumnSql(@NonNull final SqlEntityFieldBinding fieldBinding, final IQueryFilterModifier modifier, final SqlOptions sqlOpts)
 	{
-		String columnSql = fieldBinding.getColumnSql();
+		SqlSelectValue columnSql = fieldBinding.getSqlSelectValue();
 		if (sqlOpts.isUseTableAlias())
 		{
-			columnSql = replaceTableNameWithTableAlias(columnSql, sqlOpts.getTableAlias());
+			columnSql = columnSql.withJoinOnTableNameOrAlias(sqlOpts.getTableAlias());
 		}
 
-		return modifier.getColumnSql(columnSql);
+		return modifier.getColumnSql(columnSql.toSqlString());
 	}
 
 	private Object convertToSqlValue(final Object value, final SqlEntityFieldBinding fieldBinding, final IQueryFilterModifier modifier)

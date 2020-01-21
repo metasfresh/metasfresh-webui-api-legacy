@@ -6,9 +6,6 @@ import java.time.LocalTime;
 import java.time.ZonedDateTime;
 import java.util.Optional;
 
-import org.adempiere.ad.expression.api.IStringExpression;
-import org.adempiere.ad.expression.api.impl.ConstantStringExpression;
-
 import com.google.common.base.MoreObjects;
 
 import de.metas.ui.web.window.datatypes.ColorValue;
@@ -75,7 +72,6 @@ public class SqlDocumentFieldDataBindingDescriptor implements DocumentFieldDataB
 	private final String fieldName;
 
 	private final String sqlColumnName;
-	private final String sqlColumnSql;
 	private final Class<?> sqlValueClass;
 
 	private final boolean virtualColumn;
@@ -88,7 +84,7 @@ public class SqlDocumentFieldDataBindingDescriptor implements DocumentFieldDataB
 
 	private final Boolean numericKey;
 	//
-	private final String sqlSelectValue;
+	private final SqlSelectValue sqlSelectValue;
 	private final SqlSelectDisplayValue sqlSelectDisplayValue;
 
 	private final int defaultOrderByPriority;
@@ -99,7 +95,6 @@ public class SqlDocumentFieldDataBindingDescriptor implements DocumentFieldDataB
 		fieldName = builder.fieldName;
 
 		sqlColumnName = builder.getColumnName();
-		sqlColumnSql = builder.getColumnSql();
 		sqlValueClass = builder.getSqlValueClass();
 		virtualColumn = builder.isVirtualColumn();
 		mandatory = builder.mandatory;
@@ -143,15 +138,6 @@ public class SqlDocumentFieldDataBindingDescriptor implements DocumentFieldDataB
 		return sqlColumnName;
 	}
 
-	/**
-	 * @return ColumnName or a SQL string expression in case {@link #isVirtualColumn()}
-	 */
-	@Override
-	public String getColumnSql()
-	{
-		return sqlColumnSql;
-	}
-
 	@Override
 	public Class<?> getSqlValueClass()
 	{
@@ -159,7 +145,7 @@ public class SqlDocumentFieldDataBindingDescriptor implements DocumentFieldDataB
 	}
 
 	/** @return SQL to be used in SELECT ... 'this field's sql' ... FROM ... */
-	public String getSqlSelectValue()
+	public SqlSelectValue getSqlSelectValue()
 	{
 		return sqlSelectValue;
 	}
@@ -229,12 +215,12 @@ public class SqlDocumentFieldDataBindingDescriptor implements DocumentFieldDataB
 	}
 
 	@Override
-	public IStringExpression getSqlOrderBy()
+	public SqlOrderByValue getSqlOrderBy()
 	{
-		final SqlSelectDisplayValue sqlSelectDisplayValue = getSqlSelectDisplayValue();
-		return sqlSelectDisplayValue != null
-				? sqlSelectDisplayValue.toStringExpression()
-				: ConstantStringExpression.ofNullable(getColumnSql());
+		return SqlOrderByValue.builder()
+				.sqlSelectDisplayValue(getSqlSelectDisplayValue())
+				.sqlSelectValue(getSqlSelectValue())
+				.build();
 	}
 
 	public static final class Builder
@@ -302,7 +288,7 @@ public class SqlDocumentFieldDataBindingDescriptor implements DocumentFieldDataB
 					.build();
 		}
 
-		private String buildSqlSelectValue()
+		private SqlSelectValue buildSqlSelectValue()
 		{
 			final String columnSql = getColumnSql();
 			final String columnName = getColumnName();
@@ -313,19 +299,29 @@ public class SqlDocumentFieldDataBindingDescriptor implements DocumentFieldDataB
 			// Check the Labels case for example.
 			if (Check.isEmpty(columnName, true))
 			{
-				return "NULL AS " + getFieldName();
+				return SqlSelectValue.builder()
+						.virtualColumnSql("NULL")
+						.columnNameAlias(getFieldName())
+						.build();
 			}
 			//
 			// Virtual column
 			else if (isVirtualColumn())
 			{
-				return columnSql + " AS " + columnName;
+				return SqlSelectValue.builder()
+						.virtualColumnSql(columnSql)
+						.columnNameAlias(columnName)
+						.build();
 			}
 			//
 			// Regular table column
 			else
 			{
-				return getTableName() + "." + columnSql + " AS " + columnName;
+				return SqlSelectValue.builder()
+						.tableNameOrAlias(getTableName())
+						.columnName(columnSql)
+						.columnNameAlias(columnName)
+						.build();
 			}
 		}
 

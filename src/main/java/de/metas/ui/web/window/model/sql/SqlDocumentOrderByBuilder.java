@@ -3,6 +3,7 @@ package de.metas.ui.web.window.model.sql;
 import org.adempiere.ad.expression.api.IStringExpression;
 
 import de.metas.ui.web.window.descriptor.sql.SqlEntityBinding;
+import de.metas.ui.web.window.descriptor.sql.SqlOrderByValue;
 import de.metas.ui.web.window.model.DocumentQueryOrderBy;
 import de.metas.ui.web.window.model.DocumentQueryOrderByList;
 import lombok.NonNull;
@@ -44,14 +45,21 @@ public class SqlDocumentOrderByBuilder
 	@FunctionalInterface
 	public interface SqlOrderByBindings
 	{
-		IStringExpression getFieldOrderBy(String fieldName);
+		SqlOrderByValue getFieldOrderBy(String fieldName);
 	}
 
 	private final SqlOrderByBindings bindings;
+	private String joinOnTableNameOrAlias;
 
 	private SqlDocumentOrderByBuilder(@NonNull final SqlOrderByBindings bindings)
 	{
 		this.bindings = bindings;
+	}
+
+	public SqlDocumentOrderByBuilder joinOnTableNameOrAlias(final String joinOnTableNameOrAlias)
+	{
+		this.joinOnTableNameOrAlias = joinOnTableNameOrAlias;
+		return this;
 	}
 
 	/**
@@ -64,37 +72,32 @@ public class SqlDocumentOrderByBuilder
 			return null;
 		}
 
-		final IStringExpression sqlOrderByFinal = orderBys
+		return orderBys
 				.stream()
-				.map(orderBy -> buildSqlOrderBy(orderBy))
+				.map(this::buildSqlOrderBy)
 				.filter(sql -> sql != null && !sql.isNullExpression())
 				.collect(IStringExpression.collectJoining(", "));
-
-		return sqlOrderByFinal;
 	}
 
 	private final IStringExpression buildSqlOrderBy(final DocumentQueryOrderBy orderBy)
 	{
 		final String fieldName = orderBy.getFieldName();
-		final IStringExpression sqlExpression = bindings.getFieldOrderBy(fieldName);
+		final SqlOrderByValue sqlExpression = bindings.getFieldOrderBy(fieldName);
 		return buildSqlOrderBy(sqlExpression, orderBy.isAscending(), orderBy.isNullsLast());
 	}
 
-	/**
-	 * 
-	 * @param sqlExpression
-	 * @param ascending
-	 * @return ORDER BY SQL or empty
-	 */
-	private static final IStringExpression buildSqlOrderBy(final IStringExpression sqlExpression, final boolean ascending, final boolean nullsLast)
+	private final IStringExpression buildSqlOrderBy(
+			final SqlOrderByValue orderBy,
+			final boolean ascending,
+			final boolean nullsLast)
 	{
-		if (sqlExpression.isNullExpression())
+		if (orderBy.isNullExpression())
 		{
-			return sqlExpression;
+			return IStringExpression.NULL;
 		}
 
 		return IStringExpression.composer()
-				.append("(").append(sqlExpression).append(")")
+				.append("(").append(orderBy.withJoinOnTableNameOrAlias(joinOnTableNameOrAlias).toStringExpression()).append(")")
 				.append(ascending ? " ASC" : " DESC")
 				.append(nullsLast ? " NULLS LAST" : " NULLS FIRST")
 				.build();

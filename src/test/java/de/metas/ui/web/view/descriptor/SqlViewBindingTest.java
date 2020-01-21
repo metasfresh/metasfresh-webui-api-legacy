@@ -2,7 +2,7 @@ package de.metas.ui.web.view.descriptor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import de.metas.ui.web.document.filter.sql.SqlDocumentFilterConverter;
 import de.metas.ui.web.document.filter.sql.SqlDocumentFilterConverterDecorator;
@@ -34,7 +34,6 @@ import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
 
 public class SqlViewBindingTest
 {
-
 	@Test
 	public void createSqlViewBinding_Has_Null_Decorator_By_Default()
 	{
@@ -67,12 +66,10 @@ public class SqlViewBindingTest
 				.keyColumn(true)
 				.build();
 
-		final Builder builder = SqlViewBinding.builder()
+		return SqlViewBinding.builder()
 				.tableName("dummyTable")
 				.field(field)
 				.displayFieldNames("displayFieldName");
-
-		return builder;
 	}
 
 	public static class CustomSqlDocumentFilterConverterDecoratorProvider implements SqlDocumentFilterConverterDecorator

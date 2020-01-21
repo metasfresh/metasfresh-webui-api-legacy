@@ -6,7 +6,6 @@ import javax.annotation.Nullable;
 
 import org.adempiere.ad.expression.api.IStringExpression;
 import org.adempiere.ad.expression.api.impl.ConstantStringExpression;
-import org.compiere.util.Evaluatees;
 
 import de.metas.printing.esb.base.util.Check;
 import lombok.Builder;
@@ -48,7 +47,7 @@ public class SqlSelectDisplayValue
 
 	private final String joinOnTableNameOrAlias;
 	private final String joinOnColumnName;
-	private final IStringExpression sqlExpression;
+	private final SqlForFetchingLookupById sqlExpression;
 	@Getter
 	private final String columnNameAlias;
 
@@ -56,7 +55,7 @@ public class SqlSelectDisplayValue
 	private SqlSelectDisplayValue(
 			@Nullable final String joinOnTableNameOrAlias,
 			@NonNull final String joinOnColumnName,
-			@Nullable final IStringExpression sqlExpression,
+			@Nullable final SqlForFetchingLookupById sqlExpression,
 			@NonNull final String columnNameAlias)
 	{
 		this.joinOnTableNameOrAlias = joinOnTableNameOrAlias;
@@ -78,17 +77,13 @@ public class SqlSelectDisplayValue
 				? joinOnTableNameOrAlias + "." + joinOnColumnName
 				: joinOnColumnName;
 
-		if (sqlExpression == null || sqlExpression.isNullExpression())
+		if (sqlExpression == null)
 		{
 			return ConstantStringExpression.of(joinOnColumnNameFQ);
 		}
 		else
 		{
-			return sqlExpression.resolvePartial(Evaluatees
-					.mapBuilder()
-					.put(SqlLookupDescriptor.SQL_PARAM_KeyId, joinOnColumnNameFQ)
-					.put(SqlLookupDescriptor.SQL_PARAM_ShowInactive, SqlLookupDescriptor.SQL_PARAM_VALUE_ShowInactive_Yes)
-					.build());
+			return sqlExpression.toStringExpression(joinOnColumnNameFQ);
 		}
 	}
 

@@ -10,7 +10,6 @@ import java.util.stream.Stream;
 
 import javax.annotation.Nullable;
 
-import org.adempiere.ad.expression.api.IExpressionEvaluator.OnVariableNotFound;
 import org.adempiere.ad.expression.api.IStringExpression;
 import org.adempiere.ad.expression.api.impl.ConstantStringExpression;
 import org.adempiere.exceptions.AdempiereException;
@@ -269,7 +268,7 @@ public class SqlViewBinding implements SqlEntityBinding
 		final ImmutableMap.Builder<String, String> sqlOrderBysIndexedByFieldName = ImmutableMap.builder();
 		for (final SqlViewRowFieldBinding fieldBinding : getFields())
 		{
-			final String fieldOrderBy = fieldBinding.getSqlOrderBy().evaluate(viewEvalCtx.toEvaluatee(), OnVariableNotFound.Fail);
+			final String fieldOrderBy = fieldBinding.getSqlOrderBy().evaluate(viewEvalCtx.toEvaluatee());
 			if (Check.isEmpty(fieldOrderBy, true))
 			{
 				continue;

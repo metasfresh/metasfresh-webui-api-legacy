@@ -329,8 +329,8 @@ public final class SqlDocumentEntityDataBindingDescriptor implements DocumentEnt
 			{
 				//
 				// Value column
-				final String sqlSelectValue = sqlField.getSqlSelectValue();
-				sqlSelectValuesList.add(sqlSelectValue);
+				final SqlSelectValue sqlSelectValue = sqlField.getSqlSelectValue();
+				sqlSelectValuesList.add(sqlSelectValue.toSqlStringWithColumnNameAlias());
 
 				//
 				// Display column, if any
