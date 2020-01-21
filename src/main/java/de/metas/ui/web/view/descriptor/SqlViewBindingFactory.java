@@ -195,7 +195,6 @@ public class SqlViewBindingFactory
 		return SqlViewRowFieldBinding.builder()
 				.fieldName(fieldName)
 				.columnName(documentField.getColumnName())
-//				.columnSql(documentField.getColumnSql())
 				.keyColumn(documentField.isKeyColumn())
 				.widgetType(documentField.getWidgetType())
 				.virtualColumn(documentField.isVirtualColumn())
