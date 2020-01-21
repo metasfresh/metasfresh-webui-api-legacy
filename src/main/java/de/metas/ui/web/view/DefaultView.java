@@ -39,6 +39,7 @@ import de.metas.ui.web.window.datatypes.DocumentPath;
 import de.metas.ui.web.window.datatypes.LookupValuesList;
 import de.metas.ui.web.window.datatypes.json.JSONDocumentChangedEvent;
 import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
+import de.metas.ui.web.window.model.Document;
 import de.metas.ui.web.window.model.DocumentCollection;
 import de.metas.ui.web.window.model.DocumentQueryOrderByList;
 import de.metas.ui.web.window.model.DocumentSaveStatus;
@@ -594,34 +595,44 @@ public final class DefaultView implements IEditableView
 		final DocumentPath documentPath = getById(rowId).getDocumentPath();
 
 		Services.get(ITrxManager.class)
-				.runInThreadInheritedTrx(() -> documentsCollection.forDocumentWritable(documentPath, NullDocumentChangesCollector.instance, document -> {
-					//
-					// Process changes and the save the document
-					document.processValueChanges(fieldChangeRequests, ReasonSupplier.NONE);
-					document.saveIfValidAndHasChanges();
-
-					//
-					// Important: before allowing the document to be stored back in documents collection,
-					// we need to make sure it's valid and saved.
-					final DocumentValidStatus validStatus = document.getValidStatus();
-					if (!validStatus.isValid())
-					{
-						throw new AdempiereException(validStatus.getReason());
-					}
-					final DocumentSaveStatus saveStatus = document.getSaveStatus();
-					if (!saveStatus.isSavedOrDeleted())
-					{
-						throw new AdempiereException(saveStatus.getReason());
-					}
-
-					//
-					return null; // nothing/not important
-				}));
+				.runInThreadInheritedTrx(
+						() -> documentsCollection.forDocumentWritable(
+								documentPath,
+								NullDocumentChangesCollector.instance,
+								document -> {
+									patchDocument(document, fieldChangeRequests);
+									return null;
+								}));
 
 		invalidateRowById(rowId);
 		ViewChangesCollector.getCurrentOrAutoflush().collectRowChanged(this, rowId);
 
 		documentsCollection.invalidateRootDocument(documentPath);
+	}
+
+	private void patchDocument(
+			@NonNull final Document document,
+			@NonNull final List<JSONDocumentChangedEvent> fieldChangeRequests)
+	{
+		//
+		// Process changes and the save the document
+		document.processValueChanges(fieldChangeRequests, ReasonSupplier.NONE);
+		document.saveIfValidAndHasChanges();
+
+		//
+		// Important: before allowing the document to be stored back in documents collection,
+		// we need to make sure it's valid and saved.
+		final DocumentValidStatus validStatus = document.getValidStatus();
+		if (!validStatus.isValid())
+		{
+			throw new AdempiereException(validStatus.getReason());
+		}
+
+		final DocumentSaveStatus saveStatus = document.getSaveStatus();
+		if (!saveStatus.isSavedOrDeleted())
+		{
+			throw new AdempiereException(saveStatus.getReason());
+		}
 	}
 
 	@Override
@@ -825,11 +836,6 @@ public final class DefaultView implements IEditableView
 			return _filtersById.isEmpty() ? DocumentFilterList.EMPTY : DocumentFilterList.ofList(_filtersById.values());
 		}
 
-		public boolean hasFilters()
-		{
-			return !_filtersById.isEmpty();
-		}
-
 		public Builder addFiltersIfAbsent(final Collection<DocumentFilter> filters)
 		{
 			filters.forEach(filter -> _filtersById.putIfAbsent(filter.getFilterId(), filter));
@@ -842,7 +848,7 @@ public final class DefaultView implements IEditableView
 			return this;
 		}
 
-		public boolean isRefreshViewOnChangeEvents()
+		private boolean isRefreshViewOnChangeEvents()
 		{
 			return refreshViewOnChangeEvents;
 		}
