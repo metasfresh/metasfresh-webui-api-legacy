@@ -1,5 +1,7 @@
 package de.metas.ui.web.view;
 
+import java.util.Objects;
+
 import javax.annotation.Nullable;
 
 import de.metas.ui.web.window.datatypes.WindowId;
@@ -55,6 +57,11 @@ public final class ViewRowIdsOrderedSelection
 		this.queryLimitHit = queryLimit > 0
 				&& size > 0
 				&& size >= queryLimit;
+	}
+
+	public static boolean equals(final ViewRowIdsOrderedSelection s1, final ViewRowIdsOrderedSelection s2)
+	{
+		return Objects.equals(s1, s2);
 	}
 
 	public WindowId getWindowId()

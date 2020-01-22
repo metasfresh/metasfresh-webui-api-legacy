@@ -3,8 +3,11 @@ package de.metas.ui.web.view;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
+import java.util.function.UnaryOperator;
 
-import org.adempiere.util.lang.ExtendedMemorizingSupplier;
+import javax.annotation.Nullable;
+
+import org.adempiere.util.lang.SynchronizedMutable;
 
 import com.google.common.collect.ImmutableSet;
 
@@ -47,7 +50,7 @@ final class ViewRowIdsOrderedSelectionsHolder
 	private final Supplier<ViewEvaluationCtx> viewEvaluationCtxSupplier;
 
 	private final AtomicBoolean selectionDeleteBeforeCreate = new AtomicBoolean(false);
-	private final ExtendedMemorizingSupplier<ViewRowIdsOrderedSelections> selectionsRef;
+	private final SynchronizedMutable<ViewRowIdsOrderedSelections> currentSelectionsRef = SynchronizedMutable.of(null);
 
 	@Builder
 	private ViewRowIdsOrderedSelectionsHolder(
@@ -63,8 +66,27 @@ final class ViewRowIdsOrderedSelectionsHolder
 		this.applySecurityRestrictions = applySecurityRestrictions;
 		this.allFilters = stickyFilters.mergeWith(filters);
 		this.viewEvaluationCtxSupplier = viewEvaluationCtxSupplier;
+	}
 
-		selectionsRef = ExtendedMemorizingSupplier.of(this::createViewRowIdsOrderedSelections);
+	private ViewRowIdsOrderedSelections getCurrentSelections()
+	{
+		return currentSelectionsRef.computeIfNull(this::createViewRowIdsOrderedSelections);
+	}
+
+	private ViewRowIdsOrderedSelections computeCurrentSelections(@NonNull final UnaryOperator<ViewRowIdsOrderedSelections> remappingFunction)
+	{
+		return currentSelectionsRef.compute(previousSelections -> {
+			final ViewRowIdsOrderedSelections selections = previousSelections != null
+					? previousSelections
+					: createViewRowIdsOrderedSelections();
+
+			return remappingFunction.apply(selections);
+		});
+	}
+
+	public ViewRowIdsOrderedSelections computeCurrentSelectionsIfPresent(@NonNull final UnaryOperator<ViewRowIdsOrderedSelections> remappingFunction)
+	{
+		return currentSelectionsRef.computeIfNotNull(remappingFunction);
 	}
 
 	private ViewRowIdsOrderedSelections createViewRowIdsOrderedSelections()
@@ -81,7 +103,18 @@ final class ViewRowIdsOrderedSelectionsHolder
 				applySecurityRestrictions,
 				SqlDocumentFilterConverterContext.EMPTY);
 
-		return new ViewRowIdsOrderedSelections(defaultSelection);
+		return ViewRowIdsOrderedSelections.ofDefaultSelection(defaultSelection);
+	}
+
+	public void forgetCurrentSelections()
+	{
+		selectionDeleteBeforeCreate.set(true);
+		final ViewRowIdsOrderedSelections selections = currentSelectionsRef.setValueAndReturnPrevious(null);
+		if (selections != null)
+		{
+			final ImmutableSet<String> selectionIds = selections.getSelectionIds();
+			viewDataRepository.scheduleDeleteSelections(selectionIds);
+		}
 	}
 
 	private ViewEvaluationCtx getViewEvaluationCtx()
@@ -91,29 +124,49 @@ final class ViewRowIdsOrderedSelectionsHolder
 
 	public ViewRowIdsOrderedSelection getDefaultSelection()
 	{
-		return selectionsRef.get().getDefaultSelection();
-	}
-
-	public void forgetCurrentSelections()
-	{
-		selectionDeleteBeforeCreate.set(true);
-		final ViewRowIdsOrderedSelections selections = selectionsRef.forget();
-		if (selections != null)
-		{
-			final ImmutableSet<String> selectionIds = selections.getSelectionIds();
-			viewDataRepository.scheduleDeleteSelections(selectionIds);
-		}
+		return getCurrentSelections().getDefaultSelection();
 	}
 
 	public void removeRowIdsNotMatchingFilters(final Set<DocumentId> rowIds)
 	{
-		selectionsRef.get().computeDefaultSelection(defaultSelection -> viewDataRepository.removeRowIdsNotMatchingFilters(defaultSelection, allFilters, rowIds));
+		if (rowIds.isEmpty())
+		{
+			return;
+		}
+
+		computeCurrentSelectionsIfPresent(selections -> removeRowIdsNotMatchingFilters(selections, rowIds));
 	}
 
-	public ViewRowIdsOrderedSelection getOrderedSelection(final DocumentQueryOrderByList orderBysParam)
+	private ViewRowIdsOrderedSelections removeRowIdsNotMatchingFilters(
+			@NonNull final ViewRowIdsOrderedSelections selections,
+			@NonNull final Set<DocumentId> rowIds)
 	{
-		return selectionsRef.get().computeIfAbsent(
-				orderBysParam,
-				(defaultSelection, orderBys) -> viewDataRepository.createOrderedSelectionFromSelection(getViewEvaluationCtx(), defaultSelection, orderBys));
+		return selections.withDefaultSelection(
+				viewDataRepository.removeRowIdsNotMatchingFilters(
+						selections.getDefaultSelection(),
+						allFilters,
+						rowIds));
+	}
+
+	public ViewRowIdsOrderedSelection getOrderedSelection(final DocumentQueryOrderByList orderBys)
+	{
+		return computeCurrentSelections(selections -> computeOrderBySelectionIfAbsent(selections, orderBys))
+				.getSelection(orderBys);
+	}
+
+	private ViewRowIdsOrderedSelections computeOrderBySelectionIfAbsent(
+			@NonNull final ViewRowIdsOrderedSelections selections,
+			@Nullable final DocumentQueryOrderByList orderBys)
+	{
+		return selections.withOrderBysSelectionIfAbsent(
+				orderBys,
+				this::createSelectionFromSelection);
+	}
+
+	private ViewRowIdsOrderedSelection createSelectionFromSelection(
+			@NonNull final ViewRowIdsOrderedSelection fromSelection,
+			@Nullable final DocumentQueryOrderByList orderBys)
+	{
+		return viewDataRepository.createOrderedSelectionFromSelection(getViewEvaluationCtx(), fromSelection, orderBys);
 	}
 }

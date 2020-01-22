@@ -1,15 +1,14 @@
 package de.metas.ui.web.view;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.function.UnaryOperator;
-
 import org.adempiere.exceptions.AdempiereException;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 
 import de.metas.ui.web.window.model.DocumentQueryOrderByList;
+import lombok.EqualsAndHashCode;
 import lombok.NonNull;
+import lombok.ToString;
 
 /*
  * #%L
@@ -33,14 +32,25 @@ import lombok.NonNull;
  * #L%
  */
 
+@EqualsAndHashCode
+@ToString
 final class ViewRowIdsOrderedSelections
 {
-	private ViewRowIdsOrderedSelection defaultSelection;
-	private final HashMap<DocumentQueryOrderByList, ViewRowIdsOrderedSelection> selectionsByOrderBys = new HashMap<>();
+	public static ViewRowIdsOrderedSelections ofDefaultSelection(@NonNull final ViewRowIdsOrderedSelection defaultSelection)
+	{
+		final ImmutableMap<DocumentQueryOrderByList, ViewRowIdsOrderedSelection> selectionsByOrderBys = ImmutableMap.of();
+		return new ViewRowIdsOrderedSelections(defaultSelection, selectionsByOrderBys);
+	}
 
-	public ViewRowIdsOrderedSelections(@NonNull final ViewRowIdsOrderedSelection defaultSelection)
+	private final ViewRowIdsOrderedSelection defaultSelection;
+	private final ImmutableMap<DocumentQueryOrderByList, ViewRowIdsOrderedSelection> selectionsByOrderBys;
+
+	private ViewRowIdsOrderedSelections(
+			@NonNull final ViewRowIdsOrderedSelection defaultSelection,
+			@NonNull final ImmutableMap<DocumentQueryOrderByList, ViewRowIdsOrderedSelection> selectionsByOrderBys)
 	{
 		this.defaultSelection = defaultSelection;
+		this.selectionsByOrderBys = selectionsByOrderBys;
 	}
 
 	public synchronized ViewRowIdsOrderedSelection getDefaultSelection()
@@ -48,21 +58,11 @@ final class ViewRowIdsOrderedSelections
 		return defaultSelection;
 	}
 
-	public synchronized ViewRowIdsOrderedSelection computeDefaultSelection(@NonNull final UnaryOperator<ViewRowIdsOrderedSelection> mapper)
+	public ViewRowIdsOrderedSelections withDefaultSelection(@NonNull final ViewRowIdsOrderedSelection defaultSelection)
 	{
-		final ViewRowIdsOrderedSelection newDefaultSelection = mapper.apply(defaultSelection);
-		if (newDefaultSelection == null)
-		{
-			throw new AdempiereException("null default selection is not allowed");
-		}
-
-		if (!defaultSelection.equals(newDefaultSelection))
-		{
-			this.defaultSelection = newDefaultSelection;
-			selectionsByOrderBys.clear();
-		}
-
-		return defaultSelection;
+		return !ViewRowIdsOrderedSelection.equals(this.defaultSelection, defaultSelection)
+				? ofDefaultSelection(defaultSelection)
+				: this;
 	}
 
 	@FunctionalInterface
@@ -71,30 +71,52 @@ final class ViewRowIdsOrderedSelections
 		ViewRowIdsOrderedSelection create(ViewRowIdsOrderedSelection defaultSelection, DocumentQueryOrderByList orderBys);
 	}
 
-	public synchronized ViewRowIdsOrderedSelection computeIfAbsent(
+	public ViewRowIdsOrderedSelections withOrderBysSelectionIfAbsent(
 			@NonNull final DocumentQueryOrderByList orderBys,
-			@NonNull final ViewRowIdsOrderedSelections.ViewRowIdsOrderedSelectionFactory factory)
+			@NonNull final ViewRowIdsOrderedSelectionFactory factory)
+	{
+		final ViewRowIdsOrderedSelection selection = getSelectionOrNull(orderBys);
+		if (selection != null)
+		{
+			return this;
+		}
+
+		final ImmutableMap<DocumentQueryOrderByList, ViewRowIdsOrderedSelection> selectionsByOrderBysNew = ImmutableMap.<DocumentQueryOrderByList, ViewRowIdsOrderedSelection> builder()
+				.putAll(selectionsByOrderBys)
+				.put(orderBys, factory.create(defaultSelection, orderBys))
+				.build();
+		return new ViewRowIdsOrderedSelections(defaultSelection, selectionsByOrderBysNew);
+	}
+
+	public ViewRowIdsOrderedSelection getSelection(final DocumentQueryOrderByList orderBys)
+	{
+		final ViewRowIdsOrderedSelection selection = getSelectionOrNull(orderBys);
+		if (selection == null)
+		{
+			throw new AdempiereException("No selection found for " + orderBys + " in " + this);
+		}
+		return selection;
+	}
+
+	private ViewRowIdsOrderedSelection getSelectionOrNull(final DocumentQueryOrderByList orderBys)
 	{
 		if (orderBys == null || orderBys.isEmpty())
 		{
 			return defaultSelection;
 		}
-
 		if (DocumentQueryOrderByList.equals(defaultSelection.getOrderBys(), orderBys))
 		{
 			return defaultSelection;
 		}
 
-		return selectionsByOrderBys.computeIfAbsent(
-				orderBys,
-				k -> factory.create(defaultSelection, orderBys));
+		return selectionsByOrderBys.get(orderBys);
 	}
 
-	public synchronized ImmutableSet<String> getSelectionIds()
+	public ImmutableSet<String> getSelectionIds()
 	{
 		final ImmutableSet.Builder<String> selectionIds = ImmutableSet.builder();
 		selectionIds.add(defaultSelection.getSelectionId());
-		for (final ViewRowIdsOrderedSelection selection : new ArrayList<>(selectionsByOrderBys.values()))
+		for (final ViewRowIdsOrderedSelection selection : selectionsByOrderBys.values())
 		{
 			selectionIds.add(selection.getSelectionId());
 		}
