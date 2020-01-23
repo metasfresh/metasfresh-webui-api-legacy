@@ -59,9 +59,10 @@ import org.adempiere.model.InterfaceWrapperHelper;
 import org.adempiere.util.lang.impl.TableRecordReference;
 import org.compiere.model.I_C_Invoice;
 import org.compiere.model.I_C_Payment;
-import org.compiere.util.DisplayType;
+import org.compiere.util.TimeUtil;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -193,7 +194,10 @@ public class C_BankStatement_AllocateInvoices extends JavaProcess implements IPr
 		final BankAccountId bankAccountId = BankAccountId.ofRepoId(bankStatement.getC_BP_BankAccount_ID());
 		// TODO tbp @teo: not sure if stmt amount is the correct one. Help?
 		//    problem is the bank statement line could already have some allocations, so i have to figure that out somehow
-		final ImmutableList<PaymentId> paymentIds = retrieveOrCreatePaymentsForInvoicesOldestFirst(invoiceIds, bankAccountId, bankStatementLine.getStmtAmt());
+		//    sa vad cum sunt calculate stmt amount si trx amount
+		//    -in mod normal stmt ar trebui sa fie importat din extrasul bancar
+		//    	- cat e nealocat este stmt amount - trx amount -> asta tre sa folosesc eu
+		final ImmutableList<PaymentId> paymentIds = retrieveOrCreatePaymentsForInvoicesOldestFirst(invoiceIds, bankAccountId, bankStatementLine.getStmtAmt(), TimeUtil.asLocalDate(bankStatementLine.getStatementLineDate()));
 
 		if (paymentIds.size() == 1)
 		{
@@ -228,7 +232,11 @@ public class C_BankStatement_AllocateInvoices extends JavaProcess implements IPr
 	/**
 	 * Iterate over the selected invoices and create/retrieve payments, until the grand total of the invoice or the current line amount is reached
 	 */
-	private ImmutableList<PaymentId> retrieveOrCreatePaymentsForInvoicesOldestFirst(final ImmutableList<InvoiceId> invoiceIds, final BankAccountId bankAccountId, final BigDecimal bankStatementLineAmount)
+	private ImmutableList<PaymentId> retrieveOrCreatePaymentsForInvoicesOldestFirst(
+			final ImmutableList<InvoiceId> invoiceIds,
+			final BankAccountId bankAccountId,
+			final BigDecimal bankStatementLineAmount,
+			final LocalDate statementLineDate)
 	{
 		BigDecimal amountLeftForAllocation = bankStatementLineAmount;
 		// TODO tbp: order invoices by date, asc, since we want to try and pay the oldest invoices first. note: id order != date order
@@ -240,7 +248,7 @@ public class C_BankStatement_AllocateInvoices extends JavaProcess implements IPr
 			{
 				break;
 			}
-			amountLeftForAllocation = selectOrCreatePaymentsForInvoice(invoiceId, bankAccountId, amountLeftForAllocation, paymentIdsCollector);
+			amountLeftForAllocation = selectOrCreatePaymentsForInvoice(invoiceId, bankAccountId, amountLeftForAllocation, paymentIdsCollector, statementLineDate);
 		}
 		return paymentIdsCollector.build();
 	}
@@ -252,7 +260,12 @@ public class C_BankStatement_AllocateInvoices extends JavaProcess implements IPr
 		return bankStatementDAO.getById(bankStatementId);
 	}
 
-	private BigDecimal selectOrCreatePaymentsForInvoice(final InvoiceId invoiceId, final BankAccountId bankAccountId, /*not final*/ BigDecimal amountLeftForAllocation, final ImmutableList.Builder<PaymentId> paymentIDsCollector)
+	private BigDecimal selectOrCreatePaymentsForInvoice(
+			final InvoiceId invoiceId,
+			final BankAccountId bankAccountId,
+			/*not final*/ BigDecimal amountLeftForAllocation,
+			final ImmutableList.Builder<PaymentId> paymentIDsCollector,
+			final LocalDate statementLineDate)
 	{
 		final I_C_Invoice invoice = invoiceDAO.getByIdInTrx(invoiceId);
 
@@ -290,8 +303,8 @@ public class C_BankStatement_AllocateInvoices extends JavaProcess implements IPr
 				.bpBankAccountId(bankAccountId)
 				.payAmt(openAmtSelectedToAllocate)
 				// .currencyId() // already set by the builder
-				.dateAcct(SystemTime.asLocalDate())  // TODO tbp: @teo what date to set here? something from the BankStatement/line?
-				.dateTrx(SystemTime.asLocalDate())   // TODO tbp: @teo what date to set here? something from the BankStatement/line?
+				.dateAcct(statementLineDate)
+				.dateTrx(statementLineDate)
 				.description("Automatically created from Invoice open amount during BankStatementLine allocation.")
 				.tenderType(TenderType.DirectDeposit)
 				.createAndProcess();// create and complete the payment.
