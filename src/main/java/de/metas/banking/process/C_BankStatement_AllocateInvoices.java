@@ -62,14 +62,13 @@ import org.compiere.model.I_C_Payment;
 import org.compiere.util.DisplayType;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
 public class C_BankStatement_AllocateInvoices extends JavaProcess implements IProcessPrecondition
 {
-
 	public static final String C_INVOICE_1_ID_PARAM_NAME = "C_Invoice_1_ID";
 	@Param(parameterName = C_INVOICE_1_ID_PARAM_NAME, mandatory = true)
 	private InvoiceId c_invoice_1_id;
@@ -93,12 +92,15 @@ public class C_BankStatement_AllocateInvoices extends JavaProcess implements IPr
 	private final IPaymentBL paymentBL = Services.get(IPaymentBL.class);
 	private final IInvoiceDAO invoiceDAO = Services.get(IInvoiceDAO.class);
 	private final IAllocationDAO allocationDAO = Services.get(IAllocationDAO.class);
+	private final IMsgBL iMsgBL = Services.get(IMsgBL.class);
+	private final IQueryBL queryBL = Services.get(IQueryBL.class);
+	private final IPaymentDAO paymentDAO = Services.get(IPaymentDAO.class);
+	private final IBankStatmentPaymentBL bankStatmentPaymentBL = Services.get(IBankStatmentPaymentBL.class);
+	private final IBankStatementDAO bankStatementDAO = Services.get(IBankStatementDAO.class);
 
 	@Override
 	public ProcessPreconditionsResolution checkPreconditionsApplicable(@NonNull final IProcessPreconditionsContext context)
 	{
-		final IMsgBL iMsgBL = Services.get(IMsgBL.class);
-
 		if (context.isNoSelection())
 		{
 			return ProcessPreconditionsResolution.rejectBecauseNoSelection();
@@ -109,7 +111,6 @@ public class C_BankStatement_AllocateInvoices extends JavaProcess implements IPr
 			return ProcessPreconditionsResolution.rejectBecauseNotSingleSelection();
 		}
 
-		// TODO tbp: reject if the bank statement is not open
 		final I_C_BankStatement selectedBankStatement = context.getSelectedModel(I_C_BankStatement.class);
 		final DocStatus docStatus = DocStatus.ofCode(selectedBankStatement.getDocStatus());
 		if (docStatus.isCompletedOrClosedReversedOrVoided())
@@ -174,7 +175,7 @@ public class C_BankStatement_AllocateInvoices extends JavaProcess implements IPr
 		final I_C_BankStatementLine bankStatementLine = getSelectedBankStatementLine();
 		final int bankStatementLineCBPartnerId = bankStatementLine.getC_BPartner_ID();
 
-		final ImmutableSet<InvoiceId> invoiceIds = Services.get(IQueryBL.class).createQueryBuilder(I_C_Invoice.class)
+		final ImmutableSet<InvoiceId> invoiceIds = queryBL.createQueryBuilder(I_C_Invoice.class)
 				.addOnlyActiveRecordsFilter()
 				.addEqualsFilter(I_C_Invoice.COLUMNNAME_DocStatus, DocStatus.Completed)
 				.addEqualsFilter(I_C_Invoice.COLUMNNAME_IsPaid, false)
@@ -208,21 +209,22 @@ public class C_BankStatement_AllocateInvoices extends JavaProcess implements IPr
 		final ImmutableList<InvoiceId> invoiceIds = getSelectedInvoices();
 
 		final BankAccountId bankAccountId = BankAccountId.ofRepoId(bankStatement.getC_BP_BankAccount_ID());
-		final ImmutableList<PaymentId> paymentIds = retrieveOrCreatePaymentsForInvoices(invoiceIds, bankAccountId, bankStatementLine.getStmtAmt());  // TODO tbp: not sure if stmt amount is the correct one. Help?
+		// TODO tbp @teo: not sure if stmt amount is the correct one. Help?
+		//    problem is the bank statement line could already have some allocations, so i have to figure that out somehow
+		final ImmutableList<PaymentId> paymentIds = retrieveOrCreatePaymentsForInvoicesOldestFirst(invoiceIds, bankAccountId, bankStatementLine.getStmtAmt());
 
 		if (paymentIds.size() == 1)
 		{
 			// Link the single Payment to the BankStatementLine directly
-			final I_C_Payment payment = Services.get(IPaymentDAO.class).getById(paymentIds.iterator().next());
-			Services.get(IBankStatmentPaymentBL.class).setC_Payment(bankStatementLine, payment);
-			InterfaceWrapperHelper.save(bankStatementLine);
+			final I_C_Payment payment = paymentDAO.getById(paymentIds.iterator().next());
+			bankStatmentPaymentBL.setC_Payment(bankStatementLine, payment);
 			// interceptors will update the bank statement and line
 		}
 		else
 		{
 			// Iterate over the Payments and link them to the BankStatementLine via BankStatementLineRef
-			bankStatementLine.setIsMultiplePaymentOrInvoice(true);  // TODO tbp: why do we have 2 fields which do pretty much the same thing?
-			bankStatementLine.setIsMultiplePayment(true); // TODO tbp: why do we have 2 fields which do pretty much the same thing?
+			bankStatementLine.setIsMultiplePaymentOrInvoice(true);  // TODO tbp: @teo why do we have 2 fields which do pretty much the same thing?
+			bankStatementLine.setIsMultiplePayment(true); // TODO tbp: @teo why do we have 2 fields which do pretty much the same thing?
 			int lineNumber = 10;
 			for (final PaymentId paymentId : paymentIds)
 			{
@@ -232,21 +234,22 @@ public class C_BankStatement_AllocateInvoices extends JavaProcess implements IPr
 				lineRef.setLine(lineNumber);
 				lineNumber += 10;
 
-				final I_C_Payment payment = Services.get(IPaymentDAO.class).getById(paymentId);
-				Services.get(IBankStatmentPaymentBL.class).setC_Payment(lineRef, payment);
+				final I_C_Payment payment = paymentDAO.getById(paymentId);
+				bankStatmentPaymentBL.setC_Payment(lineRef, payment);
 				InterfaceWrapperHelper.save(lineRef);
 				// interceptors will update the bank statement and line
 			}
 		}
+		InterfaceWrapperHelper.save(bankStatementLine);
 	}
 
 	/**
 	 * Iterate over the selected invoices and create/retrieve payments, until the grand total of the invoice or the current line amount is reached
 	 */
-	private ImmutableList<PaymentId> retrieveOrCreatePaymentsForInvoices(final ImmutableList<InvoiceId> invoiceIds, final BankAccountId bankAccountId, final BigDecimal bankStatementLineAmountLeftForAllocation)
+	private ImmutableList<PaymentId> retrieveOrCreatePaymentsForInvoicesOldestFirst(final ImmutableList<InvoiceId> invoiceIds, final BankAccountId bankAccountId, final BigDecimal bankStatementLineAmount)
 	{
-		BigDecimal amountLeftForAllocation = bankStatementLineAmountLeftForAllocation;
-
+		BigDecimal amountLeftForAllocation = bankStatementLineAmount;
+		// TODO tbp: order invoices by date, asc, since we want to try and pay the oldest invoices first. note: id order != date order
 		final ImmutableList.Builder<PaymentId> paymentIdsCollector = ImmutableList.builder();
 		for (final InvoiceId invoiceId : invoiceIds)
 		{
@@ -263,7 +266,7 @@ public class C_BankStatement_AllocateInvoices extends JavaProcess implements IPr
 	private I_C_BankStatement getSelectedBankStatement()
 	{
 		final int bankStatementId = getRecord_ID();
-		final IBankStatementDAO bankStatementDAO = Services.get(IBankStatementDAO.class);
+		final IBankStatementDAO bankStatementDAO = this.bankStatementDAO;
 		return bankStatementDAO.getById(bankStatementId);
 	}
 
@@ -298,15 +301,15 @@ public class C_BankStatement_AllocateInvoices extends JavaProcess implements IPr
 		}
 
 		final BigDecimal openAmt = invoiceDAO.retrieveOpenAmt(invoiceId).getAsBigDecimal();
-		final BigDecimal openAmtPossibleToAllocate = openAmt.min(amountLeftForAllocation); // in an ideal world, openAmt and amountLeftForAllocation are ==
+		final BigDecimal openAmtSelectedToAllocate = openAmt.min(amountLeftForAllocation); // in an ideal world, openAmt and amountLeftForAllocation are ==
 
-		amountLeftForAllocation = amountLeftForAllocation.subtract(openAmtPossibleToAllocate);
+		amountLeftForAllocation = amountLeftForAllocation.subtract(openAmtSelectedToAllocate);
 		final I_C_Payment payment = paymentBL.newBuilderOfInvoice(invoice)
 				.bpBankAccountId(bankAccountId)
-				.payAmt(openAmtPossibleToAllocate)
+				.payAmt(openAmtSelectedToAllocate)
 				// .currencyId() // already set by the builder
-				.dateAcct(SystemTime.asLocalDate())  // TODO tbp: what date to set here? something from the BankStatement/line?
-				.dateTrx(SystemTime.asLocalDate())   // TODO tbp: what date to set here? something from the BankStatement/line?
+				.dateAcct(SystemTime.asLocalDate())  // TODO tbp: @teo what date to set here? something from the BankStatement/line?
+				.dateTrx(SystemTime.asLocalDate())   // TODO tbp: @teo what date to set here? something from the BankStatement/line?
 				.description("Automatically created from Invoice open amount during BankStatementLine allocation.")
 				.tenderType(TenderType.DirectDeposit)
 				.createAndProcess();// create and complete the payment.
@@ -318,12 +321,12 @@ public class C_BankStatement_AllocateInvoices extends JavaProcess implements IPr
 	private I_C_BankStatementLine getSelectedBankStatementLine()
 	{
 		final Integer lineId = getSelectedIncludedRecordIds(I_C_BankStatementLine.class).iterator().next();
-		return Services.get(IBankStatementDAO.class).getLineById(lineId);
+		return bankStatementDAO.getLineById(lineId);
 	}
 
 	private ImmutableList<InvoiceId> getSelectedInvoices()
 	{
-		final ArrayList<InvoiceId> invoiceIds = new ArrayList<>();
+		final HashSet<InvoiceId> invoiceIds = new HashSet<>();
 		invoiceIds.add(c_invoice_1_id);
 		invoiceIds.add(c_invoice_2_id);
 		invoiceIds.add(c_invoice_3_id);
