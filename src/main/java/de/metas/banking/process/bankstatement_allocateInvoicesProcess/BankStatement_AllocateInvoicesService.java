@@ -64,6 +64,6 @@ public class BankStatement_AllocateInvoicesService
 				.setWidgetType(DocumentFieldWidgetType.Lookup)
 				.buildForDefaultScope();
 
-		return LookupDataSourceFactory.instance.getLookupDataSource(invoiceByIdLookupDescriptor).findByIds(invoiceIds);
+		return LookupDataSourceFactory.instance.getLookupDataSource(invoiceByIdLookupDescriptor).findByIdsOrdered(invoiceIds);
 	}
 }

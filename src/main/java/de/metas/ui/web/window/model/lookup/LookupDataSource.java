@@ -8,7 +8,7 @@ import lombok.NonNull;
 import org.compiere.util.Evaluatee;
 
 import java.util.Collection;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -60,17 +60,20 @@ public interface LookupDataSource extends LookupValueByIdSupplier
 	@Override
 	LookupValue findById(Object id);
 
+	/**
+	 * @return lookup values in the same order as the collection order
+	 */
 	@NonNull
-	default LookupValuesList findByIds(@NonNull final Collection<? extends Object> ids)
+	default LookupValuesList findByIdsOrdered(@NonNull final Collection<? extends Object> ids)
 	{
 		if (ids.isEmpty())
 		{
 			return LookupValuesList.EMPTY;
 		}
 
-		// TODO @teo: avoid SQL N+1 problem
+		// TODO @teo: avoid SQL N+1 problem and also return the data ordered in the input collection order
 
-		return new HashSet<>(ids)
+		return new LinkedHashSet<>(ids)
 				.stream()
 				.map(this::findById)
 				.filter(Objects::nonNull)
