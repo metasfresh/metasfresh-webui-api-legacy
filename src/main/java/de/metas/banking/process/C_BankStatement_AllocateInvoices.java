@@ -93,10 +93,11 @@ public class C_BankStatement_AllocateInvoices extends JavaProcess implements IPr
 	private final IInvoiceDAO invoiceDAO = Services.get(IInvoiceDAO.class);
 	private final IAllocationDAO allocationDAO = Services.get(IAllocationDAO.class);
 	private final IMsgBL iMsgBL = Services.get(IMsgBL.class);
-	private final IQueryBL queryBL = Services.get(IQueryBL.class);
 	private final IPaymentDAO paymentDAO = Services.get(IPaymentDAO.class);
 	private final IBankStatmentPaymentBL bankStatmentPaymentBL = Services.get(IBankStatmentPaymentBL.class);
 	private final IBankStatementDAO bankStatementDAO = Services.get(IBankStatementDAO.class);
+
+	private final BankStatement_AllocateInvoicesService bankStatement_AllocateInvoicesService = SpringContextHolder.instance.getBean(BankStatement_AllocateInvoicesService.class);
 
 	@Override
 	public ProcessPreconditionsResolution checkPreconditionsApplicable(@NonNull final IProcessPreconditionsContext context)
@@ -143,55 +144,36 @@ public class C_BankStatement_AllocateInvoices extends JavaProcess implements IPr
 	@ProcessParamLookupValuesProvider(parameterName = C_INVOICE_1_ID_PARAM_NAME, numericKey = true, lookupSource = DocumentLayoutElementFieldDescriptor.LookupSource.lookup, lookupTableName = I_C_Invoice.Table_Name)
 	public LookupValuesList invoice1LookupProvider()
 	{
-		return defaultInvoiceLookupProvider();
+		final BPartnerId bPartnerId = BPartnerId.ofRepoId(getSelectedBankStatementLine().getC_BPartner_ID());
+		return bankStatement_AllocateInvoicesService.getInvoiceLookupProvider_UnpaidByBpartner(bPartnerId);
 	}
 
 	@ProcessParamLookupValuesProvider(parameterName = C_INVOICE_2_ID_PARAM_NAME, numericKey = true, lookupSource = DocumentLayoutElementFieldDescriptor.LookupSource.lookup, lookupTableName = I_C_Invoice.Table_Name)
 	public LookupValuesList invoice2LookupProvider()
 	{
-		return defaultInvoiceLookupProvider();
+		final BPartnerId bPartnerId = BPartnerId.ofRepoId(getSelectedBankStatementLine().getC_BPartner_ID());
+		return bankStatement_AllocateInvoicesService.getInvoiceLookupProvider_UnpaidByBpartner(bPartnerId);
 	}
 
 	@ProcessParamLookupValuesProvider(parameterName = C_INVOICE_3_ID_PARAM_NAME, numericKey = true, lookupSource = DocumentLayoutElementFieldDescriptor.LookupSource.lookup, lookupTableName = I_C_Invoice.Table_Name)
 	public LookupValuesList invoice3LookupProvider()
 	{
-		return defaultInvoiceLookupProvider();
+		final BPartnerId bPartnerId = BPartnerId.ofRepoId(getSelectedBankStatementLine().getC_BPartner_ID());
+		return bankStatement_AllocateInvoicesService.getInvoiceLookupProvider_UnpaidByBpartner(bPartnerId);
 	}
 
 	@ProcessParamLookupValuesProvider(parameterName = C_INVOICE_4_ID_PARAM_NAME, numericKey = true, lookupSource = DocumentLayoutElementFieldDescriptor.LookupSource.lookup, lookupTableName = I_C_Invoice.Table_Name)
 	public LookupValuesList invoice4LookupProvider()
 	{
-		return defaultInvoiceLookupProvider();
+		final BPartnerId bPartnerId = BPartnerId.ofRepoId(getSelectedBankStatementLine().getC_BPartner_ID());
+		return bankStatement_AllocateInvoicesService.getInvoiceLookupProvider_UnpaidByBpartner(bPartnerId);
 	}
 
 	@ProcessParamLookupValuesProvider(parameterName = C_INVOICE_5_ID_PARAM_NAME, numericKey = true, lookupSource = DocumentLayoutElementFieldDescriptor.LookupSource.lookup, lookupTableName = I_C_Invoice.Table_Name)
 	public LookupValuesList invoice5LookupProvider()
 	{
-		return defaultInvoiceLookupProvider();
-	}
-
-	private LookupValuesList defaultInvoiceLookupProvider()
-	{
-		final I_C_BankStatementLine bankStatementLine = getSelectedBankStatementLine();
-		final int bankStatementLineCBPartnerId = bankStatementLine.getC_BPartner_ID();
-
-		final ImmutableSet<InvoiceId> invoiceIds = queryBL.createQueryBuilder(I_C_Invoice.class)
-				.addOnlyActiveRecordsFilter()
-				.addEqualsFilter(I_C_Invoice.COLUMNNAME_DocStatus, DocStatus.Completed)
-				.addEqualsFilter(I_C_Invoice.COLUMNNAME_IsPaid, false)
-				.addEqualsFilter(I_C_Invoice.COLUMNNAME_C_BPartner_ID, bankStatementLineCBPartnerId)
-				.create()
-				.listIds(InvoiceId::ofRepoId);
-
-		final LookupDescriptor invoiceByIdLookupDescriptor = SqlLookupDescriptor.builder()
-				.setCtxTableName(I_C_Invoice.Table_Name)
-				.setCtxColumnName(I_C_Invoice.COLUMNNAME_C_Invoice_ID)
-				.setDisplayType(DisplayType.Search)
-				.setWidgetType(DocumentFieldWidgetType.Lookup)
-				// TODO tbp: @teo how to .orderby asc???
-				.buildForDefaultScope();
-
-		return LookupDataSourceFactory.instance.getLookupDataSource(invoiceByIdLookupDescriptor).findByIds(invoiceIds);
+		final BPartnerId bPartnerId = BPartnerId.ofRepoId(getSelectedBankStatementLine().getC_BPartner_ID());
+		return bankStatement_AllocateInvoicesService.getInvoiceLookupProvider_UnpaidByBpartner(bPartnerId);
 	}
 
 	@Override
@@ -223,8 +205,8 @@ public class C_BankStatement_AllocateInvoices extends JavaProcess implements IPr
 		else
 		{
 			// Iterate over the Payments and link them to the BankStatementLine via BankStatementLineRef
-			bankStatementLine.setIsMultiplePaymentOrInvoice(true);  // TODO tbp: @teo why do we have 2 fields which do pretty much the same thing?
-			bankStatementLine.setIsMultiplePayment(true); // TODO tbp: @teo why do we have 2 fields which do pretty much the same thing?
+			bankStatementLine.setIsMultiplePaymentOrInvoice(true);
+			bankStatementLine.setIsMultiplePayment(true);
 			int lineNumber = 10;
 			for (final PaymentId paymentId : paymentIds)
 			{
@@ -301,7 +283,7 @@ public class C_BankStatement_AllocateInvoices extends JavaProcess implements IPr
 		}
 
 		final BigDecimal openAmt = invoiceDAO.retrieveOpenAmt(invoiceId).getAsBigDecimal();
-		final BigDecimal openAmtSelectedToAllocate = openAmt.min(amountLeftForAllocation); // in an ideal world, openAmt and amountLeftForAllocation are ==
+		final BigDecimal openAmtSelectedToAllocate = openAmt.min(amountLeftForAllocation);
 
 		amountLeftForAllocation = amountLeftForAllocation.subtract(openAmtSelectedToAllocate);
 		final I_C_Payment payment = paymentBL.newBuilderOfInvoice(invoice)
