@@ -278,6 +278,15 @@ public class C_BankStatement_AllocateInvoices extends JavaProcess implements IPr
 				break;
 			}
 
+			// TODO: I am not sure here so i'm asking (teo's also not sure):
+			//   what happens in the case where a portion of the payment is allocated?
+			//   ie. paytment amount = 600, allocated amount = 100.
+			//   how to handle this case?
+			if (cPayment.isReconciled())
+			{
+				continue;
+			}
+
 			final BigDecimal payAmt = cPayment.getPayAmt();
 			// if amount left for allocation - pay amount < 0 => skip this payment
 			if (amountLeftForAllocation.subtract(payAmt).compareTo(BigDecimal.ZERO) < 0)
