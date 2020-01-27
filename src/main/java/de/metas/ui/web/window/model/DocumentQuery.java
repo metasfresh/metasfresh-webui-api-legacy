@@ -1,10 +1,15 @@
 package de.metas.ui.web.window.model;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Set;
 import java.util.function.Function;
+
+import javax.annotation.Nullable;
 
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 
 import de.metas.ui.web.document.filter.DocumentFilter;
 import de.metas.ui.web.document.filter.DocumentFilterList;
@@ -51,7 +56,7 @@ public final class DocumentQuery
 		return new Builder(entityDescriptor);
 	}
 
-	public static Builder ofRecordId(final DocumentEntityDescriptor entityDescriptor, @NonNull final DocumentId recordId)
+	public static Builder ofRecordId(final DocumentEntityDescriptor entityDescriptor, final DocumentId recordId)
 	{
 		return builder(entityDescriptor)
 				.setRecordId(recordId)
@@ -59,7 +64,7 @@ public final class DocumentQuery
 	}
 
 	private final DocumentEntityDescriptor entityDescriptor;
-	private final DocumentId recordId;
+	private final ImmutableSet<DocumentId> recordIds;
 	private final Document parentDocument;
 
 	private final DocumentFilterList filters;
@@ -75,7 +80,7 @@ public final class DocumentQuery
 	private DocumentQuery(final Builder builder)
 	{
 		entityDescriptor = builder.entityDescriptor; // not null
-		recordId = builder.recordId;
+		recordIds = ImmutableSet.copyOf(builder.recordIds);
 		parentDocument = builder.parentDocument;
 
 		filters = DocumentFilterList.ofList(builder.filters);
@@ -95,7 +100,7 @@ public final class DocumentQuery
 		return MoreObjects.toStringHelper(this)
 				.omitNullValues()
 				.add("tableName", entityDescriptor.getTableNameOrNull())
-				.add("recordId", recordId)
+				.add("recordIds", recordIds.isEmpty() ? null : recordIds)
 				.add("parentDocument", parentDocument)
 				.add("filters", filters.isEmpty() ? null : filters)
 				.add("firstRow", firstRow > 0 ? firstRow : null)
@@ -109,9 +114,9 @@ public final class DocumentQuery
 		return entityDescriptor;
 	}
 
-	public DocumentId getRecordId()
+	public ImmutableSet<DocumentId> getRecordIds()
 	{
-		return recordId;
+		return recordIds;
 	}
 
 	public Document getParentDocument()
@@ -163,7 +168,7 @@ public final class DocumentQuery
 	{
 		private final DocumentEntityDescriptor entityDescriptor;
 		private Document parentDocument;
-		private DocumentId recordId;
+		private Set<DocumentId> recordIds = ImmutableSet.of();
 		public ArrayList<DocumentFilter> filters = null;
 
 		private boolean _noSorting = false; // always false by default
@@ -223,9 +228,21 @@ public final class DocumentQuery
 			return entityDescriptor.getDataBinding().getDocumentsRepository();
 		}
 
-		public Builder setRecordId(final DocumentId documentId)
+		public Builder setRecordId(@Nullable final DocumentId documentId)
 		{
-			recordId = documentId;
+			recordIds = documentId != null
+					? ImmutableSet.of(documentId)
+					: ImmutableSet.of();
+
+			return this;
+		}
+
+		public Builder setRecordIds(@Nullable final Collection<DocumentId> documentIds)
+		{
+			recordIds = documentIds != null
+					? ImmutableSet.copyOf(documentIds)
+					: ImmutableSet.of();
+
 			return this;
 		}
 

@@ -2,12 +2,14 @@ package de.metas.ui.web.window.model;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.List;
 
 import javax.annotation.Nullable;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
 
+import de.metas.ui.web.window.datatypes.DocumentId;
 import lombok.NonNull;
 import lombok.ToString;
 
@@ -54,7 +56,7 @@ public final class OrderedDocumentsList
 		return new OrderedDocumentsList(ImmutableList.of(), orderBys);
 	}
 
-	private final List<Document> documents;
+	private final ArrayList<Document> documents;
 	private final DocumentQueryOrderByList orderBys;
 
 	private OrderedDocumentsList(
@@ -65,9 +67,14 @@ public final class OrderedDocumentsList
 		this.orderBys = orderBys;
 	}
 
-	public List<Document> toList()
+	public ArrayList<Document> toList()
 	{
 		return documents;
+	}
+
+	public ImmutableMap<DocumentId, Document> toImmutableMap()
+	{
+		return Maps.uniqueIndex(documents, Document::getDocumentId);
 	}
 
 	public void addDocument(@NonNull final Document document)

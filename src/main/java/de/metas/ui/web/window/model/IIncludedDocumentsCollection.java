@@ -38,6 +38,8 @@ public interface IIncludedDocumentsCollection
 
 	OrderedDocumentsList getDocuments(DocumentQueryOrderByList orderBys);
 
+	OrderedDocumentsList getDocumentsByIds(DocumentIdsSelection documentIds);
+
 	Document getDocumentById(DocumentId documentId);
 
 	void updateStatusFromParent();
@@ -64,7 +66,7 @@ public interface IIncludedDocumentsCollection
 	void saveIfHasChanges();
 
 	void markStaleAll();
-	
+
 	void markStale(final DocumentIdsSelection rowIds);
 
 	/** @return true if contains at least one stale document */

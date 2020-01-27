@@ -3,6 +3,8 @@ package de.metas.ui.web.window.model;
 import org.adempiere.ad.expression.api.LogicExpressionResult;
 
 import com.google.common.base.MoreObjects;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 
 import de.metas.ui.web.window.datatypes.DocumentId;
 import de.metas.ui.web.window.datatypes.DocumentIdsSelection;
@@ -13,6 +15,7 @@ import de.metas.ui.web.window.exceptions.DocumentNotFoundException;
 import de.metas.ui.web.window.exceptions.InvalidDocumentStateException;
 import de.metas.ui.web.window.model.Document.CopyMode;
 import de.metas.ui.web.window.model.Document.OnValidStatusChanged;
+import lombok.NonNull;
 
 /*
  * #%L
@@ -77,6 +80,46 @@ public final class HighVolumeReadonlyIncludedDocumentsCollection implements IInc
 				.setChangesCollector(NullDocumentChangesCollector.instance)
 				.setOrderBys(orderBys)
 				.retriveDocuments();
+	}
+
+	@Override
+	public OrderedDocumentsList getDocumentsByIds(@NonNull final DocumentIdsSelection documentIds)
+	{
+		if (documentIds.isAll())
+		{
+			final ImmutableList<DocumentQueryOrderBy> orderBys = ImmutableList.of();
+			return getDocuments(orderBys);
+		}
+		else if (documentIds.isEmpty())
+		{
+			return OrderedDocumentsList.newEmpty();
+		}
+		else
+		{
+			final ImmutableMap<DocumentId, Document> loadedDocuments = DocumentQuery.builder(entityDescriptor)
+					.setParentDocument(parentDocument)
+					.setRecordIds(documentIds.toSet())
+					.setChangesCollector(NullDocumentChangesCollector.instance)
+					.setOrderBys(ImmutableList.of())
+					.retriveDocuments()
+					.toImmutableMap();
+
+			final OrderedDocumentsList result = OrderedDocumentsList.newEmpty();
+			for (final DocumentId documentId : documentIds.toSet())
+			{
+				final Document loadedDocument = loadedDocuments.get(documentId);
+				if (loadedDocument != null)
+				{
+					result.addDocument(loadedDocument);
+				}
+				else
+				{
+					// No document found for documentId. Ignore it.
+				}
+			}
+
+			return result;
+		}
 	}
 
 	@Override
