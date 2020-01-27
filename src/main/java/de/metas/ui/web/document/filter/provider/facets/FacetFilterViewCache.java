@@ -32,7 +32,7 @@ import lombok.Value;
 public class FacetFilterViewCache
 {
 	@NonNull
-	String id;
+	String filterId;
 
 	@NonNull
 	LookupValuesList availableValues;

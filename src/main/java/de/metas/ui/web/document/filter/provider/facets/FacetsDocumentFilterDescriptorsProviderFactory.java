@@ -95,7 +95,7 @@ public class FacetsDocumentFilterDescriptorsProviderFactory implements DocumentF
 		final DocumentFieldDescriptor fieldDescriptor = extractFieldDescriptorByName(fields, columnName);
 		final FacetsFilterLookupDescriptor lookupDescriptor = FacetsFilterLookupDescriptor.builder()
 				.viewsRepository(viewsRepository)
-				.id(filterId)
+				.filterId(filterId)
 				.fieldName(columnName)
 				.widgetType(DocumentFieldWidgetType.List)
 				.fieldLookupDescriptor(fieldDescriptor.getLookupDescriptorForFiltering().get())
@@ -127,7 +127,7 @@ public class FacetsDocumentFilterDescriptorsProviderFactory implements DocumentF
 		final DocumentFieldDescriptor fieldDescriptor = extractFieldDescriptorByName(fields, columnName);
 		final FacetsFilterLookupDescriptor lookupDescriptor = FacetsFilterLookupDescriptor.builder()
 				.viewsRepository(viewsRepository)
-				.id(filterId)
+				.filterId(filterId)
 				.fieldName(columnName)
 				.widgetType(DocumentFieldWidgetType.List)
 				.fieldLookupDescriptor(fieldDescriptor.getLookupDescriptorForFiltering().get())
@@ -159,7 +159,7 @@ public class FacetsDocumentFilterDescriptorsProviderFactory implements DocumentF
 		final DocumentFieldDescriptor fieldDescriptor = extractFieldDescriptorByName(fields, columnName);
 		final FacetsFilterLookupDescriptor lookupDescriptor = FacetsFilterLookupDescriptor.builder()
 				.viewsRepository(viewsRepository)
-				.id(filterId)
+				.filterId(filterId)
 				.fieldName(columnName)
 				.widgetType(DocumentFieldWidgetType.List)
 				.fieldLookupDescriptor(fieldDescriptor.getLookupDescriptorForFiltering().get())
@@ -190,7 +190,7 @@ public class FacetsDocumentFilterDescriptorsProviderFactory implements DocumentF
 
 		final FacetsFilterLookupDescriptor lookupDescriptor = FacetsFilterLookupDescriptor.builder()
 				.viewsRepository(viewsRepository)
-				.id(filterId)
+				.filterId(filterId)
 				.fieldName(columnName)
 				.widgetType(DocumentFieldWidgetType.LocalDate)
 				.build();
@@ -220,7 +220,7 @@ public class FacetsDocumentFilterDescriptorsProviderFactory implements DocumentF
 
 		final FacetsFilterLookupDescriptor lookupDescriptor = FacetsFilterLookupDescriptor.builder()
 				.viewsRepository(viewsRepository)
-				.id(filterId)
+				.filterId(filterId)
 				.fieldName(columnName)
 				.widgetType(DocumentFieldWidgetType.YesNo)
 				.build();

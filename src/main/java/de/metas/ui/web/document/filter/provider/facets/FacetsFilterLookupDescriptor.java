@@ -59,7 +59,7 @@ final class FacetsFilterLookupDescriptor extends SimpleLookupDescriptorTemplate
 	private final IMsgBL msgBL = Services.get(IMsgBL.class);
 	private final IViewsRepository viewsRepository;
 
-	private final String id;
+	private final String filterId;
 	private final String fieldName;
 	private final DocumentFieldWidgetType widgetType;
 	private final LookupDescriptor fieldLookupDescriptor;
@@ -70,14 +70,14 @@ final class FacetsFilterLookupDescriptor extends SimpleLookupDescriptorTemplate
 	private FacetsFilterLookupDescriptor(
 			@NonNull final IViewsRepository viewsRepository,
 			//
-			@NonNull final String id,
+			@NonNull final String filterId,
 			@NonNull final String fieldName,
 			@NonNull final DocumentFieldWidgetType widgetType,
 			@Nullable final LookupDescriptor fieldLookupDescriptor)
 	{
 		this.viewsRepository = viewsRepository;
 
-		this.id = id;
+		this.filterId = filterId;
 		this.fieldName = fieldName;
 		this.widgetType = widgetType;
 		this.fieldLookupDescriptor = fieldLookupDescriptor;
@@ -148,7 +148,7 @@ final class FacetsFilterLookupDescriptor extends SimpleLookupDescriptorTemplate
 		final DefaultView view = getView(evalCtx);
 
 		return view.getFacetFiltersCacheMap()
-				.computeIfAbsent(id, () -> createFacetFilterViewCache(view))
+				.computeIfAbsent(filterId, () -> createFacetFilterViewCache(view))
 				.getAvailableValues();
 	}
 
@@ -171,7 +171,7 @@ final class FacetsFilterLookupDescriptor extends SimpleLookupDescriptorTemplate
 				.collect(LookupValuesList.collect());
 
 		return FacetFilterViewCache.builder()
-				.id(id)
+				.filterId(filterId)
 				.availableValues(availableValues)
 				.build();
 	}
