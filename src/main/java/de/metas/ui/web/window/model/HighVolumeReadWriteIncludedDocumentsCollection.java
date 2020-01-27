@@ -13,7 +13,6 @@ import org.compiere.util.Evaluatee;
 import org.slf4j.Logger;
 
 import com.google.common.base.MoreObjects;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -193,8 +192,7 @@ public class HighVolumeReadWriteIncludedDocumentsCollection implements IIncluded
 	{
 		if (documentIds.isAll())
 		{
-			final ImmutableList<DocumentQueryOrderBy> orderBys = ImmutableList.of();
-			return getDocuments(orderBys);
+			return getDocuments(DocumentQueryOrderByList.EMPTY);
 		}
 		else if (documentIds.isEmpty())
 		{
@@ -212,7 +210,7 @@ public class HighVolumeReadWriteIncludedDocumentsCollection implements IIncluded
 						.setParentDocument(parentDocument)
 						.setRecordIds(documentIdsToLoad)
 						.setChangesCollector(NullDocumentChangesCollector.instance)
-						.setOrderBys(ImmutableList.of())
+						.setOrderBys(DocumentQueryOrderByList.EMPTY)
 						.retriveDocuments()
 						.toImmutableMap();
 			}

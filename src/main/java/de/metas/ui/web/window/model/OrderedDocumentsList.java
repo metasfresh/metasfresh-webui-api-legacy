@@ -51,6 +51,11 @@ public final class OrderedDocumentsList
 		return new OrderedDocumentsList(documents, orderBys);
 	}
 
+	public static OrderedDocumentsList newEmpty()
+	{
+		return new OrderedDocumentsList(ImmutableList.of(), DocumentQueryOrderByList.EMPTY);
+	}
+
 	public static OrderedDocumentsList newEmpty(final DocumentQueryOrderByList orderBys)
 	{
 		return new OrderedDocumentsList(ImmutableList.of(), orderBys);

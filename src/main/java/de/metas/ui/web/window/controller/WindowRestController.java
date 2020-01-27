@@ -71,7 +71,6 @@ import de.metas.ui.web.window.model.Document;
 import de.metas.ui.web.window.model.DocumentChangeLogService;
 import de.metas.ui.web.window.model.DocumentCollection;
 import de.metas.ui.web.window.model.DocumentCollection.DocumentPrint;
-import de.metas.ui.web.window.model.DocumentQueryOrderBy;
 import de.metas.ui.web.window.model.DocumentQueryOrderByList;
 import de.metas.ui.web.window.model.DocumentReference;
 import de.metas.ui.web.window.model.DocumentReferencesService;
@@ -241,7 +240,7 @@ public class WindowRestController
 			documentPath = DocumentPath.includedDocumentPath(windowId, documentId, tabId, onlyRowIds);
 		}
 
-		final List<DocumentQueryOrderBy> orderBys = DocumentQueryOrderBy.parseOrderBysList(orderBysListStr);
+		final DocumentQueryOrderByList orderBys = DocumentQueryOrderByList.parse(orderBysListStr);
 		return getData(documentPath, fieldsListStr, advanced, orderBys);
 	}
 

@@ -108,8 +108,7 @@ public class SingleRowDetailIncludedDocumentsCollection implements IIncludedDocu
 	@Override
 	public OrderedDocumentsList getDocumentsByIds(DocumentIdsSelection documentIds)
 	{
-		final List<DocumentQueryOrderBy> orderBys = ImmutableList.of();
-		final ImmutableMap<DocumentId, Document> loadedDocuments = getDocuments(orderBys).toImmutableMap();
+		final ImmutableMap<DocumentId, Document> loadedDocuments = getDocuments(DocumentQueryOrderByList.EMPTY).toImmutableMap();
 
 		final OrderedDocumentsList result = OrderedDocumentsList.newEmpty();
 		for (final DocumentId documentId : documentIds.toSet())

@@ -3,7 +3,6 @@ package de.metas.ui.web.window.model;
 import org.adempiere.ad.expression.api.LogicExpressionResult;
 
 import com.google.common.base.MoreObjects;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
 import de.metas.ui.web.window.datatypes.DocumentId;
@@ -87,8 +86,7 @@ public final class HighVolumeReadonlyIncludedDocumentsCollection implements IInc
 	{
 		if (documentIds.isAll())
 		{
-			final ImmutableList<DocumentQueryOrderBy> orderBys = ImmutableList.of();
-			return getDocuments(orderBys);
+			return getDocuments(DocumentQueryOrderByList.EMPTY);
 		}
 		else if (documentIds.isEmpty())
 		{
@@ -100,7 +98,7 @@ public final class HighVolumeReadonlyIncludedDocumentsCollection implements IInc
 					.setParentDocument(parentDocument)
 					.setRecordIds(documentIds.toSet())
 					.setChangesCollector(NullDocumentChangesCollector.instance)
-					.setOrderBys(ImmutableList.of())
+					.setOrderBys(DocumentQueryOrderByList.EMPTY)
 					.retriveDocuments()
 					.toImmutableMap();
 
