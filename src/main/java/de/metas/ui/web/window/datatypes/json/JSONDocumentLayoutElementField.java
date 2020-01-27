@@ -1,6 +1,5 @@
 package de.metas.ui.web.window.datatypes.json;
 
-import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -25,6 +24,8 @@ import de.metas.ui.web.window.descriptor.DocumentLayoutElementFieldDescriptor.Lo
 import de.metas.ui.web.window.descriptor.factory.NewRecordDescriptorsProvider;
 import de.metas.util.GuavaCollectors;
 import io.swagger.annotations.ApiModel;
+import lombok.Builder;
+import lombok.Getter;
 import lombok.NonNull;
 
 /*
@@ -50,18 +51,19 @@ import lombok.NonNull;
  */
 
 @ApiModel("field")
-@SuppressWarnings("serial")
 @JsonAutoDetect(fieldVisibility = Visibility.ANY, getterVisibility = Visibility.NONE, isGetterVisibility = Visibility.NONE, setterVisibility = Visibility.NONE)
-public final class JSONDocumentLayoutElementField implements Serializable
+public final class JSONDocumentLayoutElementField
 {
-	public static Set<JSONDocumentLayoutElementField> ofSet(final Set<DocumentLayoutElementFieldDescriptor> fieldDescriptors, final JSONOptions jsonOpts)
+	public static Set<JSONDocumentLayoutElementField> ofSet(
+			final Set<DocumentLayoutElementFieldDescriptor> fieldDescriptors,
+			final JSONDocumentLayoutOptions options)
 	{
 		return fieldDescriptors.stream()
-				.map(fieldDescriptor -> of(fieldDescriptor, jsonOpts))
+				.map(fieldDescriptor -> of(fieldDescriptor, options))
 				.collect(GuavaCollectors.toImmutableSet());
 	}
 
-	private static JSONDocumentLayoutElementField of(final DocumentLayoutElementFieldDescriptor fieldDescriptor, final JSONOptions jsonOpts)
+	private static JSONDocumentLayoutElementField of(final DocumentLayoutElementFieldDescriptor fieldDescriptor, final JSONDocumentLayoutOptions jsonOpts)
 	{
 		return new JSONDocumentLayoutElementField(fieldDescriptor, jsonOpts);
 	}
@@ -72,7 +74,7 @@ public final class JSONDocumentLayoutElementField implements Serializable
 	 * Please keep in sync with {@link FieldType}
 	 */
 	@ApiModel("field-type")
-	public static enum JSONFieldType
+	public enum JSONFieldType
 	{
 		/**
 		 * For the docstatus/docaction widget, the two fields @{@code DocStatus} and {@code DocAction} are mashed together.
@@ -84,7 +86,7 @@ public final class JSONDocumentLayoutElementField implements Serializable
 		ActionButton,
 
 		/**
-		 * Used to tell the frontend that a field with is part of a composition shall be shown as tooltip,
+		 * Used to tell the frontend that a field which is part of a composition shall be shown as tooltip,
 		 * when the respective tooltip icon/button is pressed
 		 */
 		Tooltip;
@@ -118,7 +120,7 @@ public final class JSONDocumentLayoutElementField implements Serializable
 	 * Please keep in sync with {@link LookupSource}.
 	 */
 	@ApiModel("lookup-source")
-	public static enum JSONLookupSource
+	public enum JSONLookupSource
 	{
 		lookup, list,
 
@@ -147,7 +149,11 @@ public final class JSONDocumentLayoutElementField implements Serializable
 	}
 
 	@JsonProperty(value = "field", required = true)
+	@Getter
 	private final String field;
+	
+	@JsonProperty(value = "caption", required = true)
+	private final String caption;
 
 	@JsonProperty("type")
 	@JsonInclude(JsonInclude.Include.NON_NULL)
@@ -156,10 +162,6 @@ public final class JSONDocumentLayoutElementField implements Serializable
 	@JsonProperty("tooltipIconName")
 	@JsonInclude(JsonInclude.Include.NON_NULL)
 	private final String tooltipIconName;
-
-	@JsonProperty("source")
-	@JsonInclude(JsonInclude.Include.NON_NULL)
-	private final JSONLookupSource source;
 
 	@JsonProperty("emptyText")
 	@JsonInclude(JsonInclude.Include.NON_EMPTY)
@@ -177,26 +179,42 @@ public final class JSONDocumentLayoutElementField implements Serializable
 	@JsonInclude(JsonInclude.Include.NON_EMPTY)
 	private final String newRecordCaption;
 
+	//
+	// Lookup
+	@JsonProperty("source")
+	@JsonInclude(JsonInclude.Include.NON_NULL)
+	private final JSONLookupSource source;
+	//
+	@JsonProperty("lookupSearchStringMinLength")
+	@JsonInclude(JsonInclude.Include.NON_NULL)
+	private final Integer lookupSearchStringMinLength;
+	//
+	@JsonProperty("lookupSearchStartDelayMillis")
+	@JsonInclude(JsonInclude.Include.NON_NULL)
+	private final Integer lookupSearchStartDelayMillis;
+
+	//
+	// Zoom
 	@JsonProperty("supportZoomInto")
 	@JsonInclude(JsonInclude.Include.NON_NULL)
 	private final Boolean supportZoomInto;
 
 	private JSONDocumentLayoutElementField(
 			@NonNull final DocumentLayoutElementFieldDescriptor fieldDescriptor,
-			@NonNull final JSONOptions jsonOpts)
+			@NonNull final JSONDocumentLayoutOptions jsonOpts)
 	{
 		field = fieldDescriptor.getField();
+		caption = fieldDescriptor.getCaption().translate(jsonOpts.getAdLanguage());
 		type = JSONFieldType.fromNullable(fieldDescriptor.getFieldType());
 		tooltipIconName = fieldDescriptor.getTooltipIconName();
-		source = JSONLookupSource.fromNullable(fieldDescriptor.getLookupSource());
-		emptyText = fieldDescriptor.getEmptyText(jsonOpts.getAD_Language());
+		emptyText = fieldDescriptor.getEmptyText(jsonOpts.getAdLanguage());
 		devices = fieldDescriptor.getDevices();
 
 		final DocumentEntityDescriptor newRecordEntityDescriptor = findNewRecordEntityDescriptor(fieldDescriptor.getLookupTableName().orElse(null), jsonOpts);
 		if (newRecordEntityDescriptor != null)
 		{
 			newRecordWindowId = newRecordEntityDescriptor.getDocumentTypeId().toJson();
-			newRecordCaption = newRecordEntityDescriptor.getCaption().translate(jsonOpts.getAD_Language());
+			newRecordCaption = newRecordEntityDescriptor.getCaption().translate(jsonOpts.getAdLanguage());
 		}
 		else
 		{
@@ -204,30 +222,58 @@ public final class JSONDocumentLayoutElementField implements Serializable
 			newRecordCaption = null;
 		}
 
+		//
+		// Lookup
+		source = JSONLookupSource.fromNullable(fieldDescriptor.getLookupSource());
+		if (source != null)
+		{
+			lookupSearchStringMinLength = fieldDescriptor.getLookupSearchStringMinLength();
+			lookupSearchStartDelayMillis = (int)fieldDescriptor.getLookupSearchStartDelay()
+					.orElseGet(jsonOpts::getDefaultLookupSearchStartDelay)
+					.toMillis();
+		}
+		else
+		{
+			lookupSearchStringMinLength = null;
+			lookupSearchStartDelayMillis = null;
+		}
+
 		supportZoomInto = fieldDescriptor.isSupportZoomInto() ? Boolean.TRUE : null;
 	}
 
 	@JsonCreator
-	/* package */ JSONDocumentLayoutElementField(
+	@Builder
+	private JSONDocumentLayoutElementField(
 			@JsonProperty("field") final String field,
+			@JsonProperty("caption") final String caption,
 			@JsonProperty("type") final JSONFieldType type,
 			@JsonProperty("tooltipIconName") final String tooltipIconName,
-			@JsonProperty("source") final JSONLookupSource source,
 			@JsonProperty("emptyText") final String emptyText,
 			@JsonProperty("devices") final List<JSONDeviceDescriptor> devices,
 			@JsonProperty("newRecordWindowId") final String newRecordWindowId,
 			@JsonProperty("newRecordCaption") final String newRecordCaption,
+			//
+			@JsonProperty("source") final JSONLookupSource source,
+			@JsonProperty("lookupSearchStringMinLength") final Integer lookupSearchStringMinLength,
+			@JsonProperty("lookupSearchStartDelayMillis") final Integer lookupSearchStartDelayMillis,
+			//
 			@JsonProperty("supportZoomInto") final boolean supportZoomInto)
 	{
 		this.field = field;
+		this.caption = caption;
 		this.type = type;
 		this.tooltipIconName = tooltipIconName;
-		this.source = source;
 		this.emptyText = emptyText;
 		this.devices = devices == null ? ImmutableList.of() : ImmutableList.copyOf(devices);
 
 		this.newRecordWindowId = newRecordWindowId;
 		this.newRecordCaption = newRecordCaption;
+
+		//
+		// Lookup
+		this.source = source;
+		this.lookupSearchStringMinLength = lookupSearchStringMinLength;
+		this.lookupSearchStartDelayMillis = lookupSearchStartDelayMillis;
 
 		this.supportZoomInto = supportZoomInto;
 	}
@@ -247,7 +293,7 @@ public final class JSONDocumentLayoutElementField implements Serializable
 				.toString();
 	}
 
-	private static final DocumentEntityDescriptor findNewRecordEntityDescriptor(final String lookupTableName, final JSONOptions jsonOpts)
+	private static DocumentEntityDescriptor findNewRecordEntityDescriptor(final String lookupTableName, final JSONDocumentLayoutOptions jsonOpts)
 	{
 		if (lookupTableName == null)
 		{

@@ -23,6 +23,8 @@ import org.adempiere.exceptions.DBException;
 import org.adempiere.exceptions.DBMoreThenOneRecordsFoundException;
 import org.adempiere.model.InterfaceWrapperHelper;
 import org.adempiere.model.PlainContextAware;
+import org.adempiere.service.ClientId;
+import org.adempiere.service.ISysConfigBL;
 import org.adempiere.util.lang.impl.TableRecordReference;
 import org.compiere.model.PO;
 import org.compiere.model.POInfo;
@@ -47,7 +49,6 @@ import de.metas.ui.web.window.descriptor.DocumentFieldDataBindingDescriptor;
 import de.metas.ui.web.window.descriptor.DocumentFieldDescriptor;
 import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
 import de.metas.ui.web.window.descriptor.LookupDescriptor;
-import de.metas.ui.web.window.descriptor.LookupDescriptorProvider.LookupScope;
 import de.metas.ui.web.window.descriptor.sql.DocumentFieldValueLoader;
 import de.metas.ui.web.window.descriptor.sql.SqlDocumentEntityDataBindingDescriptor;
 import de.metas.ui.web.window.descriptor.sql.SqlDocumentFieldDataBindingDescriptor;
@@ -60,7 +61,6 @@ import de.metas.ui.web.window.model.IDocumentChangesCollector;
 import de.metas.ui.web.window.model.IDocumentFieldView;
 import de.metas.ui.web.window.model.OrderedDocumentsList;
 import de.metas.ui.web.window.model.lookup.LabelsLookup;
-import de.metas.util.Check;
 import de.metas.util.Services;
 import lombok.NonNull;
 
@@ -101,47 +101,33 @@ public final class SqlDocumentsRepository implements DocumentsRepository
 
 	private static final String VERSION_DEFAULT = "0";
 
-	private int loadLimitWarn = 100;
-	private int loadLimitMax = 300;
+	private static final String SYSCONFIG_LoadLimitWarn = "webui.documents.LoadLimitWarn";
+	private static final int DEFAULT_LoadLimitWarn = 250;
+
+	private static final String SYSCONFIG_LoadLimitMax = "webui.documents.LoadLimitMax";
+	private static final int DEFAULT_LoadLimitMax = 300;
 
 	private SqlDocumentsRepository()
 	{
-		super();
 	}
 
-	private final void assertThisRepository(final DocumentEntityDescriptor entityDescriptor)
+	private int getLoadLimitWarn()
 	{
-		final DocumentsRepository documentsRepository = entityDescriptor.getDataBinding().getDocumentsRepository();
-		if (documentsRepository != this)
-		{
-			// shall not happen
-			throw new IllegalArgumentException("Entity descriptor's repository is invalid: " + entityDescriptor
-					+ "\n Expected: " + this
-					+ "\n But it was: " + documentsRepository);
-		}
+		return Services.get(ISysConfigBL.class).getIntValue(SYSCONFIG_LoadLimitWarn, DEFAULT_LoadLimitWarn);
 	}
 
-	public void setLoadLimitWarn(final int loadLimitWarn)
+	private int getLoadLimitMax()
 	{
-		final int loadLimitWarnOld = this.loadLimitWarn;
-		this.loadLimitWarn = loadLimitWarn;
-		logger.warn("Changed LoadLimitWarn: {} -> {}", loadLimitWarnOld, this.loadLimitWarn);
-	}
-
-	public void setLoadLimitMax(final int loadLimitMax)
-	{
-		final int loadLimitMaxOld = this.loadLimitMax;
-		this.loadLimitMax = loadLimitMax;
-		logger.warn("Changed LoadLimitWarn: {} -> {}", loadLimitMaxOld, this.loadLimitMax);
+		return Services.get(ISysConfigBL.class).getIntValue(SYSCONFIG_LoadLimitMax, DEFAULT_LoadLimitMax);
 	}
 
 	private static DocumentId retrieveNextDocumentId(final DocumentEntityDescriptor entityDescriptor)
 	{
 		final SqlDocumentEntityDataBindingDescriptor dataBinding = SqlDocumentEntityDataBindingDescriptor.cast(entityDescriptor.getDataBinding());
 
-		final int adClientId = UserSession.getCurrent().getAD_Client_ID();
+		final ClientId adClientId = UserSession.getCurrent().getClientId();
 		final String tableName = dataBinding.getTableName();
-		final int nextId = DB.getNextID(adClientId, tableName, ITrx.TRXNAME_ThreadInherited);
+		final int nextId = DB.getNextID(adClientId.getRepoId(), tableName, ITrx.TRXNAME_ThreadInherited);
 		if (nextId <= 0)
 		{
 			throw new DBException("Cannot retrieve next ID from database for " + entityDescriptor);
@@ -173,8 +159,8 @@ public final class SqlDocumentsRepository implements DocumentsRepository
 		final String adLanguage = sqlBuilder.getAD_Language();
 		logger.debug("Retrieving records: SQL={} -- {}", sql, sqlParams);
 
-		final int loadLimitWarn = this.loadLimitWarn;
-		final int loadLimitMax = this.loadLimitMax;
+		final int loadLimitWarn = getLoadLimitWarn();
+		final int loadLimitMax = getLoadLimitMax();
 		int maxRowsToFetch = limit;
 		if (maxRowsToFetch <= 0)
 		{
@@ -225,14 +211,18 @@ public final class SqlDocumentsRepository implements DocumentsRepository
 				// Stop if we reached the MAXIMUM limit
 				if (loadLimitMax > 0 && loadCount >= loadLimitMax)
 				{
-					logger.warn("Reached load count MAXIMUM level. Stop loading. \n SQL: {} \n SQL Params: {} \n loadCount: {}", sql, sqlParams, loadCount);
+					logger.warn("Reached load count MAXIMUM level. Stop loading. \n SQL: {} \n SQL Params: {} \n loadCount: {}"
+							+ "\n To change this limit check {} sysconfig.",
+							sql, sqlParams, loadCount, SYSCONFIG_LoadLimitMax);
 					break;
 				}
 
 				// WARN if we reached the Warning limit
 				if (!loadLimitWarnReported && loadLimitWarn > 0 && loadCount >= loadLimitWarn)
 				{
-					logger.warn("Reached load count Warning level. Continue loading. \n SQL: {} \n SQL Params: {} \n loadCount: {}", sql, sqlParams, loadCount);
+					logger.warn("Reached load count Warning level. Continue loading. \n SQL: {} \n SQL Params: {} \n loadCount: {}"
+							+ "\n To change this limit check {} sysconfig.",
+							sql, sqlParams, loadCount, SYSCONFIG_LoadLimitWarn);
 					loadLimitWarnReported = true;
 				}
 			}
@@ -305,7 +295,7 @@ public final class SqlDocumentsRepository implements DocumentsRepository
 	}
 
 	@FunctionalInterface
-	private static interface FieldValueSupplier
+	private interface FieldValueSupplier
 	{
 		/**
 		 * @param fieldDescriptor
@@ -327,11 +317,8 @@ public final class SqlDocumentsRepository implements DocumentsRepository
 
 		private String version;
 
-		public ResultSetDocumentValuesSupplier(final DocumentEntityDescriptor entityDescriptor, final String adLanguage, final ResultSet rs)
+		public ResultSetDocumentValuesSupplier(@NonNull final DocumentEntityDescriptor entityDescriptor, final String adLanguage, @NonNull final ResultSet rs)
 		{
-			super();
-			Check.assumeNotNull(entityDescriptor, "Parameter entityDescriptor is not null");
-			Check.assumeNotNull(rs, "Parameter rs is not null");
 			this.entityDescriptor = entityDescriptor;
 			this.adLanguage = adLanguage;
 			this.rs = rs;
@@ -352,7 +339,7 @@ public final class SqlDocumentsRepository implements DocumentsRepository
 			}
 		}
 
-		private final DocumentId retrieveDocumentId()
+		private DocumentId retrieveDocumentId()
 		{
 			final List<DocumentFieldDescriptor> idFields = entityDescriptor.getIdFields();
 			if (idFields.isEmpty())
@@ -410,7 +397,7 @@ public final class SqlDocumentsRepository implements DocumentsRepository
 
 			final DocumentFieldValueLoader fieldValueLoader = fieldDataBinding.getDocumentFieldValueLoader();
 			final boolean isDisplayColumnAvailable = true;
-			final LookupDescriptor lookupDescriptor = fieldDescriptor.getLookupDescriptor(LookupScope.DocumentField);
+			final LookupDescriptor lookupDescriptor = fieldDescriptor.getLookupDescriptor().orElse(null);
 
 			try
 			{
@@ -440,7 +427,7 @@ public final class SqlDocumentsRepository implements DocumentsRepository
 		}
 	}
 
-	public static enum RefreshResult
+	public enum RefreshResult
 	{
 		OK, MISSING
 	}
@@ -650,7 +637,7 @@ public final class SqlDocumentsRepository implements DocumentsRepository
 		return po;
 	}
 
-	private static final TableRecordReference extractRootRecordReference(final Document includedDocument)
+	private static TableRecordReference extractRootRecordReference(final Document includedDocument)
 	{
 		if (includedDocument.isRootDocument())
 		{
@@ -673,7 +660,7 @@ public final class SqlDocumentsRepository implements DocumentsRepository
 		return TableRecordReference.of(rootTableName, rootRecordId);
 	}
 
-	private static final IQueryBuilder<Object> toQueryBuilder(final SqlDocumentEntityDataBindingDescriptor dataBinding, final DocumentId documentId)
+	private static IQueryBuilder<Object> toQueryBuilder(final SqlDocumentEntityDataBindingDescriptor dataBinding, final DocumentId documentId)
 	{
 		final String tableName = dataBinding.getTableName();
 
@@ -801,7 +788,7 @@ public final class SqlDocumentsRepository implements DocumentsRepository
 				}
 			}
 
-			// TODO: handle not updateable columns... i think we shall set them only if the PO is new
+			// TODO: handle not updatable columns... i think we shall set them only if the PO is new
 
 			// NOTE: at this point we shall not do any other validations like "mandatory but null", value min/max range check,
 			// because we shall rely completely on Document level validations and not duplicate the logic here.
@@ -821,7 +808,7 @@ public final class SqlDocumentsRepository implements DocumentsRepository
 	}
 
 	/** @return true if PO field's values can be considered the same */
-	private static final boolean poFieldValueEqual(final Object value1, final Object value2)
+	private static boolean poFieldValueEqual(final Object value1, final Object value2)
 	{
 		if (value1 == value2)
 		{
@@ -838,7 +825,7 @@ public final class SqlDocumentsRepository implements DocumentsRepository
 		return DataTypes.equals(value1, value2);
 	}
 
-	private static final boolean isEmptyPOFieldValue(final Object value)
+	private static boolean isEmptyPOFieldValue(final Object value)
 	{
 		if (value == null)
 		{
@@ -903,9 +890,9 @@ public final class SqlDocumentsRepository implements DocumentsRepository
 		return DB.getSQLValueEx(ITrx.TRXNAME_ThreadInherited, sql, sqlParams);
 	}
 
-	private static final void saveLabels(final Document document, final IDocumentFieldView documentField)
+	private static void saveLabels(final Document document, final IDocumentFieldView documentField)
 	{
-		final LabelsLookup lookup = LabelsLookup.cast(documentField.getDescriptor().getLookupDescriptor(LookupScope.DocumentField));
+		final LabelsLookup lookup = LabelsLookup.cast(documentField.getDescriptor().getLookupDescriptor().orElse(null));
 
 		final int linkId = document.getFieldView(lookup.getLinkColumnName()).getValueAsInt(-1);
 		final Set<Object> listValuesInDatabase = lookup.retrieveExistingValues(linkId).getKeys();
@@ -940,7 +927,7 @@ public final class SqlDocumentsRepository implements DocumentsRepository
 		}
 	}
 
-	private static final void createLabelPORecord(@NonNull final Object listValueObj, final int linkId, @NonNull final LabelsLookup lookup)
+	private static void createLabelPORecord(@NonNull final Object listValueObj, final int linkId, @NonNull final LabelsLookup lookup)
 	{
 		final String listValue = listValueObj.toString();
 		final PO labelPO = TableModelLoader.instance.newPO(lookup.getLabelsTableName());

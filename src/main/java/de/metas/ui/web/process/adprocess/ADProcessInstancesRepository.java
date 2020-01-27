@@ -8,7 +8,7 @@ import java.util.stream.Stream;
 
 import javax.annotation.Nullable;
 
-import org.adempiere.ad.security.IUserRolePermissions;
+import org.adempiere.ad.element.api.AdWindowId;
 import org.adempiere.exceptions.AdempiereException;
 import org.adempiere.util.api.IRangeAwareParams;
 import org.adempiere.util.lang.IAutoCloseable;
@@ -18,6 +18,7 @@ import org.compiere.util.Env;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -31,6 +32,7 @@ import de.metas.process.PInstanceId;
 import de.metas.process.ProcessDefaultParametersUpdater;
 import de.metas.process.ProcessInfo;
 import de.metas.process.ProcessInfo.ProcessInfoBuilder;
+import de.metas.security.IUserRolePermissions;
 import de.metas.ui.web.process.CreateProcessInstanceRequest;
 import de.metas.ui.web.process.IProcessInstanceController;
 import de.metas.ui.web.process.IProcessInstancesRepository;
@@ -164,6 +166,11 @@ public class ADProcessInstancesRepository implements IProcessInstancesRepository
 		final DocumentId adPInstanceId = DocumentId.of(processInfo.getPinstanceId());
 
 		final Object processClassInstance = processInfo.newProcessClassInstanceOrNull();
+		if (processClassInstance == null)
+		{
+			throw new AdempiereException("No process instance created for " + processInfo);
+		}
+
 		try (final IAutoCloseable c = JavaProcess.temporaryChangeCurrentInstance(processClassInstance))
 		{
 			//
@@ -186,6 +193,7 @@ public class ADProcessInstancesRepository implements IProcessInstancesRepository
 					.instanceId(adPInstanceId)
 					.parameters(parametersDoc)
 					.processClassInstance(processClassInstance)
+					.startProcessDirectly(processDescriptor.isStartProcessDirectly())
 					.contextSingleDocumentPath(request.getSingleDocumentPath())
 					.viewId(request.getViewRowIdsSelection() != null ? request.getViewRowIdsSelection().getViewId() : null)
 					.build();
@@ -200,7 +208,7 @@ public class ADProcessInstancesRepository implements IProcessInstancesRepository
 		final String tableName;
 		final int recordId;
 		final String sqlWhereClause;
-		final int adWindowId;
+		final AdWindowId adWindowId;
 
 		//
 		// View
@@ -211,7 +219,7 @@ public class ADProcessInstancesRepository implements IProcessInstancesRepository
 			final IView view = viewsRepo.getView(viewId);
 			final DocumentIdsSelection viewDocumentIds = viewRowIdsSelection.getRowIds();
 
-			adWindowId = viewId.getWindowId().toIntOr(-1);
+			adWindowId = viewId.getWindowId().toAdWindowIdOrNull();
 
 			if (viewDocumentIds.isSingleDocumentId())
 			{
@@ -234,7 +242,6 @@ public class ADProcessInstancesRepository implements IProcessInstancesRepository
 				recordId = -1;
 			}
 
-
 			final boolean emptyTableName = Check.isEmpty(tableName);
 			if (viewDocumentIds.isEmpty() || emptyTableName)
 			{
@@ -253,20 +260,31 @@ public class ADProcessInstancesRepository implements IProcessInstancesRepository
 		{
 			final DocumentEntityDescriptor entityDescriptor = documentDescriptorFactory.getDocumentEntityDescriptor(singleDocumentPath);
 
-			adWindowId = singleDocumentPath.getWindowId().toIntOr(-1);
+			adWindowId = singleDocumentPath.getWindowId().toAdWindowIdOrNull();
 
 			tableName = entityDescriptor.getTableNameOrNull();
+			final DocumentId documentId;
 			if (singleDocumentPath.isRootDocument())
 			{
-				recordId = singleDocumentPath.getDocumentId().toInt();
+				documentId = singleDocumentPath.getDocumentId();
 			}
 			else
 			{
-				recordId = singleDocumentPath.getSingleRowId().toInt();
+				documentId = singleDocumentPath.getSingleRowId();
 			}
+
+			if (documentId.isInt())
+			{
+				recordId = documentId.toInt();
+			}
+			else
+			{
+				recordId = -1;
+			}
+
 			sqlWhereClause = entityDescriptor
 					.getDataBinding(SqlDocumentEntityDataBindingDescriptor.class)
-					.getSqlWhereClauseById(recordId);
+					.getSqlWhereClauseById(documentId);
 		}
 		//
 		// From menu
@@ -275,7 +293,7 @@ public class ADProcessInstancesRepository implements IProcessInstancesRepository
 			tableName = null;
 			recordId = -1;
 			sqlWhereClause = null;
-			adWindowId = -1;
+			adWindowId = null;
 		}
 
 		//
@@ -288,13 +306,22 @@ public class ADProcessInstancesRepository implements IProcessInstancesRepository
 				.setCtx(Env.getCtx())
 				.setCreateTemporaryCtx()
 				.setAD_Process_ID(request.getProcessIdAsInt())
-				.setAD_Window_ID(adWindowId)
+				.setAdWindowId(adWindowId)
 				.setRecord(tableName, recordId)
 				.setSelectedIncludedRecords(selectedIncludedRecords)
 				.setWhereClause(sqlWhereClause);
 
 		//
 		// View related internal parameters
+		addViewInternalParameters(request, processInfoBuilder);
+		
+		return processInfoBuilder.build();
+	}
+
+	@VisibleForTesting
+	protected void addViewInternalParameters(final CreateProcessInstanceRequest request,
+			final ProcessInfoBuilder processInfoBuilder)
+	{
 		if (request.getViewRowIdsSelection() != null)
 		{
 			final ViewRowIdsSelection viewRowIdsSelection = request.getViewRowIdsSelection();
@@ -320,10 +347,8 @@ public class ADProcessInstancesRepository implements IProcessInstancesRepository
 					.addParameter(ViewBasedProcessTemplate.PARAM_ChildViewId, childViewRowIdsSelection.getViewId().toJson())
 					.addParameter(ViewBasedProcessTemplate.PARAM_ChildViewSelectedIds, childViewRowIdsSelection.getRowIds().toCommaSeparatedString());
 		}
-
-		return processInfoBuilder.build();
 	}
-
+	
 	private ADProcessInstanceController retrieveProcessInstance(final DocumentId adPInstanceDocumentId)
 	{
 		Check.assumeNotNull(adPInstanceDocumentId, "Parameter adPInstanceDocumentId is not null");
@@ -342,7 +367,7 @@ public class ADProcessInstancesRepository implements IProcessInstancesRepository
 		{
 			//
 			// Build the parameters document
-			final ProcessId processId = ProcessId.ofAD_Process_ID(processInfo.getAD_Process_ID());
+			final ProcessId processId = ProcessId.ofAD_Process_ID(processInfo.getAdProcessId());
 			final ProcessDescriptor processDescriptor = getProcessDescriptor(processId);
 
 			//
@@ -368,6 +393,7 @@ public class ADProcessInstancesRepository implements IProcessInstancesRepository
 					.instanceId(adPInstanceDocumentId)
 					.parameters(parametersDoc)
 					.processClassInstance(processClassInstance)
+					.startProcessDirectly(processDescriptor.isStartProcessDirectly())
 					.viewId(viewId)
 					.build();
 		}

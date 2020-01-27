@@ -4,7 +4,7 @@ import java.util.stream.Stream;
 
 import javax.annotation.OverridingMethodsMustInvokeSuper;
 
-import org.compiere.Adempiere;
+import org.compiere.SpringContextHolder;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import de.metas.process.ClientOnlyProcess;
@@ -19,10 +19,12 @@ import de.metas.ui.web.view.IView;
 import de.metas.ui.web.view.IViewRow;
 import de.metas.ui.web.view.IViewsRepository;
 import de.metas.ui.web.view.ViewId;
+import de.metas.ui.web.view.ViewProfileId;
 import de.metas.ui.web.view.ViewRowIdsSelection;
 import de.metas.ui.web.window.datatypes.DocumentId;
 import de.metas.ui.web.window.datatypes.DocumentIdsSelection;
 import de.metas.ui.web.window.datatypes.WindowId;
+import de.metas.ui.web.window.datatypes.json.JSONOptions;
 import de.metas.util.Check;
 import lombok.NonNull;
 
@@ -88,13 +90,21 @@ public abstract class ViewBasedProcessTemplate extends JavaProcess
 	private String p_WebuiChildViewSelectedIdsStr;
 
 	private IView _view;
+	private ViewProfileId _viewProfileId;
 	private ViewRowIdsSelection _viewRowIdsSelection;
 	private ViewRowIdsSelection _parentViewRowIdsSelection;
 	private ViewRowIdsSelection _childViewRowIdsSelection;
+	
+	private transient JSONOptions _jsonOptions; // lazy
 
 	protected ViewBasedProcessTemplate()
 	{
-		Adempiere.autowire(this);
+		SpringContextHolder.instance.autowire(this);
+	}
+	
+	protected final IViewsRepository getViewsRepo()
+	{
+		return viewsRepo;
 	}
 
 	/**
@@ -151,9 +161,15 @@ public abstract class ViewBasedProcessTemplate extends JavaProcess
 		return getView().getViewId().getWindowId();
 	}
 
+	protected final ViewProfileId getViewProfileId()
+	{
+		return _viewProfileId;
+	}
+
 	private final void setViewInfos(@NonNull final ViewAsPreconditionsContext viewContext)
 	{
 		_view = viewContext.getView();
+		_viewProfileId = viewContext.getViewProfileId();
 		_viewRowIdsSelection = viewContext.getViewRowIdsSelection();
 		_parentViewRowIdsSelection = viewContext.getParentViewRowIdsSelection();
 		_childViewRowIdsSelection = viewContext.getChildViewRowIdsSelection();
@@ -191,6 +207,11 @@ public abstract class ViewBasedProcessTemplate extends JavaProcess
 		}
 
 		return expectedViewClass.isAssignableFrom(view.getClass());
+	}
+
+	protected final void invalidateView(@NonNull final IView view)
+	{
+		viewsRepo.invalidateView(view);
 	}
 
 	protected final void invalidateView(@NonNull final ViewId viewId)
@@ -267,4 +288,13 @@ public abstract class ViewBasedProcessTemplate extends JavaProcess
 		return getChildView(IView.class).getById(rowId);
 	}
 
+	protected final JSONOptions getJSONOptions()
+	{
+		JSONOptions jsonOptions = this._jsonOptions;
+		if (jsonOptions == null)
+		{
+			jsonOptions = this._jsonOptions = JSONOptions.newInstance();
+		}
+		return jsonOptions;
+	}
 }

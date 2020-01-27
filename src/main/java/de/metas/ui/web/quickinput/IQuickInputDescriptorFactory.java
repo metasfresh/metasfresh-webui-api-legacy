@@ -5,6 +5,7 @@ import java.util.Set;
 
 import org.springframework.stereotype.Component;
 
+import de.metas.lang.SOTrx;
 import de.metas.ui.web.window.datatypes.DocumentId;
 import de.metas.ui.web.window.datatypes.DocumentType;
 import de.metas.ui.web.window.descriptor.DetailId;
@@ -53,7 +54,7 @@ public interface IQuickInputDescriptorFactory
 			final DocumentType documentType,
 			final DocumentId documentTypeId,
 			final DetailId detailId,
-			final Optional<Boolean> soTrx);
+			final Optional<SOTrx> soTrx);
 
 	//
 	//
@@ -66,18 +67,21 @@ public interface IQuickInputDescriptorFactory
 	@AllArgsConstructor(access = AccessLevel.PRIVATE)
 	public static final class MatchingKey
 	{
-		public static final MatchingKey includedDocument(final DocumentType documentType, final int documentTypeIdInt, final String tableName)
+		public static MatchingKey includedDocument(final DocumentType documentType, final int documentTypeIdInt, final String tableName)
 		{
 			final DocumentId documentTypeId = DocumentId.of(documentTypeIdInt);
 			return new MatchingKey(documentType, documentTypeId, tableName);
 		}
 
-		public static final MatchingKey includedDocument(final DocumentType documentType, final DocumentId documentTypeId, final String tableName)
+		public static MatchingKey includedDocument(
+				final DocumentType rootDocumentType,
+				final DocumentId rootDocumentTypeId,
+				final String includedTableName)
 		{
-			return new MatchingKey(documentType, documentTypeId, tableName);
+			return new MatchingKey(rootDocumentType, rootDocumentTypeId, includedTableName);
 		}
 
-		public static final MatchingKey ofTableName(final String tableName)
+		public static MatchingKey ofTableName(final String tableName)
 		{
 			final DocumentType documentType = null;
 			final DocumentId documentTypeId = null;

@@ -1,13 +1,14 @@
 package de.metas.ui.web.handlingunits;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Collection;
-import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
-import org.adempiere.mm.attributes.api.IAttributeDAO;
+import org.adempiere.mm.attributes.api.AttributeConstants;
 import org.adempiere.mm.attributes.spi.IAttributeValueContext;
 import org.adempiere.mm.attributes.spi.impl.DefaultAttributeValueContext;
 import org.adempiere.util.lang.ExtendedMemorizingSupplier;
@@ -22,10 +23,10 @@ import de.metas.handlingunits.attribute.HUAttributeConstants;
 import de.metas.handlingunits.attribute.IAttributeValue;
 import de.metas.handlingunits.attribute.storage.IAttributeStorage;
 import de.metas.handlingunits.attribute.storage.IAttributeStorageListener;
-import de.metas.handlingunits.attributes.sscc18.ISSCC18CodeDAO;
 import de.metas.handlingunits.model.I_M_HU;
 import de.metas.handlingunits.model.X_M_HU;
 import de.metas.product.ProductId;
+import de.metas.ui.web.session.UserSession;
 import de.metas.ui.web.view.IViewRowAttributes;
 import de.metas.ui.web.view.descriptor.ViewRowAttributesLayout;
 import de.metas.ui.web.view.json.JSONViewRowAttributes;
@@ -33,7 +34,7 @@ import de.metas.ui.web.window.controller.Execution;
 import de.metas.ui.web.window.datatypes.DocumentPath;
 import de.metas.ui.web.window.datatypes.LookupValue;
 import de.metas.ui.web.window.datatypes.LookupValuesList;
-import de.metas.ui.web.window.datatypes.json.JSONDate;
+import de.metas.ui.web.window.datatypes.json.DateTimeConverters;
 import de.metas.ui.web.window.datatypes.json.JSONDocumentChangedEvent;
 import de.metas.ui.web.window.datatypes.json.JSONDocumentField;
 import de.metas.ui.web.window.datatypes.json.JSONLayoutWidgetType;
@@ -44,7 +45,6 @@ import de.metas.ui.web.window.model.IDocumentChangesCollector;
 import de.metas.ui.web.window.model.MutableDocumentFieldChangedEvent;
 import de.metas.ui.web.window.model.lookup.LookupValueFilterPredicates;
 import de.metas.util.Check;
-import de.metas.util.Services;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NonNull;
@@ -180,13 +180,13 @@ public class HUEditorRowAttributes implements IViewRowAttributes
 	}
 
 	@Override
-	public JSONViewRowAttributes toJson(final JSONOptions jsonOpts_NOTUSED)
+	public JSONViewRowAttributes toJson(final JSONOptions jsonOpts)
 	{
 		final JSONViewRowAttributes jsonDocument = new JSONViewRowAttributes(documentPath);
 
 		final List<JSONDocumentField> jsonFields = attributesStorage.getAttributeValues()
 				.stream()
-				.map(this::toJSONDocumentField)
+				.map(attributeValue -> toJSONDocumentField(attributeValue, jsonOpts))
 				.collect(Collectors.toList());
 
 		jsonDocument.setFields(jsonFields);
@@ -194,10 +194,10 @@ public class HUEditorRowAttributes implements IViewRowAttributes
 		return jsonDocument;
 	}
 
-	private final JSONDocumentField toJSONDocumentField(final IAttributeValue attributeValue)
+	private final JSONDocumentField toJSONDocumentField(final IAttributeValue attributeValue, final JSONOptions jsonOpts)
 	{
 		final String fieldName = HUEditorRowAttributesHelper.extractAttributeName(attributeValue);
-		final Object jsonValue = HUEditorRowAttributesHelper.extractJSONValue(attributesStorage, attributeValue);
+		final Object jsonValue = HUEditorRowAttributesHelper.extractJSONValue(attributesStorage, attributeValue, jsonOpts);
 		final DocumentFieldWidgetType widgetType = HUEditorRowAttributesHelper.extractWidgetType(attributeValue);
 		return JSONDocumentField.ofNameAndValue(fieldName, jsonValue)
 				.setDisplayed(isDisplayed(fieldName))
@@ -263,10 +263,22 @@ public class HUEditorRowAttributes implements IViewRowAttributes
 		final String attributeValueType = attributesStorage.getAttributeValueType(attribute);
 		if (X_M_Attribute.ATTRIBUTEVALUETYPE_Date.equals(attributeValueType))
 		{
-			return JSONDate.fromJson(jsonValue.toString(), DocumentFieldWidgetType.Date);
-		}
+			final LocalDate localDate = DateTimeConverters.fromObjectToLocalDate(jsonValue.toString());
+			if (localDate == null)
+			{
+				return null;
+			}
 
-		return jsonValue;
+			// convert the LocalDate to ZonedDateTime using session's time zone,
+			// because later on the date is converted to Timestamp using system's default time zone.
+			// And we want to have a valid date for session's timezone.
+			final ZoneId zoneId = UserSession.getTimeZoneOrSystemDefault();
+			return localDate.atStartOfDay(zoneId);
+		}
+		else
+		{
+			return jsonValue;
+		}
 	}
 
 	@Override
@@ -298,13 +310,12 @@ public class HUEditorRowAttributes implements IViewRowAttributes
 
 	public Optional<String> getSSCC18()
 	{
-		final I_M_Attribute sscc18Attribute = Services.get(ISSCC18CodeDAO.class).retrieveSSCC18Attribute();
-		if (!attributesStorage.hasAttribute(sscc18Attribute))
+		if (!attributesStorage.hasAttribute(HUAttributeConstants.ATTR_SSCC18_Value))
 		{
 			return Optional.empty();
 		}
 
-		final String sscc18 = attributesStorage.getValueAsString(sscc18Attribute);
+		final String sscc18 = attributesStorage.getValueAsString(HUAttributeConstants.ATTR_SSCC18_Value);
 		if (Check.isEmpty(sscc18, true))
 		{
 			return Optional.empty();
@@ -313,16 +324,14 @@ public class HUEditorRowAttributes implements IViewRowAttributes
 		return Optional.of(sscc18.trim());
 	}
 
-	public Optional<Date> getBestBeforeDate()
+	public Optional<LocalDate> getBestBeforeDate()
 	{
-		final IAttributeDAO attributeDAO = Services.get(IAttributeDAO.class);
-		final I_M_Attribute bestBeforeDateAttribute = attributeDAO.retrieveAttributeByValue(HUAttributeConstants.ATTR_BestBeforeDate);
-		if (!attributesStorage.hasAttribute(bestBeforeDateAttribute))
+		if (!attributesStorage.hasAttribute(AttributeConstants.ATTR_BestBeforeDate))
 		{
 			return Optional.empty();
 		}
 
-		final Date bestBeforeDate = attributesStorage.getValueAsDate(bestBeforeDateAttribute);
+		final LocalDate bestBeforeDate = attributesStorage.getValueAsLocalDate(AttributeConstants.ATTR_BestBeforeDate);
 		return Optional.ofNullable(bestBeforeDate);
 	}
 
@@ -331,13 +340,23 @@ public class HUEditorRowAttributes implements IViewRowAttributes
 		return attributesStorage.getValue(attributeName);
 	}
 
+	public String getValueAsString(@NonNull final String attributeName)
+	{
+		return attributesStorage.getValueAsString(attributeName);
+	}
+
+	public boolean hasAttribute(@NonNull final String attributeName)
+	{
+		return attributesStorage.hasAttribute(attributeName);
+	}
+
 	/**
 	 * Intercepts {@link IAttributeStorage} events and forwards them to {@link Execution#getCurrentDocumentChangesCollector()}.
 	 */
 	@EqualsAndHashCode
 	private static final class AttributeStorage2ExecutionEventsForwarder implements IAttributeStorageListener
 	{
-		public static final void bind(final IAttributeStorage storage, final DocumentPath documentPath)
+		public static void bind(final IAttributeStorage storage, final DocumentPath documentPath)
 		{
 			final AttributeStorage2ExecutionEventsForwarder forwarder = new AttributeStorage2ExecutionEventsForwarder(documentPath);
 			storage.addListener(forwarder);
@@ -350,12 +369,12 @@ public class HUEditorRowAttributes implements IViewRowAttributes
 			this.documentPath = documentPath;
 		}
 
-		private final void forwardEvent(final IAttributeStorage storage, final IAttributeValue attributeValue)
+		private void forwardEvent(final IAttributeStorage storage, final IAttributeValue attributeValue)
 		{
 			final IDocumentChangesCollector changesCollector = Execution.getCurrentDocumentChangesCollector();
 
 			final String attributeName = HUEditorRowAttributesHelper.extractAttributeName(attributeValue);
-			final Object jsonValue = HUEditorRowAttributesHelper.extractJSONValue(storage, attributeValue);
+			final Object jsonValue = HUEditorRowAttributesHelper.extractJSONValue(storage, attributeValue, JSONOptions.newInstance());
 			final DocumentFieldWidgetType widgetType = HUEditorRowAttributesHelper.extractWidgetType(attributeValue);
 
 			changesCollector.collectEvent(MutableDocumentFieldChangedEvent.of(documentPath, attributeName, widgetType)
@@ -378,12 +397,6 @@ public class HUEditorRowAttributes implements IViewRowAttributes
 		public void onAttributeValueDeleted(final IAttributeValueContext attributeValueContext, final IAttributeStorage storage, final IAttributeValue attributeValue)
 		{
 			throw new UnsupportedOperationException();
-		}
-
-		@Override
-		public void onAttributeStorageDisposed(final IAttributeStorage storage)
-		{
-			// nothing
 		}
 	}
 }

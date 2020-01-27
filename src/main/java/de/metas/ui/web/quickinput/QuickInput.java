@@ -1,6 +1,7 @@
 package de.metas.ui.web.quickinput;
 
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
@@ -14,6 +15,7 @@ import org.slf4j.Logger;
 
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 
 import de.metas.logging.LogManager;
 import de.metas.ui.web.window.datatypes.DocumentId;
@@ -23,9 +25,9 @@ import de.metas.ui.web.window.datatypes.json.JSONLookupValuesList;
 import de.metas.ui.web.window.descriptor.DetailId;
 import de.metas.ui.web.window.model.Document;
 import de.metas.ui.web.window.model.Document.CopyMode;
+import de.metas.ui.web.window.model.IDocumentChangesCollector;
 import de.metas.util.Check;
 import de.metas.util.Services;
-import de.metas.ui.web.window.model.IDocumentChangesCollector;
 
 /*
  * #%L
@@ -57,12 +59,12 @@ import de.metas.ui.web.window.model.IDocumentChangesCollector;
  */
 public final class QuickInput
 {
-	public static final Builder builder()
+	public static Builder builder()
 	{
 		return new Builder();
 	}
 
-	public static final QuickInput getQuickInputOrNull(final ICalloutField calloutField)
+	public static QuickInput getQuickInputOrNull(final ICalloutField calloutField)
 	{
 		final Object documentObj = calloutField.getModel(Object.class);
 		final QuickInput quickInput = InterfaceWrapperHelper.getDynAttribute(documentObj, DYNATTR_QuickInput);
@@ -89,7 +91,6 @@ public final class QuickInput
 
 	private QuickInput(final Builder builder)
 	{
-		super();
 		descriptor = builder.getQuickInputDescriptor();
 		rootDocumentPath = builder.getRootDocumentPath();
 		targetDetailId = builder.getTargetDetailId();
@@ -98,7 +99,7 @@ public final class QuickInput
 		quickInputDocument.setDynAttribute(DYNATTR_QuickInput, this);
 
 		rootDocument = null;
-		
+
 		// State
 		readwriteLock = new ReentrantReadWriteLock();
 		completed = false;
@@ -107,7 +108,6 @@ public final class QuickInput
 	/** Copy constructor */
 	private QuickInput(final QuickInput from, final CopyMode copyMode, final IDocumentChangesCollector changesCollector)
 	{
-		super();
 		descriptor = from.descriptor;
 		rootDocumentPath = from.rootDocumentPath;
 		targetDetailId = from.targetDetailId;
@@ -123,7 +123,7 @@ public final class QuickInput
 		}
 
 		rootDocument = null; // we are not copying it on purpose
-		
+
 		// State
 		readwriteLock = from.readwriteLock; // always shared
 		completed = from.completed;
@@ -140,12 +140,12 @@ public final class QuickInput
 				.add("quickInputDocument", quickInputDocument)
 				.toString();
 	}
-	
+
 	public DocumentPath getDocumentPath()
 	{
 		return quickInputDocument.getDocumentPath();
 	}
-	
+
 	public IAutoCloseable lockForReading()
 	{
 		final ReadLock readLock = readwriteLock.readLock();
@@ -171,7 +171,6 @@ public final class QuickInput
 			logger.debug("Released write lock for {}: {}", this, writeLock);
 		};
 	}
-
 
 	public DocumentId getId()
 	{
@@ -242,37 +241,54 @@ public final class QuickInput
 	/**
 	 * @return newly created document
 	 */
-	public Document complete()
+	public List<Document> complete()
 	{
-		Services.get(ITrxManager.class).assertThreadInheritedTrxExists();
+		final ITrxManager trxManager = Services.get(ITrxManager.class);
+		trxManager.assertThreadInheritedTrxExists();
 
 		final IQuickInputProcessor processor = descriptor.createProcessor();
-		final DocumentId documentLineId = processor.process(this);
+		final Set<DocumentId> documentLineIds = processor.process(this);
+		
 		final Document rootDocument = getRootDocument();
-		final Document includedDocumentJustCreated = rootDocument.getIncludedDocument(targetDetailId, documentLineId);
+		
+		final List<Document> includedDocumentsJustCreated = documentLineIds.stream()
+				.map(documentLineId -> rootDocument.getIncludedDocument(targetDetailId, documentLineId))
+				.collect(ImmutableList.toImmutableList());
 
 		this.completed = true;
-		return includedDocumentJustCreated;
+		return includedDocumentsJustCreated;
 	}
-	
+
 	public boolean isCompleted()
 	{
 		return completed;
 	}
 
-	public JSONLookupValuesList getFieldDropdownValues(final String fieldName)
+	public JSONLookupValuesList getFieldDropdownValues(final String fieldName, final String adLanguage)
 	{
 		return getQuickInputDocument()
 				.getFieldLookupValues(fieldName)
-				.transform(JSONLookupValuesList::ofLookupValuesList);
+				.transform(lookupValuesList -> JSONLookupValuesList.ofLookupValuesList(lookupValuesList, adLanguage));
 	}
 
-	public JSONLookupValuesList getFieldTypeaheadValues(final String fieldName, final String query)
+	public JSONLookupValuesList getFieldTypeaheadValues(final String fieldName, final String query, final String adLanguage)
 	{
 		return getQuickInputDocument()
 				.getFieldLookupValuesForQuery(fieldName, query)
-				.transform(JSONLookupValuesList::ofLookupValuesList);
+				.transform(lookupValuesList -> JSONLookupValuesList.ofLookupValuesList(lookupValuesList, adLanguage));
 	}
+
+	public boolean hasField(final String fieldName)
+	{
+		return getQuickInputDocument().hasField(fieldName);
+	}
+
+	//
+	//
+	// ------
+	//
+	//
+	//
 
 	public static final class Builder
 	{
@@ -325,10 +341,8 @@ public final class QuickInput
 		private Document buildQuickInputDocument()
 		{
 			return Document.builder(getQuickInputDescriptor().getEntityDescriptor())
-					.initializeAsNewDocument(nextQuickInputDocumentId::getAndIncrement, VERSION_DEFAULT)
-					.build();
+					.initializeAsNewDocument(nextQuickInputDocumentId::getAndIncrement, VERSION_DEFAULT);
 
 		}
-
 	}
 }

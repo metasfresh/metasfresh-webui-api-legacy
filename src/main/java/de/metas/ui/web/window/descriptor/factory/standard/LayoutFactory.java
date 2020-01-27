@@ -4,13 +4,16 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 import javax.annotation.Nullable;
 
+import org.adempiere.ad.element.api.AdTabId;
+import org.adempiere.ad.element.api.AdWindowId;
 import org.adempiere.ad.expression.api.ILogicExpression;
 import org.adempiere.model.InterfaceWrapperHelper;
-import org.compiere.Adempiere;
+import org.compiere.SpringContextHolder;
 import org.compiere.model.GridTabVO;
 import org.compiere.model.GridWindowVO;
 import org.compiere.model.I_AD_UI_Column;
@@ -19,17 +22,18 @@ import org.compiere.model.I_AD_UI_ElementField;
 import org.compiere.model.I_AD_UI_ElementGroup;
 import org.compiere.model.I_AD_UI_Section;
 import org.compiere.model.X_AD_UI_Element;
-import org.compiere.util.Util;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import com.google.common.base.MoreObjects;
+import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
 import de.metas.i18n.IModelTranslationMap;
 import de.metas.i18n.ITranslatableString;
 import de.metas.i18n.ImmutableTranslatableString;
+import de.metas.i18n.TranslatableStrings;
 import de.metas.logging.LogManager;
 import de.metas.ui.web.quickinput.QuickInputDescriptorFactoryService;
 import de.metas.ui.web.view.descriptor.ViewLayout;
@@ -44,16 +48,16 @@ import de.metas.ui.web.window.descriptor.DocumentLayoutDetailDescriptor;
 import de.metas.ui.web.window.descriptor.DocumentLayoutElementDescriptor;
 import de.metas.ui.web.window.descriptor.DocumentLayoutElementFieldDescriptor;
 import de.metas.ui.web.window.descriptor.DocumentLayoutElementFieldDescriptor.FieldType;
-import de.metas.ui.web.window.descriptor.DocumentLayoutElementFieldDescriptor.LookupSource;
 import de.metas.ui.web.window.descriptor.DocumentLayoutElementGroupDescriptor;
 import de.metas.ui.web.window.descriptor.DocumentLayoutElementLineDescriptor;
 import de.metas.ui.web.window.descriptor.DocumentLayoutSectionDescriptor;
 import de.metas.ui.web.window.descriptor.DocumentLayoutSingleRow;
+import de.metas.ui.web.window.descriptor.DocumentLayoutSingleRow.Builder;
 import de.metas.ui.web.window.descriptor.LayoutType;
 import de.metas.ui.web.window.descriptor.ViewEditorRenderMode;
 import de.metas.ui.web.window.descriptor.WidgetSize;
 import de.metas.util.Check;
-
+import de.metas.util.lang.CoalesceUtil;
 import lombok.NonNull;
 
 /*
@@ -98,16 +102,16 @@ public class LayoutFactory
 
 	// FIXME TRL HARDCODED_TAB_EMPTY_RESULT_TEXT
 	public static final ITranslatableString HARDCODED_TAB_EMPTY_RESULT_TEXT = ImmutableTranslatableString.builder()
-			.setDefaultValue("There are no detail rows")
-			.put("de_DE", "Es sind noch keine Detailzeilen vorhanden.")
-			.put("de_CH", "Es sind noch keine Detailzeilen vorhanden.")
+			.defaultValue("There are no detail rows")
+			.trl("de_DE", "Es sind noch keine Detailzeilen vorhanden.")
+			.trl("de_CH", "Es sind noch keine Detailzeilen vorhanden.")
 			.build();
 
 	// FIXME TRL HARDCODED_TAB_EMPTY_RESULT_TEXT
 	public static final ITranslatableString HARDCODED_TAB_EMPTY_RESULT_HINT = ImmutableTranslatableString.builder()
-			.setDefaultValue("You can create them in this window.")
-			.put("de_DE", "Du kannst sie im jeweiligen Fenster erfassen.")
-			.put("de_CH", "Du kannst sie im jeweiligen Fenster erfassen.")
+			.defaultValue("You can create them in this window.")
+			.trl("de_DE", "Du kannst sie im jeweiligen Fenster erfassen.")
+			.trl("de_CH", "Du kannst sie im jeweiligen Fenster erfassen.")
 			.build();
 
 	private static final int DEFAULT_MultiLine_LinesCount = 3;
@@ -115,7 +119,7 @@ public class LayoutFactory
 	//
 	// Parameters
 	private final GridTabVOBasedDocumentEntityDescriptorFactory descriptorsFactory;
-	private final int _adWindowId;
+	private final AdWindowId _adWindowId;
 	private final ITranslatableString windowCaption;
 
 	private final ImmutableSet<Integer> childAdTabIdsToSkip;
@@ -125,14 +129,17 @@ public class LayoutFactory
 	private final IWindowUIElementsProvider _uiProvider;
 	private final List<I_AD_UI_Section> _uiSections;
 
-	private LayoutFactory(final GridWindowVO gridWindowVO, final GridTabVO gridTabVO, final GridTabVO parentTab)
+	private LayoutFactory(
+			@NonNull final GridWindowVO gridWindowVO,
+			@NonNull final GridTabVO gridTabVO,
+			@Nullable final GridTabVO parentTab)
 	{
-		Adempiere.autowire(this);
+		SpringContextHolder.instance.autowire(this);
 
-		_adWindowId = gridTabVO.getAD_Window_ID();
-		windowCaption = ImmutableTranslatableString.ofMap(gridWindowVO.getNameTrls(), gridWindowVO.getName());
+		_adWindowId = gridTabVO.getAdWindowId();
+		windowCaption = TranslatableStrings.ofMap(gridWindowVO.getNameTrls(), gridWindowVO.getName());
 
-		final int templateTabId = Util.firstGreaterThanZero(gridTabVO.getTemplateTabId(), gridTabVO.getAD_Tab_ID());
+		final AdTabId templateTabId = AdTabId.ofRepoId(CoalesceUtil.firstGreaterThanZero(gridTabVO.getTemplateTabId(), gridTabVO.getAD_Tab_ID()));
 
 		//
 		// Pick the right UI elements provider (DAO, fallback to InMemory),
@@ -200,7 +207,7 @@ public class LayoutFactory
 				.flatMap(uiElementGroup -> getUIProvider().getUIElements(uiElementGroup).stream());
 	}
 
-	private int getAD_Window_ID()
+	private AdWindowId getAdWindowId()
 	{
 		return _adWindowId;
 	}
@@ -441,18 +448,7 @@ public class LayoutFactory
 			logger.trace("Skip layout element for {} because it has no fields: {}", uiElement, layoutElementBuilder);
 			return null;
 		}
-
-		// NOTE: per jassy request, when dealing with composed lookup fields, first field shall be Lookup and not List.
-		if (layoutElementBuilder.getFieldsCount() > 1)
-		{
-			final DocumentLayoutElementFieldDescriptor.Builder layoutElementFieldBuilder = layoutElementBuilder.getFirstField();
-			if (layoutElementFieldBuilder.isLookup())
-			{
-				layoutElementBuilder.setWidgetType(DocumentFieldWidgetType.Lookup);
-				layoutElementFieldBuilder.setLookupSource(LookupSource.lookup);
-			}
-		}
-
+		
 		//
 		// Collect advanced fields
 		if (layoutElementBuilder.isAdvancedField())
@@ -513,7 +509,7 @@ public class LayoutFactory
 	{
 		final List<DocumentFieldDescriptor.Builder> fields = new ArrayList<>();
 
-		final String uiElementType = Util.coalesce(uiElement.getAD_UI_ElementType(), X_AD_UI_Element.AD_UI_ELEMENTTYPE_Field);
+		final String uiElementType = CoalesceUtil.coalesce(uiElement.getAD_UI_ElementType(), X_AD_UI_Element.AD_UI_ELEMENTTYPE_Field);
 		if (X_AD_UI_Element.AD_UI_ELEMENTTYPE_Field.equals(uiElementType))
 		{
 			// add the "primary" field
@@ -622,7 +618,7 @@ public class LayoutFactory
 	}
 
 	/** @return included entity grid layout */
-	public DocumentLayoutDetailDescriptor.Builder layoutDetail()
+	public Optional<DocumentLayoutDetailDescriptor.Builder> layoutDetail()
 	{
 		final DocumentEntityDescriptor.Builder entityDescriptor = documentEntity();
 		logger.trace("Generating layout detail for {}", entityDescriptor);
@@ -632,29 +628,37 @@ public class LayoutFactory
 		if (tabDisplayLogic.isConstantFalse())
 		{
 			logger.trace("Skip adding detail tab to layout because it's never displayed: {}, tabDisplayLogic={}", entityDescriptor, tabDisplayLogic);
-			return null;
+			return Optional.empty();
 		}
 
-		final DocumentLayoutDetailDescriptor.Builder layoutDetail = DocumentLayoutDetailDescriptor.builder(entityDescriptor.getWindowId(), entityDescriptor.getDetailId())
+		final Builder layoutSingleRow = layoutSingleRow();
+
+		final DocumentLayoutDetailDescriptor.Builder builder = DocumentLayoutDetailDescriptor
+				.builder(entityDescriptor.getWindowId(), entityDescriptor.getDetailId())
+				.caption(entityDescriptor.getCaption())
+				.description(entityDescriptor.getDescription())
 				.internalName(entityDescriptor.getInternalName())
 				.gridLayout(layoutGridView())
-				.singleRowLayout(layoutSingleRow())
-				.queryOnActivate(entityDescriptor.isQueryIncludedTabOnActivate());
+				.singleRowLayout(layoutSingleRow)
+				.queryOnActivate(entityDescriptor.isQueryIncludedTabOnActivate())
+				.supportQuickInput(isSupportQuickInput(entityDescriptor));
+		return Optional.of(builder);
+	}
 
-		//
-		// Quick input
+	private boolean isSupportQuickInput(final DocumentEntityDescriptor.Builder entityDescriptor)
 		{
-			final boolean supportQuickInput = quickInputDescriptors.hasQuickInputEntityDescriptor(
-					entityDescriptor.getDocumentType(),
-					entityDescriptor.getDocumentTypeId(),
-					entityDescriptor.getTableNameOrNull(),
-					entityDescriptor.getDetailId(),
-					entityDescriptor.getIsSOTrx());
-			layoutDetail.supportQuickInput(supportQuickInput);
+		if (!entityDescriptor.isAllowQuickInput())
+		{
+			return false;
 		}
 
-		return layoutDetail;
-	}
+		return quickInputDescriptors.hasQuickInputEntityDescriptor(
+					entityDescriptor.getDocumentType(),
+					entityDescriptor.getDocumentTypeId(),
+				entityDescriptor.getTableName(),
+					entityDescriptor.getDetailId(),
+					entityDescriptor.getSOTrx());
+		}
 
 	private final DocumentLayoutElementFieldDescriptor.Builder layoutElementField(final DocumentFieldDescriptor.Builder field)
 	{
@@ -667,12 +671,13 @@ public class LayoutFactory
 		}
 
 		final DocumentLayoutElementFieldDescriptor.Builder layoutElementFieldBuilder = DocumentLayoutElementFieldDescriptor.builder(fieldName)
-				.setLookupSource(field.getLookupSourceType())
+				.setCaption(field.getCaption())
+				.setLookupInfos(field.getLookupDescriptor().orElse(null))
 				.setPublicField(field.hasCharacteristic(Characteristic.PublicField))
 				.setSupportZoomInto(field.isSupportZoomInto())
 				.trackField(field);
 
-		if(!Check.isEmpty(field.getTooltipIconName()))
+		if (!Check.isEmpty(field.getTooltipIconName()))
 		{
 			layoutElementFieldBuilder.setFieldType(FieldType.Tooltip);
 			layoutElementFieldBuilder.setTooltipIconName(field.getTooltipIconName());
@@ -685,7 +690,7 @@ public class LayoutFactory
 	public final ViewLayout layoutSideListView()
 	{
 		final ViewLayout.Builder layoutBuilder = ViewLayout.builder()
-				.setWindowId(WindowId.of(getAD_Window_ID()))
+				.setWindowId(WindowId.of(getAdWindowId()))
 				.setEmptyResultText(HARDCODED_TAB_EMPTY_RESULT_TEXT)
 				.setEmptyResultHint(HARDCODED_TAB_EMPTY_RESULT_HINT);
 
@@ -695,7 +700,9 @@ public class LayoutFactory
 				// .peek((uiElement)->System.out.println("UI ELEMENT: "+uiElement + ", SIDE="+uiElement.isDisplayed_SideList()))
 				.filter(uiElement -> uiElement.isDisplayed_SideList())
 				.sorted(Comparator.comparing(I_AD_UI_Element::getSeqNo_SideList))
-				.map(uiElement -> layoutElement(uiElement).setGridElement())
+				.map(this::layoutElement)
+				.filter(Predicates.notNull()) // avoid NPE
+				.map(layoutElement -> layoutElement.setGridElement())
 				.filter(uiElement -> uiElement != null)
 				.forEach(layoutBuilder::addElement);
 

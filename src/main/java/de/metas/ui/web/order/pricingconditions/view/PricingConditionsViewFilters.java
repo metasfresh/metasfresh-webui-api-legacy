@@ -10,15 +10,16 @@ import com.google.common.collect.ImmutableList;
 import de.metas.i18n.IMsgBL;
 import de.metas.ui.web.document.filter.DocumentFilter;
 import de.metas.ui.web.document.filter.DocumentFilterDescriptor;
-import de.metas.ui.web.document.filter.DocumentFilterDescriptorsProvider;
 import de.metas.ui.web.document.filter.DocumentFilterParam.Operator;
+import de.metas.ui.web.document.filter.provider.DocumentFilterDescriptorsProvider;
+import de.metas.ui.web.document.filter.provider.ImmutableDocumentFilterDescriptorsProvider;
 import de.metas.ui.web.document.filter.DocumentFilterParamDescriptor;
 import de.metas.ui.web.document.filter.DocumentFiltersList;
-import de.metas.ui.web.document.filter.ImmutableDocumentFilterDescriptorsProvider;
 import de.metas.ui.web.view.CreateViewRequest;
 import de.metas.ui.web.view.json.JSONFilterViewRequest;
 import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
 import de.metas.util.Services;
+import lombok.NonNull;
 
 /*
  * #%L
@@ -30,12 +31,12 @@ import de.metas.util.Services;
  * it under the terms of the GNU General Public License as
  * published by the Free Software Foundation, either version 2 of the
  * License, or (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public
  * License along with this program. If not, see
  * <http://www.gnu.org/licenses/gpl-2.0.html>.
@@ -117,16 +118,18 @@ class PricingConditionsViewFilters
 				|| ((showCustomers && row.isCustomer()) || (showVendors && row.isVendor()));
 	}
 
-	public DocumentFiltersList extractFilters(final JSONFilterViewRequest filterViewRequest)
+	public DocumentFiltersList extractFilters(@NonNull final JSONFilterViewRequest filterViewRequest)
 	{
 		final DocumentFilterDescriptorsProvider filtersDescriptors = getFilterDescriptorsProvider();
 		return DocumentFiltersList.ofJSONFilters(filterViewRequest.getFilters())
 				.unwrapAndCopy(filtersDescriptors);
 	}
 
-	public DocumentFiltersList extractFilters(final CreateViewRequest request)
+	public DocumentFiltersList extractFilters(@NonNull final CreateViewRequest request)
 	{
-		return request.isUseAutoFilters() ? getDefaultFilters() : request.getFilters().unwrapAndCopy(getFilterDescriptorsProvider());
+		return request.isUseAutoFilters()
+				? getDefaultFilters()
+				: request.getFilters().unwrapAndCopy(getFilterDescriptorsProvider());
 	}
 
 	private DocumentFiltersList getDefaultFilters()

@@ -1,6 +1,7 @@
 package de.metas.ui.web.window.descriptor;
 
 import java.io.Serializable;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -13,12 +14,12 @@ import com.google.common.collect.ImmutableList;
 
 import de.metas.i18n.ITranslatableString;
 import de.metas.i18n.ImmutableTranslatableString;
+import de.metas.i18n.TranslatableStrings;
 import de.metas.logging.LogManager;
 import de.metas.ui.web.devices.JSONDeviceDescriptor;
 import de.metas.ui.web.window.datatypes.json.JSONDocumentLayoutElementField.JSONFieldType;
 import de.metas.ui.web.window.datatypes.json.JSONDocumentLayoutElementField.JSONLookupSource;
 import de.metas.util.Check;
-
 import lombok.Getter;
 import lombok.NonNull;
 
@@ -47,7 +48,7 @@ import lombok.NonNull;
 @SuppressWarnings("serial")
 public final class DocumentLayoutElementFieldDescriptor implements Serializable
 {
-	public static final Builder builder(final String fieldName)
+	public static Builder builder(final String fieldName)
 	{
 		return new Builder(fieldName);
 	}
@@ -55,17 +56,19 @@ public final class DocumentLayoutElementFieldDescriptor implements Serializable
 	/**
 	 * Please keep in sync with {@link JSONLookupSource}.
 	 */
-	public static enum LookupSource
+	public enum LookupSource
 	{
-		lookup, list,
+		lookup,
+
+		list,
 
 		text
-	};
+	}
 
 	/**
 	 * Please keep in sync with {@link JSONFieldType}.
 	 */
-	public static enum FieldType
+	public enum FieldType
 	{
 		ActionButtonStatus,
 
@@ -74,10 +77,11 @@ public final class DocumentLayoutElementFieldDescriptor implements Serializable
 		Tooltip
 	}
 
-	private final String internalName;
-
 	@Getter
 	private final String field;
+
+	@Getter
+	private final ITranslatableString caption;
 
 	@Getter
 	private final FieldType fieldType;
@@ -93,9 +97,12 @@ public final class DocumentLayoutElementFieldDescriptor implements Serializable
 
 	@Getter
 	private final LookupSource lookupSource;
-
 	@Getter
 	private final Optional<String> lookupTableName;
+	@Getter
+	private final int lookupSearchStringMinLength;
+	@Getter
+	private final Optional<Duration> lookupSearchStartDelay;
 
 	private final ITranslatableString emptyText;
 
@@ -107,9 +114,8 @@ public final class DocumentLayoutElementFieldDescriptor implements Serializable
 
 	private DocumentLayoutElementFieldDescriptor(@NonNull final Builder builder)
 	{
-		internalName = builder.internalName;
 		field = builder.getFieldName();
-
+		caption = builder.getCaption();
 		fieldType = builder.fieldType;
 		if (FieldType.Tooltip.equals(fieldType))
 		{
@@ -121,11 +127,13 @@ public final class DocumentLayoutElementFieldDescriptor implements Serializable
 		}
 
 		publicField = builder.publicField;
-		emptyText = ImmutableTranslatableString.copyOfNullable(builder.emptyText);
+		emptyText = TranslatableStrings.copyOfNullable(builder.emptyText);
 		devices = builder.getDevices();
 
 		lookupSource = builder.lookupSource;
 		lookupTableName = builder.getLookupTableName();
+		lookupSearchStringMinLength = builder.lookupSearchStringMinLength;
+		lookupSearchStartDelay = builder.lookupSearchStartDelay;
 
 		supportZoomInto = builder.isSupportZoomInto();
 	}
@@ -136,7 +144,6 @@ public final class DocumentLayoutElementFieldDescriptor implements Serializable
 		return MoreObjects.toStringHelper(this)
 				.omitNullValues()
 				.add("field", field)
-				.add("internalName", internalName)
 				.add("publicField", publicField)
 				.add("devices", devices.isEmpty() ? null : devices)
 				.toString();
@@ -174,13 +181,13 @@ public final class DocumentLayoutElementFieldDescriptor implements Serializable
 
 		// FIXME TRL HARDCODED_FIELD_EMPTY_TEXT
 		private static final ITranslatableString HARDCODED_FIELD_EMPTY_TEXT = ImmutableTranslatableString.builder()
-				.setDefaultValue("none")
-				.put("de_DE", "leer")
-				.put("de_CH", "leer")
+				.defaultValue("none")
+				.trl("de_DE", "leer")
+				.trl("de_CH", "leer")
 				.build();
 
-		private String internalName;
 		private final String fieldName;
+		private ITranslatableString caption = TranslatableStrings.empty();
 		private FieldType fieldType;
 		private String tooltipIconName;
 
@@ -190,6 +197,8 @@ public final class DocumentLayoutElementFieldDescriptor implements Serializable
 
 		private LookupSource lookupSource;
 		private Optional<String> lookupTableName = null;
+		private int lookupSearchStringMinLength = -1;
+		private Optional<Duration> lookupSearchStartDelay = Optional.empty();
 
 		private boolean consumed = false;
 		private DocumentFieldDescriptor.Builder documentFieldBuilder;
@@ -207,10 +216,9 @@ public final class DocumentLayoutElementFieldDescriptor implements Serializable
 		{
 			return MoreObjects.toStringHelper(this)
 					.omitNullValues()
-					.add("internalName", internalName)
 					.add("fieldName", fieldName)
 					.add("publicField", publicField)
-					.add("fieldActions", _devices.isEmpty() ? null : _devices)
+					.add("fieldActions", (_devices == null || _devices.isEmpty()) ? null : _devices)
 					.add("consumed", consumed)
 					.toString();
 		}
@@ -224,58 +232,77 @@ public final class DocumentLayoutElementFieldDescriptor implements Serializable
 			return result;
 		}
 
-		public Builder setInternalName(final String internalName)
-		{
-			this.internalName = internalName;
-			return this;
-		}
-
 		public String getFieldName()
 		{
 			Check.assumeNotEmpty(fieldName, "fieldName is not empty");
 			return fieldName;
 		}
 
-		public Builder setLookupSource(final LookupSource lookupSource)
+		public Builder setCaption(@NonNull final ITranslatableString caption)
 		{
-			this.lookupSource = lookupSource;
+			this.caption = caption;
 			return this;
 		}
 
-		public LookupSource getLookupSource()
+		public ITranslatableString getCaption()
 		{
-			return lookupSource;
+			return caption;
 		}
 
-		public boolean isLookup()
+		public Builder setLookupInfos(final LookupDescriptor lookupDescriptor)
 		{
-			return lookupSource != null;
-		}
+			if (lookupDescriptor != null)
+			{
+				this.lookupSource = lookupDescriptor.getLookupSourceType();
+				this.lookupTableName = lookupDescriptor.getTableName();
+				this.lookupSearchStringMinLength = lookupDescriptor.getSearchStringMinLength();
+				this.lookupSearchStartDelay = lookupDescriptor.getSearchStartDelay();
+			}
+			else
+			{
+				this.lookupSource = null;
+				this.lookupTableName = Optional.empty();
+				this.lookupSearchStringMinLength = -1;
+				this.lookupSearchStartDelay = Optional.empty();
+			}
 
-		public Builder setLookupTableName(@NonNull final Optional<String> lookupTableName)
-		{
-			this.lookupTableName = lookupTableName;
 			return this;
 		}
 
-		public Optional<String> getLookupTableName()
+		public Builder setLookupSourceAsText()
+		{
+			this.lookupSource = LookupSource.text;
+			this.lookupTableName = Optional.empty();
+			this.lookupSearchStringMinLength = -1;
+			this.lookupSearchStartDelay = Optional.empty();
+			return this;
+		}
+
+		private Optional<String> getLookupTableName()
 		{
 			if (lookupTableName != null)
 			{
 				return lookupTableName;
 			}
-			if (documentFieldBuilder != null)
+			else if (documentFieldBuilder != null)
 			{
 				return documentFieldBuilder.getLookupTableName();
 			}
-
-			return Optional.empty();
+			else
+			{
+				return Optional.empty();
+			}
 		}
 
 		public Builder setFieldType(final FieldType fieldType)
 		{
 			this.fieldType = fieldType;
 			return this;
+		}
+
+		public boolean isRegularField()
+		{
+			return fieldType == null;
 		}
 
 		/** May be {@code null}, unless the field type is {@link FieldType#Tooltip}. */

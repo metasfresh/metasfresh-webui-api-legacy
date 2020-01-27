@@ -12,10 +12,10 @@ import javax.annotation.Nullable;
 import org.adempiere.ad.service.IADReferenceDAO;
 import org.adempiere.ad.service.IADReferenceDAO.ADRefListItem;
 import org.compiere.model.I_AD_Process_Para;
-import org.compiere.model.I_C_BPartner;
 import org.compiere.util.DisplayType;
 import org.compiere.util.Env;
 
+import de.metas.bpartner.BPartnerId;
 import de.metas.handlingunits.HuId;
 import de.metas.handlingunits.IHandlingUnitsBL;
 import de.metas.handlingunits.IHandlingUnitsDAO;
@@ -25,6 +25,7 @@ import de.metas.handlingunits.model.I_M_HU_PI_Item;
 import de.metas.handlingunits.model.I_M_HU_PI_Version;
 import de.metas.handlingunits.model.X_M_HU;
 import de.metas.printing.esb.base.util.Check;
+import de.metas.process.AdProcessId;
 import de.metas.process.IADProcessDAO;
 import de.metas.process.IProcessDefaultParametersProvider;
 import de.metas.product.ProductId;
@@ -130,7 +131,7 @@ public class WebuiHUTransformParametersFiller
 		{
 			final I_M_HU cu = getSelectedRow().getM_HU(); // should work, because otherwise the param is not even shown.
 
-			return HUTransformService.newInstance().getMaximumQtyCU(cu, getSelectedRow().getC_UOM()).getAsBigDecimal();
+			return HUTransformService.newInstance().getMaximumQtyCU(cu, getSelectedRow().getC_UOM()).toBigDecimal();
 		}
 		else if (WEBUI_M_HU_Transform.PARAM_QtyTU.equals(parameterName))
 		{
@@ -152,7 +153,7 @@ public class WebuiHUTransformParametersFiller
 	/**
 	 * @return the actions that are available according to which row is currently selected and to also according to whether there are already existing TUs or LUs in the context.
 	 */
-	public final LookupValuesList getActions(final int processId)
+	public final LookupValuesList getActions(final AdProcessId processId)
 	{
 		final Set<String> allowedActions = new HashSet<>();
 
@@ -173,15 +174,16 @@ public class WebuiHUTransformParametersFiller
 		}
 
 		final IADProcessDAO adProcessDAO = Services.get(IADProcessDAO.class);
-		final I_AD_Process_Para processParameter = adProcessDAO.retriveProcessParameter(processId, WEBUI_M_HU_Transform.PARAM_Action);
+		final I_AD_Process_Para processParameter = adProcessDAO.retrieveProcessParameter(processId, WEBUI_M_HU_Transform.PARAM_Action);
 		final int actionsReferenceId = processParameter.getAD_Reference_Value_ID();
 		final Collection<ADRefListItem> allActiveActionItems = adReferenceDAO.retrieveListItems(actionsReferenceId);
 
 		final String adLanguage = Env.getAD_Language();
 
-		return allActiveActionItems.stream()
+		return allActiveActionItems
+				.stream()
 				.filter(item -> allowedActions.contains(item.getValueName()))
-				.map(item -> StringLookupValue.of(item.getValueName(), item.getName()))
+				.map(item -> StringLookupValue.of(item.getValueName(), item.getName(), item.getDescription()))
 				.sorted(Comparator.comparing(lookupValue -> lookupValue.getDisplayName(adLanguage)))
 				.collect(LookupValuesList.collect());
 	}
@@ -261,12 +263,12 @@ public class WebuiHUTransformParametersFiller
 	private static LookupValuesList retrieveHUPItemProductsForNewTU(final HUEditorRow cuRow)
 	{
 		final ProductId productId = cuRow.getProductId();
-		final I_C_BPartner bPartner = cuRow.getM_HU().getC_BPartner();
+		final BPartnerId bpartnerId = IHandlingUnitsBL.extractBPartnerIdOrNull(cuRow.getM_HU());
 
 		return WEBUI_ProcessHelper.retrieveHUPIItemProducts(
 				Env.getCtx(),
 				productId,
-				bPartner,
+				bpartnerId,
 				false); // includeVirtualItem = false..moving a cu onto a "virtual" TU makes no sense. Instead, the user can just leave the CU as it is, or take it out of a physical TU
 	}
 
@@ -299,7 +301,7 @@ public class WebuiHUTransformParametersFiller
 							.excludeHUId(getParentHUIdOfSelectedRow()) // ..may not be the one TU that 'cu' is already attached to
 							.excludeHUStatus(X_M_HU.HUSTATUS_Destroyed)
 							.build())
-					.sorted(Comparator.comparing(HUEditorRow::getHuIdAsInt))
+					.sorted(Comparator.comparing(row -> row.getHuId().getRepoId()))
 					.map(row -> row.toLookupValue())
 					.collect(LookupValuesList.collect());
 		}
@@ -355,7 +357,7 @@ public class WebuiHUTransformParametersFiller
 							.excludeHUId(getParentHUIdOfSelectedRow()) // ..may not be the one LU that 'tu' is already attached to
 							.excludeHUStatus(X_M_HU.HUSTATUS_Destroyed)
 							.build())
-					.sorted(Comparator.comparing(HUEditorRow::getHuIdAsInt))
+					.sorted(Comparator.comparing(row -> row.getHuId().getRepoId()))
 					.map(row -> row.toLookupValue())
 					.collect(LookupValuesList.collect());
 		}
@@ -429,7 +431,10 @@ public class WebuiHUTransformParametersFiller
 		final I_M_HU_PI_Version effectivePIVersion = handlingUnitsBL.getEffectivePIVersion(tuHU);
 		Check.errorIf(effectivePIVersion == null, "tuHU is inconsistent; hu={}", tuHU);
 
-		final List<I_M_HU_PI_Item> luPIItems = handlingUnitsDAO.retrieveParentPIItemsForParentPI(effectivePIVersion.getM_HU_PI(), null, tuHU.getC_BPartner());
+		final List<I_M_HU_PI_Item> luPIItems = handlingUnitsDAO.retrieveParentPIItemsForParentPI(
+				effectivePIVersion.getM_HU_PI(), 
+				null, 
+				IHandlingUnitsBL.extractBPartnerIdOrNull(tuHU));
 
 		return luPIItems;
 	}

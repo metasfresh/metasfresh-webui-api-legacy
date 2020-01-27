@@ -1,10 +1,9 @@
 package de.metas.ui.web.handlingunits;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 
@@ -20,7 +19,9 @@ import org.compiere.util.Env;
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMultimap;
+import com.google.common.collect.ImmutableSet;
 
+import de.metas.bpartner.BPartnerId;
 import de.metas.handlingunits.HuId;
 import de.metas.handlingunits.IHandlingUnitsDAO;
 import de.metas.handlingunits.model.I_M_HU;
@@ -32,10 +33,11 @@ import de.metas.product.ProductId;
 import de.metas.ui.web.exceptions.EntityNotFoundException;
 import de.metas.ui.web.handlingunits.report.HUEditorRowAsHUToReport;
 import de.metas.ui.web.view.IViewRow;
+import de.metas.ui.web.view.ViewRowFieldNameAndJsonValues;
+import de.metas.ui.web.view.ViewRowFieldNameAndJsonValuesHolder;
 import de.metas.ui.web.view.descriptor.annotation.ViewColumn;
 import de.metas.ui.web.view.descriptor.annotation.ViewColumn.ViewColumnLayout;
 import de.metas.ui.web.view.descriptor.annotation.ViewColumn.ViewColumnLayout.Displayed;
-import de.metas.ui.web.view.descriptor.annotation.ViewColumnHelper;
 import de.metas.ui.web.view.json.JSONViewDataType;
 import de.metas.ui.web.window.datatypes.DocumentId;
 import de.metas.ui.web.window.datatypes.DocumentPath;
@@ -86,12 +88,12 @@ public final class HUEditorRow implements IViewRow
 {
 	private static final String SYSCFG_PREFIX = "de.metas.ui.web.handlingunits.field";
 
-	public static final Builder builder(final WindowId windowId)
+	public static Builder builder(final WindowId windowId)
 	{
 		return new Builder(windowId);
 	}
 
-	public static final HUEditorRow cast(final IViewRow viewRow)
+	public static HUEditorRow cast(final IViewRow viewRow)
 	{
 		return (HUEditorRow)viewRow;
 	}
@@ -101,7 +103,7 @@ public final class HUEditorRow implements IViewRow
 	private final HUEditorRowType type;
 	private final boolean topLevel;
 	private final boolean processed;
-	private final int bpartnerId;
+	private final BPartnerId bpartnerId;
 
 	public static final String FIELDNAME_M_HU_ID = I_M_HU.COLUMNNAME_M_HU_ID;
 	@ViewColumn(fieldName = FIELDNAME_M_HU_ID, widgetType = DocumentFieldWidgetType.Integer)
@@ -114,7 +116,7 @@ public final class HUEditorRow implements IViewRow
 			layouts = {
 					@ViewColumnLayout(when = JSONViewDataType.grid, seqNo = 10),
 					@ViewColumnLayout(when = JSONViewDataType.includedView, seqNo = 10)
-			})
+	})
 	private final String code;
 
 	public static final String FIELDNAME_Locator = I_M_HU.COLUMNNAME_M_Locator_ID;
@@ -122,8 +124,8 @@ public final class HUEditorRow implements IViewRow
 			captionKey = FIELDNAME_Locator, //
 			widgetType = DocumentFieldWidgetType.Text, //
 			layouts = { @ViewColumnLayout(when = JSONViewDataType.grid, seqNo = 15, //
-					displayed = Displayed.SYSCONFIG, displayedSysConfigPrefix = SYSCFG_PREFIX, defaultDisplaySysConfig = false)
-			})
+			displayed = Displayed.SYSCONFIG, displayedSysConfigPrefix = SYSCFG_PREFIX, defaultDisplaySysConfig = false)
+	})
 	private final JSONLookupValue locator;
 
 	public static final String FIELDNAME_Product = I_M_HU.COLUMNNAME_M_Product_ID;
@@ -141,7 +143,7 @@ public final class HUEditorRow implements IViewRow
 			restrictToMediaTypes = { MediaType.SCREEN }, //
 			layouts = {
 					@ViewColumnLayout(when = JSONViewDataType.grid, seqNo = 30)
-			})
+	})
 	private final JSONLookupValue huUnitType;
 
 	public static final String FIELDNAME_PackingInfo = I_M_HU.COLUMNNAME_M_HU_PI_Item_Product_ID;
@@ -149,8 +151,8 @@ public final class HUEditorRow implements IViewRow
 			captionKey = FIELDNAME_PackingInfo, //
 			widgetType = DocumentFieldWidgetType.Text, //
 			layouts = { @ViewColumnLayout(when = JSONViewDataType.grid, seqNo = 40, //
-					displayed = Displayed.SYSCONFIG, displayedSysConfigPrefix = SYSCFG_PREFIX)
-			})
+			displayed = Displayed.SYSCONFIG, displayedSysConfigPrefix = SYSCFG_PREFIX)
+	})
 	private final String packingInfo;
 
 	public static final String FIELDNAME_QtyCU = "QtyCU";
@@ -159,7 +161,7 @@ public final class HUEditorRow implements IViewRow
 			widgetSize = WidgetSize.Small, sorting = false, layouts = {
 					@ViewColumnLayout(when = JSONViewDataType.grid, seqNo = 50),
 					@ViewColumnLayout(when = JSONViewDataType.includedView, seqNo = 50)
-			})
+	})
 	private final BigDecimal qtyCU;
 
 	public static final String FIELDNAME_UOM = I_M_Product.COLUMNNAME_C_UOM_ID;
@@ -167,8 +169,8 @@ public final class HUEditorRow implements IViewRow
 			captionKey = FIELDNAME_UOM, //
 			widgetType = DocumentFieldWidgetType.Text, //
 			layouts = { @ViewColumnLayout(when = JSONViewDataType.grid, seqNo = 60, //
-					displayed = Displayed.SYSCONFIG, displayedSysConfigPrefix = SYSCFG_PREFIX)
-			})
+			displayed = Displayed.SYSCONFIG, displayedSysConfigPrefix = SYSCFG_PREFIX)
+	})
 	private final JSONLookupValue uom;
 
 	public static final String FIELDNAME_HUStatus = I_M_HU.COLUMNNAME_HUStatus;
@@ -177,7 +179,7 @@ public final class HUEditorRow implements IViewRow
 			widgetSize = WidgetSize.Small,//
 			sorting = false, layouts = {
 					@ViewColumnLayout(when = JSONViewDataType.grid, seqNo = 70),
-			})
+	})
 	private final JSONLookupValue huStatusDisplay;
 
 	public static final String FIELDNAME_IsReserved = I_M_HU.COLUMNNAME_IsReserved;
@@ -186,11 +188,11 @@ public final class HUEditorRow implements IViewRow
 	private final String huStatus;
 
 	public static final String FIELDNAME_BestBeforeDate = "BestBeforeDate";
-	@ViewColumn(fieldName = FIELDNAME_BestBeforeDate, widgetType = DocumentFieldWidgetType.Date, layouts = {
+	@ViewColumn(fieldName = FIELDNAME_BestBeforeDate, widgetType = DocumentFieldWidgetType.LocalDate, layouts = {
 			@ViewColumnLayout(when = JSONViewDataType.grid, seqNo = 80, displayed = Displayed.FALSE),
 			@ViewColumnLayout(when = JSONViewDataType.includedView, seqNo = 80, displayed = Displayed.FALSE)
 	})
-	private final Date bestBeforeDate;
+	private final LocalDate bestBeforeDate;
 
 	private final Optional<HUEditorRowAttributesSupplier> attributesSupplier;
 
@@ -200,7 +202,7 @@ public final class HUEditorRow implements IViewRow
 	private final ImmutableMultimap<OrderLineId, HUEditorRow> includedOrderLineReservations;
 
 	private transient String _summary; // lazy
-	private transient Map<String, Object> _values; // lazy
+	private final ViewRowFieldNameAndJsonValuesHolder<HUEditorRow> values = ViewRowFieldNameAndJsonValuesHolder.newInstance(HUEditorRow.class);
 
 	private HUEditorRow(@NonNull final Builder builder)
 	{
@@ -286,25 +288,21 @@ public final class HUEditorRow implements IViewRow
 		return processed;
 	}
 
-	public int getBPartnerId()
+	public BPartnerId getBPartnerId()
 	{
 		return bpartnerId;
 	}
 
-	Object getFieldValueAsJson(final String fieldName)
+	@Override
+	public ImmutableSet<String> getFieldNames()
 	{
-		return getFieldNameAndJsonValues().get(fieldName);
+		return values.getFieldNames();
 	}
 
 	@Override
-	public Map<String, Object> getFieldNameAndJsonValues()
+	public ViewRowFieldNameAndJsonValues getFieldNameAndJsonValues()
 	{
-		Map<String, Object> values = _values;
-		if (values == null)
-		{
-			values = _values = ViewColumnHelper.extractJsonMap(this);
-		}
-		return values;
+		return values.get(this);
 	}
 
 	@Override
@@ -363,11 +361,6 @@ public final class HUEditorRow implements IViewRow
 		return huId;
 	}
 
-	public int getHuIdAsInt()
-	{
-		return HuId.toRepoId(getHuId());
-	}
-
 	/**
 	 *
 	 * @return the wrapped HU or {@code null} if there is none.
@@ -395,11 +388,7 @@ public final class HUEditorRow implements IViewRow
 
 	public HUToReport getAsHUToReportOrNull()
 	{
-		if (!isPureHU())
-		{
-			return null;
-		}
-
+		// allow reports for all types ; see task https://github.com/metasfresh/metasfresh/issues/5540
 		return HUEditorRowAsHUToReport.of(this);
 	}
 
@@ -614,9 +603,9 @@ public final class HUEditorRow implements IViewRow
 		private JSONLookupValue product;
 		private JSONLookupValue uom;
 		private BigDecimal qtyCU;
-		private Date bestBeforeDate;
+		private LocalDate bestBeforeDate;
 		private JSONLookupValue locator;
-		private int bpartnerId;
+		private BPartnerId bpartnerId;
 
 		private List<HUEditorRow> includedRows = null;
 		private OrderLineId orderLineReservation = null;
@@ -741,15 +730,15 @@ public final class HUEditorRow implements IViewRow
 			return this;
 		}
 
-		public Builder setBestBeforeDate(final Date bestBeforeDate)
+		public Builder setBestBeforeDate(final LocalDate bestBeforeDate)
 		{
 			this.bestBeforeDate = bestBeforeDate;
 			return this;
 		}
 
-		private Date getBestBeforeDate()
+		private LocalDate getBestBeforeDate()
 		{
-			return bestBeforeDate != null ? (Date)bestBeforeDate.clone() : null;
+			return bestBeforeDate;
 		}
 
 		public Builder setLocator(final JSONLookupValue locator)
@@ -763,13 +752,13 @@ public final class HUEditorRow implements IViewRow
 			return locator;
 		}
 
-		public Builder setBPartnerId(final int bpartnerId)
+		public Builder setBPartnerId(final BPartnerId bpartnerId)
 		{
 			this.bpartnerId = bpartnerId;
 			return this;
 		}
 
-		private int getBPartnerId()
+		private BPartnerId getBPartnerId()
 		{
 			return bpartnerId;
 		}

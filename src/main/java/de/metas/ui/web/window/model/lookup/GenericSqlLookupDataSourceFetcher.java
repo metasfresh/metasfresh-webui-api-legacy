@@ -14,12 +14,11 @@ import org.compiere.util.DB;
 import org.slf4j.Logger;
 
 import com.google.common.base.MoreObjects;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 
 import de.metas.cache.CCache.CCacheStats;
 import de.metas.i18n.ITranslatableString;
-import de.metas.i18n.ImmutableTranslatableString;
+import de.metas.i18n.TranslatableStrings;
 import de.metas.logging.LogManager;
 import de.metas.ui.web.window.WindowConstants;
 import de.metas.ui.web.window.datatypes.LookupValue;
@@ -29,7 +28,7 @@ import de.metas.ui.web.window.datatypes.LookupValuesList;
 import de.metas.ui.web.window.datatypes.WindowId;
 import de.metas.ui.web.window.descriptor.LookupDescriptor;
 import de.metas.ui.web.window.descriptor.sql.SqlLookupDescriptor;
-
+import de.metas.util.StringUtils;
 import lombok.NonNull;
 
 /*
@@ -69,29 +68,26 @@ public class GenericSqlLookupDataSourceFetcher implements LookupDataSourceFetche
 	private final int entityTypeIndex;
 
 	private final IStringExpression sqlForFetchingExpression;
-	private final IStringExpression sqlForFetchingDisplayNameByIdExpression;
+	private final IStringExpression sqlForFetchingLookupByIdExpression;
 	private final INamePairPredicate postQueryPredicate;
 
 	private final boolean isTranslatable;
 
 	private final Optional<WindowId> zoomIntoWindowId;
 
-	private GenericSqlLookupDataSourceFetcher(final LookupDescriptor lookupDescriptor)
+	private GenericSqlLookupDataSourceFetcher(@NonNull final LookupDescriptor lookupDescriptor)
 	{
-		super();
-		// NOTE: don't store a reference to our descriptor, just extract what we need!
-
-		Preconditions.checkNotNull(lookupDescriptor);
 		final SqlLookupDescriptor sqlLookupDescriptor = lookupDescriptor.cast(SqlLookupDescriptor.class);
+
 		lookupTableNameAsOptional = sqlLookupDescriptor.getTableName();
 		lookupTableName = lookupTableNameAsOptional.get();
 		numericKey = sqlLookupDescriptor.isNumericKey();
 		entityTypeIndex = sqlLookupDescriptor.getEntityTypeIndex();
 		sqlForFetchingExpression = sqlLookupDescriptor.getSqlForFetchingExpression();
-		sqlForFetchingDisplayNameByIdExpression = sqlLookupDescriptor.getSqlForFetchingDisplayNameByIdExpression();
+		sqlForFetchingLookupByIdExpression = sqlLookupDescriptor.getSqlForFetchingLookupByIdExpression();
 		postQueryPredicate = sqlLookupDescriptor.getPostQueryPredicate();
 
-		isTranslatable = sqlForFetchingDisplayNameByIdExpression.requiresParameter(LookupDataSourceContext.PARAM_AD_Language.getName());
+		isTranslatable = sqlForFetchingLookupByIdExpression.requiresParameter(LookupDataSourceContext.PARAM_AD_Language.getName());
 
 		zoomIntoWindowId = lookupDescriptor.getZoomIntoWindowId();
 	}
@@ -131,7 +127,7 @@ public class GenericSqlLookupDataSourceFetcher implements LookupDataSourceFetche
 	{
 		return false;
 	}
-	
+
 	@Override
 	public void cacheInvalidate()
 	{
@@ -149,7 +145,7 @@ public class GenericSqlLookupDataSourceFetcher implements LookupDataSourceFetche
 		return LookupDataSourceContext.builder(lookupTableName)
 				.putFilterByIdParameterName("?")
 				.putFilterById(id)
-				.setRequiredParameters(sqlForFetchingDisplayNameByIdExpression.getParameters());
+				.setRequiredParameters(sqlForFetchingLookupByIdExpression.getParameters());
 	}
 
 	@Override
@@ -208,22 +204,30 @@ public class GenericSqlLookupDataSourceFetcher implements LookupDataSourceFetche
 			throw new IllegalStateException("No ID provided in " + evalCtx);
 		}
 
-		final String sqlDisplayName = sqlForFetchingDisplayNameByIdExpression.evaluate(evalCtx, OnVariableNotFound.Fail);
-		final String displayName = DB.getSQLValueStringEx(ITrx.TRXNAME_ThreadInherited, sqlDisplayName, id);
-		if (displayName == null)
+		final String sqlForFetchingLookupById = sqlForFetchingLookupByIdExpression.evaluate(evalCtx, OnVariableNotFound.Fail);
+
+		final String[] nameAndDescriptionAndActive = DB.getSQLValueArrayEx(ITrx.TRXNAME_None, sqlForFetchingLookupById, id);
+		if (nameAndDescriptionAndActive == null || nameAndDescriptionAndActive.length == 0)
 		{
 			return LOOKUPVALUE_NULL;
 		}
 
+		final String displayName = nameAndDescriptionAndActive[0];
+		final String description = nameAndDescriptionAndActive.length >= 2 ? nameAndDescriptionAndActive[1] : null;
+		final boolean active = nameAndDescriptionAndActive.length >= 3 ? StringUtils.toBoolean(nameAndDescriptionAndActive[2]) : true;
+
 		final ITranslatableString displayNameTrl;
+		final ITranslatableString descriptionTrl;
 		if (isTranslatable)
 		{
 			final String adLanguage = evalCtx.getAD_Language();
-			displayNameTrl = ImmutableTranslatableString.singleLanguage(adLanguage, displayName);
+			displayNameTrl = TranslatableStrings.singleLanguage(adLanguage, displayName);
+			descriptionTrl = TranslatableStrings.singleLanguage(adLanguage, description);
 		}
 		else
 		{
-			displayNameTrl = ImmutableTranslatableString.anyLanguage(displayName);
+			displayNameTrl = TranslatableStrings.anyLanguage(displayName);
+			descriptionTrl = TranslatableStrings.anyLanguage(description);
 		}
 
 		//
@@ -231,12 +235,22 @@ public class GenericSqlLookupDataSourceFetcher implements LookupDataSourceFetche
 		if (id instanceof Integer)
 		{
 			final Integer idInt = (Integer)id;
-			return IntegerLookupValue.of(idInt, displayNameTrl);
+			return IntegerLookupValue.builder()
+					.id(idInt)
+					.displayName(displayNameTrl)
+					.description(descriptionTrl)
+					.active(active)
+					.build();
 		}
 		else
 		{
 			final String idString = id.toString();
-			return StringLookupValue.of(idString, displayNameTrl);
+			return StringLookupValue.builder()
+					.id(idString)
+					.displayName(displayNameTrl)
+					.description(descriptionTrl)
+					.active(active)
+					.build();
 		}
 	}
 }

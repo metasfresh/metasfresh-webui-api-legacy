@@ -18,6 +18,8 @@ import de.metas.notification.UserNotificationsList;
 import de.metas.ui.web.config.WebConfig;
 import de.metas.ui.web.notification.json.JSONNotificationsList;
 import de.metas.ui.web.session.UserSession;
+import de.metas.ui.web.window.datatypes.json.JSONOptions;
+import de.metas.user.UserId;
 import io.swagger.annotations.Api;
 
 /*
@@ -60,7 +62,7 @@ public class NotificationRestController
 	{
 		userSession.assertLoggedIn();
 
-		final int adUserId = userSession.getAD_User_ID();
+		final UserId adUserId = userSession.getLoggedUserId();
 		return userNotificationsService.getWebsocketEndpoint(adUserId);
 	}
 
@@ -71,9 +73,11 @@ public class NotificationRestController
 	{
 		userSession.assertLoggedIn();
 
-		final int adUserId = userSession.getAD_User_ID();
+		final UserId adUserId = userSession.getLoggedUserId();
 		final UserNotificationsList notifications = userNotificationsService.getNotifications(adUserId, limit);
-		return JSONNotificationsList.of(notifications, userSession.getAD_Language());
+		
+		final JSONOptions jsonOpts = JSONOptions.of(userSession);
+		return JSONNotificationsList.of(notifications, jsonOpts);
 	}
 
 	@GetMapping("/unreadCount")
@@ -81,7 +85,7 @@ public class NotificationRestController
 	{
 		userSession.assertLoggedIn();
 
-		final int adUserId = userSession.getAD_User_ID();
+		final UserId adUserId = userSession.getLoggedUserId();
 		return userNotificationsService.getNotificationsUnreadCount(adUserId);
 	}
 
@@ -90,7 +94,7 @@ public class NotificationRestController
 	{
 		userSession.assertLoggedIn();
 
-		final int adUserId = userSession.getAD_User_ID();
+		final UserId adUserId = userSession.getLoggedUserId();
 		userNotificationsService.markNotificationAsRead(adUserId, notificationId);
 	}
 
@@ -99,7 +103,7 @@ public class NotificationRestController
 	{
 		userSession.assertLoggedIn();
 
-		final int adUserId = userSession.getAD_User_ID();
+		final UserId adUserId = userSession.getLoggedUserId();
 		userNotificationsService.markAllNotificationsAsRead(adUserId);
 	}
 
@@ -108,7 +112,7 @@ public class NotificationRestController
 	{
 		userSession.assertLoggedIn();
 
-		final int adUserId = userSession.getAD_User_ID();
+		final UserId adUserId = userSession.getLoggedUserId();
 		userNotificationsService.deleteNotification(adUserId, notificationId);
 	}
 
@@ -117,7 +121,7 @@ public class NotificationRestController
 	{
 		userSession.assertLoggedIn();
 
-		final int adUserId = userSession.getAD_User_ID();
+		final UserId adUserId = userSession.getLoggedUserId();
 
 		final List<String> notificationIds = Splitter.on(",")
 				.trimResults()
@@ -136,7 +140,7 @@ public class NotificationRestController
 	{
 		userSession.assertLoggedIn();
 
-		final int adUserId = userSession.getAD_User_ID();
+		final UserId adUserId = userSession.getLoggedUserId();
 		userNotificationsService.deleteAllNotification(adUserId);
 	}
 }

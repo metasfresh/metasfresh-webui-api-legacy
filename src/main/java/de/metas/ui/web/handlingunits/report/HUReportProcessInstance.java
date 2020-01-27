@@ -18,7 +18,7 @@ import de.metas.handlingunits.report.HUReportExecutor;
 import de.metas.handlingunits.report.HUReportExecutorResult;
 import de.metas.handlingunits.report.HUReportService;
 import de.metas.handlingunits.report.HUToReport;
-import de.metas.printing.esb.base.util.Check;
+import de.metas.process.AdProcessId;
 import de.metas.ui.web.handlingunits.HUEditorRow;
 import de.metas.ui.web.handlingunits.HUEditorView;
 import de.metas.ui.web.process.IProcessInstanceController;
@@ -41,6 +41,7 @@ import de.metas.ui.web.window.model.IDocumentChangesCollector;
 import de.metas.ui.web.window.model.IDocumentChangesCollector.ReasonSupplier;
 import de.metas.ui.web.window.model.NullDocumentChangesCollector;
 import lombok.Builder;
+import lombok.Getter;
 import lombok.NonNull;
 
 /*
@@ -71,8 +72,10 @@ final class HUReportProcessInstance implements IProcessInstanceController
 
 	private final DocumentId instanceId;
 	private final ViewRowIdsSelection viewRowIdsSelection;
-	private final int reportADProcessId;
+	private final AdProcessId reportAdProcessId;
 	private final Document parameters;
+	@Getter
+	private final boolean startProcessDirectly;
 
 	private ProcessInstanceResult lastExecutionResult;
 
@@ -82,27 +85,30 @@ final class HUReportProcessInstance implements IProcessInstanceController
 	private HUReportProcessInstance(
 			@NonNull final DocumentId instanceId,
 			@NonNull final ViewRowIdsSelection viewRowIdsSelection,
-			final int reportADProcessId,
+			@NonNull final AdProcessId reportAdProcessId,
 			@NonNull final Document parameters)
 	{
-		Check.assume(reportADProcessId > 0, "reportADProcessId > 0");
-
 		this.instanceId = instanceId;
 		this.viewRowIdsSelection = viewRowIdsSelection;
-		this.reportADProcessId = reportADProcessId;
+		this.reportAdProcessId = reportAdProcessId;
 		this.parameters = parameters;
+		this.startProcessDirectly = parameters.getFieldNames().isEmpty();
 
 		lastExecutionResult = null;
 
 		readwriteLock = new ReentrantReadWriteLock();
 	}
 
-	private HUReportProcessInstance(final HUReportProcessInstance from, final CopyMode copyMode, final IDocumentChangesCollector changesCollector)
+	private HUReportProcessInstance(
+			final HUReportProcessInstance from, 
+			final CopyMode copyMode, 
+			final IDocumentChangesCollector changesCollector)
 	{
 		instanceId = from.instanceId;
 		viewRowIdsSelection = from.viewRowIdsSelection;
-		reportADProcessId = from.reportADProcessId;
+		reportAdProcessId = from.reportAdProcessId;
 		parameters = from.parameters.copy(copyMode, changesCollector);
+		startProcessDirectly = from.startProcessDirectly;
 
 		lastExecutionResult = from.lastExecutionResult;
 
@@ -119,14 +125,14 @@ final class HUReportProcessInstance implements IProcessInstanceController
 		return new HUReportProcessInstance(this, CopyMode.CheckOutWritable, changesCollector);
 	}
 
-	/* package */ final IAutoCloseable lockForReading()
+	/* package */ IAutoCloseable lockForReading()
 	{
 		final ReadLock readLock = readwriteLock.readLock();
 		readLock.lock();
 		return readLock::unlock;
 	}
 
-	/* package */ final IAutoCloseable lockForWriting()
+	/* package */ IAutoCloseable lockForWriting()
 	{
 		final WriteLock writeLock = readwriteLock.writeLock();
 		writeLock.lock();
@@ -156,7 +162,7 @@ final class HUReportProcessInstance implements IProcessInstanceController
 		final HUReportExecutorResult reportExecutorResult = HUReportExecutor.newInstance(context.getCtx())
 				.numberOfCopies(numberOfCopies)
 				.printPreview(true)
-				.executeNow(reportADProcessId, extractHUsToReport(view));
+				.executeNow(reportAdProcessId, extractHUsToReport(view));
 
 		final ADProcessPostProcessService postProcessService = ADProcessPostProcessService.builder()
 				.viewsRepo(viewsRepo)

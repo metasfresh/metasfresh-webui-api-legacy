@@ -11,7 +11,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
-import com.google.common.base.Preconditions;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 
@@ -21,10 +20,10 @@ import de.metas.ui.web.window.datatypes.LookupValue;
 import de.metas.ui.web.window.datatypes.LookupValuesList;
 import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
 import de.metas.ui.web.window.descriptor.LookupDescriptor;
-import de.metas.ui.web.window.descriptor.LookupDescriptorProvider.LookupScope;
 import de.metas.ui.web.window.descriptor.sql.SqlLookupDescriptor;
 import de.metas.ui.web.window.model.lookup.LookupDataSource;
 import de.metas.ui.web.window.model.lookup.LookupDataSourceFactory;
+import de.metas.user.UserId;
 import lombok.AllArgsConstructor;
 import lombok.NonNull;
 import lombok.ToString;
@@ -73,16 +72,17 @@ public class WebuiMailRepository
 				.setCtxColumnName(org.compiere.model.I_AD_User.COLUMNNAME_AD_User_ID)
 				.setDisplayType(DisplayType.Search)
 				.setWidgetType(DocumentFieldWidgetType.Lookup)
-				.buildProvider()
-				.provideForScope(LookupScope.DocumentField);
+				.buildForDefaultScope();
 
 		emailToLookup = LookupDataSourceFactory.instance.getLookupDataSource(emailToLookupDescriptor);
 	}
 
-	public WebuiEmail createNewEmail(final int ownerUserId, final LookupValue from, final LookupValue to, final DocumentPath contextDocumentPath)
+	public WebuiEmail createNewEmail(
+			@NonNull final UserId ownerUserId,
+			final LookupValue from,
+			final LookupValue to,
+			final DocumentPath contextDocumentPath)
 	{
-		Preconditions.checkArgument(ownerUserId >= 0, "ownerUserId >= 0");
-
 		final String emailId = String.valueOf(nextEmailId.getAndIncrement());
 		final LookupValuesList toList = LookupValuesList.fromNullable(to);
 		final WebuiEmail email = WebuiEmail.builder()

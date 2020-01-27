@@ -1,16 +1,17 @@
 package de.metas.ui.web.order.pricingconditions.view;
 
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.RemovalNotification;
 
 import de.metas.cache.CCache;
 import de.metas.i18n.ITranslatableString;
 import de.metas.process.IADProcessDAO;
 import de.metas.process.RelatedProcessDescriptor;
+import de.metas.process.RelatedProcessDescriptor.DisplayPlace;
 import de.metas.ui.web.document.filter.DocumentFiltersList;
 import de.metas.ui.web.exceptions.EntityNotFoundException;
 import de.metas.ui.web.order.pricingconditions.process.PricingConditionsView_CopyRowToEditable;
@@ -22,7 +23,7 @@ import de.metas.ui.web.view.IView;
 import de.metas.ui.web.view.IViewFactory;
 import de.metas.ui.web.view.IViewsIndexStorage;
 import de.metas.ui.web.view.IViewsRepository;
-import de.metas.ui.web.view.ViewCloseReason;
+import de.metas.ui.web.view.ViewCloseAction;
 import de.metas.ui.web.view.ViewId;
 import de.metas.ui.web.view.ViewProfileId;
 import de.metas.ui.web.view.descriptor.ViewLayout;
@@ -30,7 +31,6 @@ import de.metas.ui.web.view.json.JSONFilterViewRequest;
 import de.metas.ui.web.view.json.JSONViewDataType;
 import de.metas.ui.web.window.datatypes.WindowId;
 import de.metas.util.Services;
-
 import lombok.NonNull;
 
 /*
@@ -64,7 +64,6 @@ public abstract class PricingConditionsViewFactoryTemplate implements IViewFacto
 
 	private final Cache<ViewId, PricingConditionsView> views = CacheBuilder.newBuilder()
 			.expireAfterAccess(1, TimeUnit.HOURS)
-			.removalListener(notification -> onViewRemoved(notification))
 			.build();
 
 	private final PricingConditionsRowLookups lookups = PricingConditionsRowLookups.newInstance();
@@ -107,18 +106,6 @@ public abstract class PricingConditionsViewFactoryTemplate implements IViewFacto
 				.build();
 	}
 
-	private final void onViewRemoved(final RemovalNotification<Object, Object> notification)
-	{
-		final PricingConditionsView view = PricingConditionsView.cast(notification.getValue());
-		final ViewCloseReason closeReason = ViewCloseReason.fromCacheEvictedFlag(notification.wasEvicted());
-		view.close(closeReason);
-
-		if (closeReason == ViewCloseReason.USER_REQUEST)
-		{
-			onViewClosedByUser(view);
-		}
-	}
-
 	protected void onViewClosedByUser(final PricingConditionsView view)
 	{
 		// nothing on this level
@@ -138,17 +125,28 @@ public abstract class PricingConditionsViewFactoryTemplate implements IViewFacto
 
 	public final PricingConditionsView getById(final ViewId viewId)
 	{
-		final PricingConditionsView view = getByIdOrNull(viewId);
+		final PricingConditionsView view = getById(viewId);
 		if (view == null)
 		{
-			throw new EntityNotFoundException(viewId.toJson());
+			throw new EntityNotFoundException("View not found: " + viewId.toJson());
 		}
 		return view;
 	}
 
 	@Override
-	public final void removeById(final ViewId viewId)
+	public final void closeById(@NonNull final ViewId viewId, @NonNull final ViewCloseAction closeAction)
 	{
+		final PricingConditionsView view = views.getIfPresent(viewId);
+		if (view == null || !view.isAllowClosingPerUserRequest())
+		{
+			return;
+		}
+
+		if (closeAction.isDone())
+		{
+			onViewClosedByUser(view);
+		}
+
 		views.invalidate(viewId);
 		views.cleanUp(); // also cleanup to prevent views cache to grow.
 	}
@@ -172,7 +170,7 @@ public abstract class PricingConditionsViewFactoryTemplate implements IViewFacto
 	}
 
 	@Override
-	public final PricingConditionsView createView(final CreateViewRequest request)
+	public final PricingConditionsView createView(@NonNull final CreateViewRequest request)
 	{
 		final PricingConditionsRowData rowsData = createPricingConditionsRowData(request);
 		return createView(rowsData);
@@ -198,9 +196,12 @@ public abstract class PricingConditionsViewFactoryTemplate implements IViewFacto
 	}
 
 	@Override
-	public final PricingConditionsView filterView(final IView viewObj, final JSONFilterViewRequest filterViewRequest)
+	public PricingConditionsView filterView(
+			@NonNull final IView view,
+			@NonNull final JSONFilterViewRequest filterViewRequest,
+			final Supplier<IViewsRepository> viewsRepo_IGNORED)
 	{
-		return PricingConditionsView.cast(viewObj)
+		return PricingConditionsView.cast(view)
 				.filter(filtersFactory.extractFilters(filterViewRequest));
 	}
 
@@ -209,8 +210,9 @@ public abstract class PricingConditionsViewFactoryTemplate implements IViewFacto
 		final IADProcessDAO adProcessDAO = Services.get(IADProcessDAO.class);
 		return RelatedProcessDescriptor.builder()
 				.processId(adProcessDAO.retrieveProcessIdByClass(processClass))
-				.anyTable().anyWindow()
-				.webuiQuickAction(true)
+				.anyTable()
+				.anyWindow()
+				.displayPlace(DisplayPlace.ViewQuickActions)
 				.build();
 	}
 

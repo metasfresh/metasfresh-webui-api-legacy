@@ -3,9 +3,13 @@ package de.metas.ui.web.window.model;
 import java.util.Comparator;
 import java.util.List;
 
+import com.google.common.collect.ImmutableList;
+
 import de.metas.ui.web.view.IViewRow;
+import de.metas.ui.web.window.datatypes.json.JSONOptions;
 import de.metas.ui.web.window.model.DocumentQueryOrderBy.FieldValueExtractor;
 import lombok.NonNull;
+import lombok.experimental.UtilityClass;
 
 /*
  * #%L
@@ -29,19 +33,25 @@ import lombok.NonNull;
  * #L%
  */
 
+@UtilityClass
 public class DocumentQueryOrderBys
 {
-	public static Comparator<IViewRow> asComparator(@NonNull final List<DocumentQueryOrderBy> orderBys)
+	public static List<DocumentQueryOrderBy> emptyList()
 	{
-		final FieldValueExtractor<IViewRow> fieldValueExtractor = (row, fieldName) -> row
-				.getFieldNameAndJsonValues()
-				.get(fieldName);
+		return ImmutableList.of();
+	}
+
+	public static <T extends IViewRow> Comparator<T> asComparator(
+			@NonNull final List<DocumentQueryOrderBy> orderBys,
+			@NonNull final JSONOptions jsonOpts)
+	{
+		final FieldValueExtractor<T> fieldValueExtractor = IViewRow::getFieldValueAsJsonObject;
 
 		// used in case orderBys is empty or whatever else goes wrong
-		final Comparator<IViewRow> noopComparator = (o1, o2) -> 0;
+		final Comparator<T> noopComparator = (o1, o2) -> 0;
 
 		return orderBys.stream()
-				.map(orderBy -> orderBy.asComparator(fieldValueExtractor))
+				.map(orderBy -> orderBy.<T> asComparator(fieldValueExtractor, jsonOpts))
 				.reduce(Comparator::thenComparing)
 				.orElse(noopComparator);
 	}

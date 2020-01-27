@@ -1,39 +1,45 @@
 package de.metas.ui.web.process.adprocess;
 
-import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
+import javax.annotation.Nullable;
+
 import org.adempiere.ad.callout.api.ICalloutField;
+import org.adempiere.ad.element.api.AdTabId;
+import org.adempiere.ad.element.api.AdWindowId;
+import org.adempiere.ad.element.api.IADElementDAO;
 import org.adempiere.ad.expression.api.ConstantLogicExpression;
 import org.adempiere.ad.expression.api.IExpression;
 import org.adempiere.ad.expression.api.IExpressionFactory;
 import org.adempiere.ad.expression.api.ILogicExpression;
-import org.adempiere.ad.security.IUserRolePermissions;
 import org.adempiere.ad.table.api.IADTableDAO;
-import org.adempiere.ad.trx.api.ITrx;
 import org.adempiere.model.InterfaceWrapperHelper;
 import org.adempiere.util.api.IRangeAwareParams;
-import org.compiere.model.I_AD_Form;
+import org.compiere.model.I_AD_Element;
 import org.compiere.model.I_AD_Process;
 import org.compiere.model.I_AD_Process_Para;
-import org.compiere.util.Env;
-
-import com.google.common.collect.ImmutableList;
+import org.compiere.model.X_AD_Process;
+import org.compiere.util.TimeUtil;
+import org.slf4j.Logger;
 
 import de.metas.cache.CCache;
 import de.metas.i18n.IModelTranslationMap;
+import de.metas.logging.LogManager;
+import de.metas.process.BarcodeScannerType;
 import de.metas.process.IADProcessDAO;
-import de.metas.process.IProcessPrecondition;
 import de.metas.process.IProcessPreconditionsContext;
 import de.metas.process.JavaProcess;
 import de.metas.process.ProcessParams;
 import de.metas.process.ProcessPreconditionsResolution;
 import de.metas.process.RelatedProcessDescriptor;
+import de.metas.process.RelatedProcessDescriptor.DisplayPlace;
+import de.metas.security.IUserRolePermissions;
 import de.metas.ui.web.exceptions.EntityNotFoundException;
 import de.metas.ui.web.process.ProcessId;
 import de.metas.ui.web.process.WebuiPreconditionsContext;
+import de.metas.ui.web.process.descriptor.InternalName;
 import de.metas.ui.web.process.descriptor.ProcessDescriptor;
 import de.metas.ui.web.process.descriptor.ProcessDescriptor.ProcessDescriptorType;
 import de.metas.ui.web.process.descriptor.ProcessLayout;
@@ -52,10 +58,10 @@ import de.metas.ui.web.window.descriptor.LookupDescriptorProvider;
 import de.metas.ui.web.window.descriptor.factory.standard.DefaultValueExpressionsFactory;
 import de.metas.ui.web.window.descriptor.factory.standard.DescriptorsFactoryHelper;
 import de.metas.ui.web.window.descriptor.sql.SqlLookupDescriptor;
-import de.metas.ui.web.window.model.DocumentsRepository;
 import de.metas.util.Check;
 import de.metas.util.GuavaCollectors;
 import de.metas.util.Services;
+import de.metas.util.lang.CoalesceUtil;
 import lombok.Builder;
 import lombok.NonNull;
 
@@ -90,7 +96,7 @@ import lombok.NonNull;
 /* package */ class ADProcessDescriptorsFactory
 {
 	// services
-	// private static final transient Logger logger = LogManager.getLogger(ProcessDescriptorsFactory.class);
+	private static final transient Logger logger = LogManager.getLogger(ADProcessDescriptorsFactory.class);
 	private final transient IExpressionFactory expressionFactory = Services.get(IExpressionFactory.class);
 	private final transient DefaultValueExpressionsFactory defaultValueExpressions = DefaultValueExpressionsFactory.newInstance();
 	private final transient IADTableDAO adTableDAO = Services.get(IADTableDAO.class);
@@ -98,17 +104,19 @@ import lombok.NonNull;
 
 	private final CCache<ProcessId, ProcessDescriptor> processDescriptorsByProcessId = CCache.newLRUCache(I_AD_Process.Table_Name + "#Descriptors#by#AD_Process_ID", 200, 0);
 
-	public Stream<WebuiRelatedProcessDescriptor> streamDocumentRelatedProcesses(final WebuiPreconditionsContext preconditionsContext, final IUserRolePermissions userRolePermissions)
+	public Stream<WebuiRelatedProcessDescriptor> streamDocumentRelatedProcesses(
+			@NonNull final WebuiPreconditionsContext preconditionsContext,
+			@NonNull final IUserRolePermissions userRolePermissions)
 	{
 		final String tableName = preconditionsContext.getTableName();
 		final int adTableId = !Check.isEmpty(tableName) ? adTableDAO.retrieveTableId(tableName) : -1;
 
-		final int adWindowId = preconditionsContext.getAD_Window_ID();
+		final AdWindowId adWindowId = preconditionsContext.getAdWindowId();
+		final AdTabId adTabId = preconditionsContext.getAdTabId();
 
 		final Stream<RelatedProcessDescriptor> relatedProcessDescriptors;
 		{
-			final Stream<RelatedProcessDescriptor> tableRelatedProcessDescriptors = adProcessDAO.retrieveRelatedProcessesForTableIndexedByProcessId(Env.getCtx(), adTableId, adWindowId)
-					.values()
+			final Stream<RelatedProcessDescriptor> tableRelatedProcessDescriptors = adProcessDAO.retrieveRelatedProcessDescriptors(adTableId, adWindowId, adTabId)
 					.stream();
 			final Stream<RelatedProcessDescriptor> additionalRelatedProcessDescriptors = preconditionsContext.getAdditionalRelatedProcessDescriptors()
 					.stream();
@@ -118,17 +126,39 @@ import lombok.NonNull;
 		}
 
 		return relatedProcessDescriptors
-				.filter(relatedProcess -> relatedProcess.isExecutionGranted(userRolePermissions)) // only those which can be executed by current user permissions
+				.filter(relatedProcess -> isEligible(relatedProcess, preconditionsContext, userRolePermissions))
 				.map(relatedProcess -> toWebuiRelatedProcessDescriptor(relatedProcess, preconditionsContext));
 	}
 
-	private WebuiRelatedProcessDescriptor toWebuiRelatedProcessDescriptor(@NonNull final RelatedProcessDescriptor relatedProcessDescriptor, @NonNull final IProcessPreconditionsContext preconditionsContext)
+	private boolean isEligible(
+			@NonNull final RelatedProcessDescriptor relatedProcess,
+			@NonNull final WebuiPreconditionsContext preconditionsContext,
+			@NonNull final IUserRolePermissions userRolePermissions)
+	{
+		final DisplayPlace displayPlace = preconditionsContext.getDisplayPlace();
+		if (displayPlace != null && !relatedProcess.isDisplayedOn(displayPlace))
+		{
+			logger.trace("Process not eligible because displayPlace not matching: {}, {}", relatedProcess, displayPlace);
+			return false;
+		}
+
+		if (!relatedProcess.isExecutionGranted(userRolePermissions))
+		{
+			logger.trace("Process not eligible because execution not granted: {}, {}", relatedProcess, userRolePermissions);
+			return false;
+		}
+
+		return true;
+	}
+
+	private WebuiRelatedProcessDescriptor toWebuiRelatedProcessDescriptor(
+			@NonNull final RelatedProcessDescriptor relatedProcessDescriptor,
+			@NonNull final IProcessPreconditionsContext preconditionsContext)
 	{
 		final ProcessId processId = ProcessId.ofAD_Process_ID(relatedProcessDescriptor.getProcessId());
 		final ProcessDescriptor processDescriptor = getProcessDescriptor(processId);
 		final ProcessPreconditionsResolutionSupplier preconditionsResolutionSupplier = ProcessPreconditionsResolutionSupplier.builder()
 				.preconditionsContext(preconditionsContext)
-				.processPreconditionsCheckers(relatedProcessDescriptor.getProcessPreconditionsCheckers())
 				.processDescriptor(processDescriptor)
 				.build();
 
@@ -139,10 +169,14 @@ import lombok.NonNull;
 				.processDescription(processDescriptor.getDescription())
 				.debugProcessClassname(processDescriptor.getProcessClassname())
 				//
-				.quickAction(relatedProcessDescriptor.isWebuiQuickAction())
+				.displayPlaces(relatedProcessDescriptor.getDisplayPlaces())
 				.defaultQuickAction(relatedProcessDescriptor.isWebuiDefaultQuickAction())
 				//
+				.shortcut(relatedProcessDescriptor.getWebuiShortcut())
+				//
 				.preconditionsResolutionSupplier(preconditionsResolutionSupplier)
+				//
+				.sortNo(relatedProcessDescriptor.getSortNo())
 				//
 				.build();
 	}
@@ -154,7 +188,8 @@ import lombok.NonNull;
 
 	private ProcessDescriptor retrieveProcessDescriptor(final ProcessId processId)
 	{
-		final I_AD_Process adProcess = InterfaceWrapperHelper.create(Env.getCtx(), processId.getProcessIdAsInt(), I_AD_Process.class, ITrx.TRXNAME_None);
+		final IADProcessDAO adProcessesRepo = Services.get(IADProcessDAO.class);
+		final I_AD_Process adProcess = adProcessesRepo.getById(processId.toAdProcessId());
 		if (adProcess == null)
 		{
 			throw new EntityNotFoundException("@NotFound@ @AD_Process_ID@ (" + processId + ")");
@@ -193,21 +228,52 @@ import lombok.NonNull;
 				.setDescription(parametersDescriptor.getDescription())
 				.addElements(parametersDescriptor);
 
+		final boolean startProcessDirectly = computeIsStartProcessDirectly(
+				adProcess.getShowHelp(),
+				!parametersDescriptor.getFields().isEmpty() // hasProcessParameters
+		);
+
 		//
 		// Process descriptor
 		return ProcessDescriptor.builder()
 				.setProcessId(processId)
-				.setInternalName(adProcess.getValue())
+				.setInternalName(InternalName.ofString(adProcess.getValue()))
 				.setType(extractType(adProcess))
 				.setProcessClassname(extractClassnameOrNull(adProcess))
 				.setParametersDescriptor(parametersDescriptor)
+				.setStartProcessDirectly(startProcessDirectly)
 				.setLayout(layout.build())
 				.build();
 	}
 
-	private DocumentFieldDescriptor.Builder createProcessParaDescriptor(final WebuiProcessClassInfo webuiProcesClassInfo, final I_AD_Process_Para adProcessParam)
+	private static boolean computeIsStartProcessDirectly(
+			final String showHelpParam,
+			final boolean hasProcessParameters)
 	{
-		final IModelTranslationMap adProcessParaTrlsMap = InterfaceWrapperHelper.getModelTranslationMap(adProcessParam);
+		final String showHelp = CoalesceUtil.coalesce(showHelpParam, X_AD_Process.SHOWHELP_DonTShowHelp);
+
+		if (X_AD_Process.SHOWHELP_ShowHelp.equals(showHelp))
+		{
+			return false;
+		}
+		else if (X_AD_Process.SHOWHELP_DonTShowHelp.equals(showHelp))
+		{
+			return !hasProcessParameters;
+		}
+		else if (X_AD_Process.SHOWHELP_RunSilently_TakeDefaults.equals(showHelp))
+		{
+			return true;
+		}
+		else
+		{
+			return false;
+		}
+	}
+
+	private DocumentFieldDescriptor.Builder createProcessParaDescriptor(
+			final WebuiProcessClassInfo webuiProcesClassInfo,
+			@NonNull final I_AD_Process_Para adProcessParam)
+	{
 		final String parameterName = adProcessParam.getColumnName();
 
 		//
@@ -226,15 +292,16 @@ import lombok.NonNull;
 					.buildProvider();
 		}
 		//
-		final LookupDescriptor lookupDescriptor = lookupDescriptorProvider.provideForScope(LookupDescriptorProvider.LookupScope.DocumentField);
+		final Optional<LookupDescriptor> lookupDescriptor = lookupDescriptorProvider.provide();
 
 		final DocumentFieldWidgetType widgetType = extractWidgetType(parameterName, adProcessParam.getAD_Reference_ID(), lookupDescriptor, adProcessParam.isRange());
 		final Class<?> valueClass = DescriptorsFactoryHelper.getValueClass(widgetType, lookupDescriptor);
 		final boolean allowShowPassword = widgetType == DocumentFieldWidgetType.Password ? true : false; // process parameters shall always allow displaying the password
+		final BarcodeScannerType barcodeScannerType = extractBarcodeScannerTypeOrNull(adProcessParam, webuiProcesClassInfo);
 
 		final ILogicExpression readonlyLogic = expressionFactory.compileOrDefault(adProcessParam.getReadOnlyLogic(), ConstantLogicExpression.FALSE, ILogicExpression.class);
 		final ILogicExpression displayLogic = expressionFactory.compileOrDefault(adProcessParam.getDisplayLogic(), ConstantLogicExpression.TRUE, ILogicExpression.class);
-		final ILogicExpression mandatoryLogic = ConstantLogicExpression.of(adProcessParam.isMandatory());
+		final ILogicExpression mandatoryLogic = adProcessParam.isMandatory() ? displayLogic : ConstantLogicExpression.FALSE;
 
 		final Optional<IExpression<?>> defaultValueExpr = defaultValueExpressions.extractDefaultValueExpression(
 				adProcessParam.getDefaultValue(),
@@ -245,14 +312,15 @@ import lombok.NonNull;
 				false // don't allow using auto sequence
 		);
 
-		final DocumentFieldDescriptor.Builder paramDescriptor = DocumentFieldDescriptor.builder(parameterName)
-				.setCaption(adProcessParaTrlsMap.getColumnTrl(I_AD_Process_Para.COLUMNNAME_Name, adProcessParam.getName()))
-				.setDescription(adProcessParaTrlsMap.getColumnTrl(I_AD_Process_Para.COLUMNNAME_Description, adProcessParam.getDescription()))
-				// .setHelp(adProcessParaTrlsMap.getColumnTrl(I_AD_Process_Para.COLUMNNAME_Help, adProcessParam.getHelp()))
+		final DocumentFieldDescriptor.Builder paramDescriptorBuilder = DocumentFieldDescriptor.builder(parameterName);
+		extractAndSetTranslatableValues(adProcessParam, paramDescriptorBuilder);
+
+		final DocumentFieldDescriptor.Builder paramDescriptor = paramDescriptorBuilder
 				//
 				.setValueClass(valueClass)
 				.setWidgetType(widgetType)
 				.setAllowShowPassword(allowShowPassword)
+				.barcodeScannerType(barcodeScannerType)
 				.setLookupDescriptorProvider(lookupDescriptorProvider)
 				//
 				.setDefaultValueExpression(defaultValueExpr)
@@ -273,12 +341,54 @@ import lombok.NonNull;
 		return paramDescriptor;
 	}
 
-	private static DocumentFieldWidgetType extractWidgetType(final String parameterName, final int adReferenceId, final LookupDescriptor lookupDescriptor, final boolean isRange)
+	private static BarcodeScannerType extractBarcodeScannerTypeOrNull(
+			@NonNull final I_AD_Process_Para adProcessParamRecord,
+			final WebuiProcessClassInfo webuiProcesClassInfo)
+	{
+		final String parameterName = adProcessParamRecord.getColumnName();
+		BarcodeScannerType barcodeScannerType = webuiProcesClassInfo.getBarcodeScannerTypeOrNull(parameterName);
+		if (barcodeScannerType != null)
+		{
+			return barcodeScannerType;
+		}
+
+		final String barcodeScannerTypeCode = adProcessParamRecord.getBarcodeScannerType();
+		return !Check.isEmpty(barcodeScannerTypeCode, true)
+				? BarcodeScannerType.ofCode(barcodeScannerTypeCode)
+				: null;
+	}
+
+	private void extractAndSetTranslatableValues(
+			@NonNull final I_AD_Process_Para adProcessParamRecord,
+			@NonNull final DocumentFieldDescriptor.Builder paramDescriptorBuilder)
+	{
+		if (adProcessParamRecord.getAD_Element_ID() <= 0)
+		{
+			final I_AD_Process_Para processParamTrl = InterfaceWrapperHelper.translate(adProcessParamRecord, I_AD_Process_Para.class);
+			paramDescriptorBuilder
+					.setCaption(processParamTrl.getName())
+					.setDescription(processParamTrl.getDescription());
+		}
+		else
+		{
+			final I_AD_Element element = Services.get(IADElementDAO.class).getById(adProcessParamRecord.getAD_Element_ID());
+			final I_AD_Element elementTrl = InterfaceWrapperHelper.translate(element, I_AD_Element.class);
+			paramDescriptorBuilder
+					.setCaption(elementTrl.getName())
+					.setDescription(elementTrl.getDescription());
+		}
+	}
+
+	private static DocumentFieldWidgetType extractWidgetType(
+			final String parameterName,
+			final int adReferenceId,
+			final Optional<LookupDescriptor> lookupDescriptor,
+			final boolean isRange)
 	{
 		final DocumentFieldWidgetType widgetType = DescriptorsFactoryHelper.extractWidgetType(parameterName, adReferenceId, lookupDescriptor);
 
 		// Date range:
-		if (isRange && widgetType == DocumentFieldWidgetType.Date)
+		if (isRange && widgetType == DocumentFieldWidgetType.LocalDate)
 		{
 			return DocumentFieldWidgetType.DateRange;
 		}
@@ -289,7 +399,7 @@ import lombok.NonNull;
 		}
 	}
 
-	private static final ProcessDescriptorType extractType(final I_AD_Process adProcess)
+	private static ProcessDescriptorType extractType(final I_AD_Process adProcess)
 	{
 		if (adProcess.getAD_Form_ID() > 0)
 		{
@@ -309,68 +419,40 @@ import lombok.NonNull;
 		}
 	}
 
-	private static final String extractClassnameOrNull(final I_AD_Process adProcess)
+	@Nullable
+	private static String extractClassnameOrNull(@NonNull final I_AD_Process adProcess)
 	{
-		//
-		// First try: Check process classname
 		if (!Check.isEmpty(adProcess.getClassname(), true))
 		{
 			return adProcess.getClassname();
 		}
-
-		//
-		// Second try: form classname (05089)
-		final I_AD_Form form = adProcess.getAD_Form();
-		if (form != null && !Check.isEmpty(form.getClassname(), true))
-		{
-			return form.getClassname();
-		}
-
 		return null;
 	}
 
 	private static final class ProcessPreconditionsResolutionSupplier implements Supplier<ProcessPreconditionsResolution>
 	{
 		private final IProcessPreconditionsContext preconditionsContext;
-		private final ImmutableList<IProcessPrecondition> processPreconditionsCheckers;
 		private final ProcessDescriptor processDescriptor;
 
 		@Builder
 		private ProcessPreconditionsResolutionSupplier(
 				@NonNull final IProcessPreconditionsContext preconditionsContext,
-				final List<IProcessPrecondition> processPreconditionsCheckers,
 				@NonNull final ProcessDescriptor processDescriptor)
 		{
 			this.preconditionsContext = preconditionsContext;
-			this.processPreconditionsCheckers = !processPreconditionsCheckers.isEmpty() ? ImmutableList.copyOf(processPreconditionsCheckers) : ImmutableList.of();
 			this.processDescriptor = processDescriptor;
 		}
 
 		@Override
 		public ProcessPreconditionsResolution get()
 		{
-			//
-			// Check registered preconditions
-			final ProcessPreconditionsResolution rejectResolution = processPreconditionsCheckers.stream()
-					.map(processPreconditionsChecker -> processPreconditionsChecker.checkPreconditionsApplicable(preconditionsContext))
-					.filter(resolution -> !resolution.isAccepted())
-					.findFirst()
-					.orElse(null);
-			if (rejectResolution != null)
-			{
-				return rejectResolution;
-			}
-
-			//
-			// Ask the process descriptor
 			return processDescriptor.checkPreconditionsApplicable(preconditionsContext);
 		}
-
 	}
 
 	private static final class ProcessParametersCallout
 	{
-		private static final void forwardValueToCurrentProcessInstance(final ICalloutField calloutField)
+		private static void forwardValueToCurrentProcessInstance(final ICalloutField calloutField)
 		{
 			final JavaProcess processInstance = JavaProcess.currentInstance();
 
@@ -393,7 +475,10 @@ import lombok.NonNull;
 			else if (fieldValue instanceof DateRangeValue)
 			{
 				final DateRangeValue dateRange = (DateRangeValue)fieldValue;
-				return ProcessParams.of(parameterName, dateRange.getFrom(), dateRange.getTo());
+				return ProcessParams.of(
+						parameterName,
+						TimeUtil.asDate(dateRange.getFrom()),
+						TimeUtil.asDate(dateRange.getTo()));
 			}
 			else
 			{
@@ -406,15 +491,7 @@ import lombok.NonNull;
 	{
 		public static final transient ProcessParametersDataBindingDescriptorBuilder instance = new ProcessParametersDataBindingDescriptorBuilder();
 
-		private static final DocumentEntityDataBindingDescriptor dataBinding = new DocumentEntityDataBindingDescriptor()
-		{
-			@Override
-			public DocumentsRepository getDocumentsRepository()
-			{
-				return ADProcessParametersRepository.instance;
-			}
-
-		};
+		private static final DocumentEntityDataBindingDescriptor dataBinding = () -> ADProcessParametersRepository.instance;
 
 		@Override
 		public DocumentEntityDataBindingDescriptor getOrBuild()

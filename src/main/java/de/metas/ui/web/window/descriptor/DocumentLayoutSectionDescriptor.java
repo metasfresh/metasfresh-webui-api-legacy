@@ -11,11 +11,11 @@ import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableList;
 
 import de.metas.i18n.ITranslatableString;
-import de.metas.i18n.ImmutableTranslatableString;
+import de.metas.i18n.TranslatableStrings;
 import de.metas.logging.LogManager;
 import de.metas.util.Check;
 import de.metas.util.GuavaCollectors;
-
+import lombok.Getter;
 import lombok.NonNull;
 
 /*
@@ -43,7 +43,25 @@ import lombok.NonNull;
 @SuppressWarnings("serial")
 public final class DocumentLayoutSectionDescriptor implements Serializable
 {
-	public static final Builder builder()
+	public enum ClosableMode
+	{
+		ALWAYS_OPEN,
+
+		INITIALLY_OPEN,
+
+		INITIALLY_CLOSED
+	}
+
+	public enum CaptionMode
+	{
+		DISPLAY_IN_ADV_EDIT,
+
+		DISPLAY,
+
+		DONT_DISPLAY;
+	}
+
+	public static Builder builder()
 	{
 		return new Builder();
 	}
@@ -51,13 +69,23 @@ public final class DocumentLayoutSectionDescriptor implements Serializable
 	private final ITranslatableString caption;
 	private final ITranslatableString description;
 	private final String internalName;
+
+	@Getter
+	private ClosableMode closableMode;
+
+	@Getter
+	private CaptionMode captionMode;
+
+	@Getter
 	private final List<DocumentLayoutColumnDescriptor> columns;
 
-	private DocumentLayoutSectionDescriptor(final Builder builder)
+	private DocumentLayoutSectionDescriptor(@NonNull final Builder builder)
 	{
 		caption = builder.caption;
 		description = builder.description;
 		internalName = builder.internalName;
+		closableMode = builder.closableMode;
+		captionMode = builder.captionMode;
 		columns = ImmutableList.copyOf(builder.buildColumns());
 	}
 
@@ -67,6 +95,7 @@ public final class DocumentLayoutSectionDescriptor implements Serializable
 		return MoreObjects.toStringHelper(this)
 				.omitNullValues()
 				.add("internalName", internalName)
+				.add("closableMode", closableMode)
 				.add("columns", columns.isEmpty() ? null : columns)
 				.toString();
 	}
@@ -81,11 +110,6 @@ public final class DocumentLayoutSectionDescriptor implements Serializable
 		return description.translate(adLanguage);
 	}
 
-	public List<DocumentLayoutColumnDescriptor> getColumns()
-	{
-		return columns;
-	}
-
 	public boolean hasColumns()
 	{
 		return !columns.isEmpty();
@@ -95,15 +119,20 @@ public final class DocumentLayoutSectionDescriptor implements Serializable
 	{
 		private static final Logger logger = LogManager.getLogger(DocumentLayoutSectionDescriptor.Builder.class);
 
-		private ITranslatableString caption = ImmutableTranslatableString.empty();
-		private ITranslatableString description = ImmutableTranslatableString.empty();
+		private ITranslatableString caption = TranslatableStrings.empty();
+		private ITranslatableString description = TranslatableStrings.empty();
 		private String internalName;
 		private final List<DocumentLayoutColumnDescriptor.Builder> columnsBuilders = new ArrayList<>();
+
+		@Getter
 		private String invalidReason;
+
+		private ClosableMode closableMode = ClosableMode.ALWAYS_OPEN;
+
+		private CaptionMode captionMode = CaptionMode.DISPLAY_IN_ADV_EDIT;
 
 		private Builder()
 		{
-			super();
 		}
 
 		@Override
@@ -112,6 +141,7 @@ public final class DocumentLayoutSectionDescriptor implements Serializable
 			return MoreObjects.toStringHelper(this)
 					.omitNullValues()
 					.add("internalName", internalName)
+					.add("closableMode", closableMode)
 					.add("invalidReason", invalidReason)
 					.add("columns-count", columnsBuilders.size())
 					.toString();
@@ -197,6 +227,18 @@ public final class DocumentLayoutSectionDescriptor implements Serializable
 			return this;
 		}
 
+		public Builder setClosableMode(@NonNull final ClosableMode closableMode)
+		{
+			this.closableMode = closableMode;
+			return this;
+		}
+
+		public Builder setCaptionMode(@NonNull final CaptionMode captionMode)
+		{
+			this.captionMode = captionMode;
+			return this;
+		}
+
 		public boolean isValid()
 		{
 			return invalidReason == null;
@@ -205,11 +247,6 @@ public final class DocumentLayoutSectionDescriptor implements Serializable
 		public boolean isInvalid()
 		{
 			return invalidReason != null;
-		}
-
-		private String getInvalidReason()
-		{
-			return invalidReason;
 		}
 
 		public boolean isNotEmpty()

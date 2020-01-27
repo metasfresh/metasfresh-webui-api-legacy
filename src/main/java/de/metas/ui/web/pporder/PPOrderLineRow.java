@@ -2,36 +2,40 @@ package de.metas.ui.web.pporder;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Map;
 import java.util.function.Supplier;
 
 import javax.annotation.Nullable;
 
-import org.adempiere.model.InterfaceWrapperHelper;
 import org.compiere.model.I_C_UOM;
 import org.eevolution.model.I_PP_Order;
 import org.eevolution.model.I_PP_Order_BOMLine;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 
+import de.metas.handlingunits.HuId;
 import de.metas.handlingunits.model.I_PP_Order_Qty;
 import de.metas.handlingunits.model.X_M_HU;
+import de.metas.material.planning.pporder.PPOrderBOMLineId;
+import de.metas.material.planning.pporder.PPOrderId;
+import de.metas.product.IProductDAO;
 import de.metas.product.ProductId;
 import de.metas.quantity.Quantity;
 import de.metas.ui.web.exceptions.EntityNotFoundException;
-import de.metas.ui.web.handlingunits.WEBUI_HU_Constants;
 import de.metas.ui.web.view.IViewRow;
 import de.metas.ui.web.view.IViewRowAttributes;
 import de.metas.ui.web.view.IViewRowAttributesProvider;
+import de.metas.ui.web.view.ViewRowFieldNameAndJsonValues;
+import de.metas.ui.web.view.ViewRowFieldNameAndJsonValuesHolder;
 import de.metas.ui.web.view.descriptor.annotation.ViewColumn;
 import de.metas.ui.web.view.descriptor.annotation.ViewColumn.ViewColumnLayout;
-import de.metas.ui.web.view.descriptor.annotation.ViewColumnHelper;
 import de.metas.ui.web.view.json.JSONViewDataType;
 import de.metas.ui.web.window.datatypes.DocumentId;
 import de.metas.ui.web.window.datatypes.DocumentPath;
 import de.metas.ui.web.window.datatypes.json.JSONLookupValue;
 import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
+import de.metas.uom.IUOMDAO;
+import de.metas.util.Services;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.ToString;
@@ -72,11 +76,11 @@ public class PPOrderLineRow implements IViewRow
 	private final List<PPOrderLineRow> includedDocuments;
 
 	private final boolean processed;
-	private final int ppOrderId;
-	private final int ppOrderBOMLineId;
+	private final PPOrderId ppOrderId;
+	private final PPOrderBOMLineId ppOrderBOMLineId;
 	private final int ppOrderQtyId;
 
-	private final int huId;
+	private final HuId huId;
 	private final boolean sourceHU;
 	private final boolean topLevelHU;
 
@@ -107,7 +111,7 @@ public class PPOrderLineRow implements IViewRow
 	@ViewColumn(captionKey = "HUStatus", widgetType = DocumentFieldWidgetType.Lookup, layouts = @ViewColumnLayout(when = JSONViewDataType.grid, seqNo = 80))
 	private final JSONLookupValue huStatus;
 
-	private transient ImmutableMap<String, Object> _values;
+	private final ViewRowFieldNameAndJsonValuesHolder<PPOrderLineRow> values = ViewRowFieldNameAndJsonValuesHolder.newInstance(PPOrderLineRow.class);
 
 	public static final PPOrderLineRow cast(final IViewRow viewRecord)
 	{
@@ -132,9 +136,9 @@ public class PPOrderLineRow implements IViewRow
 		this.rowId = rowId;
 		this.type = type;
 
-		this.ppOrderId = ppOrderQty.getPP_Order_ID();
-		this.ppOrderBOMLineId = ppOrderQty.getPP_Order_BOMLine_ID();
-		this.huId = ppOrderQty.getM_HU_ID();
+		this.ppOrderId = PPOrderId.ofRepoId(ppOrderQty.getPP_Order_ID());
+		this.ppOrderBOMLineId = PPOrderBOMLineId.ofRepoIdOrNull(ppOrderQty.getPP_Order_BOMLine_ID());
+		this.huId = HuId.ofRepoId(ppOrderQty.getM_HU_ID());
 		this.ppOrderQtyId = ppOrderQty.getPP_Order_Qty_ID();
 
 		this.processed = processed;
@@ -155,7 +159,7 @@ public class PPOrderLineRow implements IViewRow
 
 		this.includedDocuments = includedRows;
 
-		this.qty = quantity.getAsBigDecimal();
+		this.qty = quantity.toBigDecimal();
 
 		this.documentPath = computeDocumentPath();
 
@@ -173,15 +177,17 @@ public class PPOrderLineRow implements IViewRow
 		this.rowId = PPOrderLineRowId.ofPPOrderId(ppOrder.getPP_Order_ID());
 		this.type = PPOrderLineType.MainProduct;
 
-		this.ppOrderId = ppOrder.getPP_Order_ID();
-		this.ppOrderBOMLineId = -1;
-		this.huId = -1;
+		this.ppOrderId = PPOrderId.ofRepoId(ppOrder.getPP_Order_ID());
+		this.ppOrderBOMLineId = null;
+		this.huId = null;
 		this.ppOrderQtyId = -1;
 
 		this.processed = processed;
 
-		this.product = JSONLookupValueTool.createProductLookupValue(ppOrder.getM_Product());
-		this.uom = JSONLookupValueTool.createUOMLookupValue(ppOrder.getC_UOM());
+		final ProductId productId = ProductId.ofRepoId(ppOrder.getM_Product_ID());
+		this.product = JSONLookupValueTool.createProductLookupValue(Services.get(IProductDAO.class).getById(productId));
+		final int uomId = ppOrder.getC_UOM_ID();
+		this.uom = JSONLookupValueTool.createUOMLookupValue(Services.get(IUOMDAO.class).getById(uomId));
 		this.packingInfo = packingInfoOrNull;
 		this.code = null;
 
@@ -221,9 +227,9 @@ public class PPOrderLineRow implements IViewRow
 
 		this.type = type;
 
-		this.ppOrderId = ppOrderBomLine.getPP_Order_ID();
-		this.ppOrderBOMLineId = ppOrderBomLine.getPP_Order_BOMLine_ID();
-		this.huId = -1;
+		this.ppOrderId = PPOrderId.ofRepoId(ppOrderBomLine.getPP_Order_ID());
+		this.ppOrderBOMLineId = PPOrderBOMLineId.ofRepoId(ppOrderBomLine.getPP_Order_BOMLine_ID());
+		this.huId = null;
 		this.ppOrderQtyId = -1;
 
 		this.processed = processed;
@@ -259,7 +265,7 @@ public class PPOrderLineRow implements IViewRow
 	private PPOrderLineRow(
 			@NonNull final PPOrderLineRowId rowId,
 			@NonNull final PPOrderLineType type,
-			@NonNull final Integer huId,
+			@NonNull final HuId huId,
 			@Nullable final Supplier<? extends IViewRowAttributes> attributesSupplier,
 			@NonNull final String code,
 			@NonNull final JSONLookupValue product,
@@ -272,8 +278,8 @@ public class PPOrderLineRow implements IViewRow
 		this.rowId = rowId;
 		this.type = type;
 
-		this.ppOrderId = -1;
-		this.ppOrderBOMLineId = -1;
+		this.ppOrderId = null;
+		this.ppOrderBOMLineId = null;
 		this.huId = huId;
 		this.ppOrderQtyId = -1;
 
@@ -314,7 +320,11 @@ public class PPOrderLineRow implements IViewRow
 		}
 		else if (type.isHUOrHUStorage())
 		{
-			return DocumentPath.rootDocumentPath(WEBUI_HU_Constants.WEBUI_HU_Window_ID, DocumentId.of(huId));
+			// Better return null because we don't want to have here all processes which are related to HUs.
+			// More, in case the HU is destroyed, that HU will not be found in the standard HU Editor View so no process will be executed.
+			// see https://github.com/metasfresh/metasfresh-webui-api/issues/1097#issuecomment-436944470, problem 2.
+			// return DocumentPath.rootDocumentPath(WEBUI_HU_Constants.WEBUI_HU_Window_ID, DocumentId.of(huId));
+			return null;
 		}
 		else
 		{
@@ -338,12 +348,12 @@ public class PPOrderLineRow implements IViewRow
 		}
 	}
 
-	public int getPP_Order_ID()
+	public PPOrderId getOrderId()
 	{
 		return ppOrderId;
 	}
 
-	public int getPP_Order_BOMLine_ID()
+	public PPOrderBOMLineId getOrderBOMLineId()
 	{
 		return ppOrderBOMLineId;
 	}
@@ -360,14 +370,15 @@ public class PPOrderLineRow implements IViewRow
 	}
 
 	@Override
-	public Map<String, Object> getFieldNameAndJsonValues()
+	public ImmutableSet<String> getFieldNames()
 	{
-		ImmutableMap<String, Object> values = _values;
-		if (values == null)
-		{
-			values = _values = ViewColumnHelper.extractJsonMap(this);
-		}
-		return values;
+		return values.getFieldNames();
+	}
+
+	@Override
+	public ViewRowFieldNameAndJsonValues getFieldNameAndJsonValues()
+	{
+		return values.get(this);
 	}
 
 	@Override
@@ -393,38 +404,25 @@ public class PPOrderLineRow implements IViewRow
 		return product;
 	}
 
-	@Deprecated
-	public int getM_Product_ID()
-	{
-		final JSONLookupValue product = getProduct();
-		return product == null ? -1 : product.getKeyAsInt();
-	}
-	
 	public ProductId getProductId()
 	{
 		final JSONLookupValue product = getProduct();
 		return product != null ? ProductId.ofRepoIdOrNull(product.getKeyAsInt()) : null;
-		
+
 	}
 
-	public JSONLookupValue getUOM()
+	private int getUomId()
 	{
-		return uom;
-	}
-
-	public int getC_UOM_ID()
-	{
-		final JSONLookupValue uom = getUOM();
 		return uom == null ? -1 : uom.getKeyAsInt();
 	}
 
-	public I_C_UOM getC_UOM()
+	public I_C_UOM getUom()
 	{
-		final int uomId = getC_UOM_ID();
-		return InterfaceWrapperHelper.load(uomId, I_C_UOM.class);
+		final int uomId = getUomId();
+		return Services.get(IUOMDAO.class).getById(uomId);
 	}
 
-	public int getM_HU_ID()
+	public HuId getHuId()
 	{
 		return huId;
 	}

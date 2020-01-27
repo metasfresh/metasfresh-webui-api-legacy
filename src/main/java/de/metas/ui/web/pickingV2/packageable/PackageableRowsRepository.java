@@ -1,9 +1,9 @@
 package de.metas.ui.web.pickingV2.packageable;
 
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 
-import org.adempiere.user.UserId;
 import org.adempiere.warehouse.WarehouseTypeId;
 import org.adempiere.warehouse.api.IWarehouseDAO;
 import org.compiere.model.I_AD_User;
@@ -19,6 +19,7 @@ import com.google.common.collect.ImmutableList;
 
 import de.metas.bpartner.BPartnerId;
 import de.metas.i18n.ITranslatableString;
+import de.metas.i18n.TranslatableStrings;
 import de.metas.inoutcandidate.api.IPackagingDAO;
 import de.metas.inoutcandidate.api.Packageable;
 import de.metas.inoutcandidate.api.PackageableQuery;
@@ -27,13 +28,15 @@ import de.metas.money.Money;
 import de.metas.money.MoneyService;
 import de.metas.order.OrderId;
 import de.metas.shipping.ShipperId;
+import de.metas.ui.web.document.filter.DocumentFilter;
+import de.metas.ui.web.pickingV2.packageable.PackageableRowsData.PackageableRowsDataBuilder;
 import de.metas.ui.web.window.datatypes.LookupValue;
 import de.metas.ui.web.window.model.lookup.LookupDataSource;
 import de.metas.ui.web.window.model.lookup.LookupDataSourceFactory;
+import de.metas.user.UserId;
 import de.metas.util.Check;
 import de.metas.util.GuavaCollectors;
 import de.metas.util.Services;
-
 import lombok.NonNull;
 
 /*
@@ -46,12 +49,12 @@ import lombok.NonNull;
  * it under the terms of the GNU General Public License as
  * published by the Free Software Foundation, either version 2 of the
  * License, or (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public
  * License along with this program. If not, see
  * <http://www.gnu.org/licenses/gpl-2.0.html>.
@@ -81,16 +84,15 @@ final class PackageableRowsRepository
 		userLookup = Suppliers.memoize(() -> LookupDataSourceFactory.instance.searchInTableLookup(I_AD_User.Table_Name));
 	}
 
-	public PackageableRowsData getPackageableRowsData()
+	public PackageableRowsDataBuilder newPackageableRowsData()
 	{
-		return PackageableRowsData.newInstance(this);
+		return PackageableRowsData.builder().repo(this);
 	}
 
-	List<PackageableRow> retrieveRows()
+	List<PackageableRow> retrieveRows(final List<DocumentFilter> filters)
 	{
-		final PackageableQuery query = PackageableQuery.builder()
-				.onlyFromSalesOrder(true)
-				.build();
+		final PackageableQuery query = createPackageableQuery(filters);
+
 		return packageablesRepo.stream(query)
 				.collect(GuavaCollectors.toImmutableListMultimap(packageable -> extractGroupingKey(packageable)))
 				.asMap()
@@ -98,7 +100,23 @@ final class PackageableRowsRepository
 				.stream()
 				.map(this::createPackageableRowNoFail)
 				.filter(Predicates.notNull())
+				.sorted(Comparator.comparing(PackageableRow::getPreparationDate).thenComparing(PackageableRow::getOrderDocumentNo))
 				.collect(ImmutableList.toImmutableList());
+	}
+
+	private PackageableQuery createPackageableQuery(final List<DocumentFilter> filters)
+	{
+		final PackageableViewFilterVO filterVO = PackageableViewFilters.extractPackageableViewFilterVO(filters);
+
+		return PackageableQuery.builder()
+				.onlyFromSalesOrder(true)
+				.salesOrderId(filterVO.getSalesOrderId())
+				.customerId(filterVO.getCustomerId())
+				.warehouseTypeId(filterVO.getWarehouseTypeId())
+				.deliveryDate(filterVO.getDeliveryDate())
+				.preparationDate(filterVO.getPreparationDate())
+				.shipperId(filterVO.getShipperId())
+				.build();
 	}
 
 	private static ArrayKey extractGroupingKey(final Packageable packageable)
@@ -169,7 +187,7 @@ final class PackageableRowsRepository
 				.filter(Predicates.notNull())
 				.collect(Money.sumByCurrencyAndStream())
 				.map(moneyService::toTranslatableString)
-				.collect(ITranslatableString.joining(", "));
+				.collect(TranslatableStrings.joining(", "));
 	}
 
 }

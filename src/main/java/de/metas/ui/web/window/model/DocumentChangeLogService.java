@@ -5,7 +5,6 @@ import java.time.ZonedDateTime;
 
 import org.adempiere.ad.table.RecordChangeLog;
 import org.adempiere.ad.table.RecordChangeLogRepository;
-import org.adempiere.user.api.IUserDAO;
 import org.adempiere.util.lang.impl.TableRecordReference;
 import org.compiere.util.DisplayType;
 import org.compiere.util.TimeUtil;
@@ -15,6 +14,7 @@ import org.springframework.stereotype.Service;
 import de.metas.i18n.Language;
 import de.metas.logging.LogManager;
 import de.metas.ui.web.window.datatypes.json.JSONDocumentChangeLog;
+import de.metas.user.api.IUserDAO;
 import de.metas.util.Services;
 import lombok.NonNull;
 
@@ -63,9 +63,13 @@ public class DocumentChangeLogService
 	{
 		final JSONDocumentChangeLog json = new JSONDocumentChangeLog();
 		json.setCreatedByUsername(usersRepo.retrieveUserFullname(changeLog.getCreatedByUserId()));
-		json.setCreatedTimestamp(formatTimestamp(changeLog.getCreatedTimestamp(), adLanguage));
 		json.setLastChangedByUsername(usersRepo.retrieveUserFullname(changeLog.getLastChangedByUserId()));
-		json.setLastChangedTimestamp(formatTimestamp(changeLog.getLastChangedTimestamp(), adLanguage));
+
+		final ZonedDateTime created = TimeUtil.asZonedDateTime(changeLog.getCreatedTimestamp());
+		json.setCreatedTimestamp(formatTimestamp(created, adLanguage));
+
+		final ZonedDateTime updated = TimeUtil.asZonedDateTime(changeLog.getLastChangedTimestamp());
+		json.setLastChangedTimestamp(formatTimestamp(updated, adLanguage));
 
 		return json;
 	}

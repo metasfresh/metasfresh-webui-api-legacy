@@ -10,14 +10,15 @@ import org.adempiere.ad.expression.api.ConstantLogicExpression;
 import org.adempiere.ad.expression.api.IExpression;
 import org.adempiere.ad.expression.api.ILogicExpression;
 import org.adempiere.exceptions.AdempiereException;
-import org.adempiere.mm.attributes.util.ASIEditingInfo;
+import org.adempiere.mm.attributes.AttributeId;
+import org.adempiere.mm.attributes.api.IAttributesBL;
 import org.adempiere.model.InterfaceWrapperHelper;
 import org.compiere.model.I_M_Attribute;
 import org.compiere.model.I_M_AttributeInstance;
 import org.compiere.model.I_M_AttributeSet;
 import org.compiere.model.I_M_AttributeSetInstance;
-import org.compiere.model.MAttribute;
 import org.compiere.model.X_M_Attribute;
+import org.compiere.util.DisplayType;
 import org.compiere.util.TimeUtil;
 import org.compiere.util.Util.ArrayKey;
 import org.springframework.stereotype.Component;
@@ -37,9 +38,10 @@ import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
 import de.metas.ui.web.window.descriptor.DocumentLayoutElementDescriptor;
 import de.metas.ui.web.window.descriptor.DocumentLayoutElementFieldDescriptor;
 import de.metas.ui.web.window.descriptor.LookupDescriptor;
-import de.metas.ui.web.window.descriptor.LookupDescriptorProvider;
 import de.metas.ui.web.window.model.DocumentsRepository;
 import de.metas.ui.web.window.model.IDocumentFieldView;
+import de.metas.util.NumberUtils;
+import de.metas.util.Services;
 
 /*
  * #%L
@@ -67,13 +69,12 @@ import de.metas.ui.web.window.model.IDocumentFieldView;
 public class ASIDescriptorFactory
 {
 	private final CCache<ArrayKey, ASIDescriptor> asiDescriptorById = CCache.newLRUCache(I_M_AttributeSet.Table_Name + "#Descriptors#by#M_AttributeSet_ID", 200, 0);
-	private final CCache<Integer, ASILookupDescriptor> asiLookupDescriptorsByAttributeId = CCache.newLRUCache(I_M_AttributeSet.Table_Name + "#LookupDescriptors", 200, 0);
+	private final CCache<AttributeId, ASILookupDescriptor> asiLookupDescriptorsByAttributeId = CCache.newLRUCache(I_M_AttributeSet.Table_Name + "#LookupDescriptors", 200, 0);
 
 	private static final ASIDataBindingDescriptorBuilder _asiBindingsBuilder = new ASIDataBindingDescriptorBuilder();
 
 	private ASIDescriptorFactory()
 	{
-		super();
 	}
 
 	private ASIDataBindingDescriptorBuilder getASIBindingsBuilder()
@@ -81,29 +82,31 @@ public class ASIDescriptorFactory
 		return _asiBindingsBuilder;
 	}
 
-	public ASIDescriptor getASIDescriptor(final ASIEditingInfo info)
+	public ASIDescriptor getASIDescriptor(final WebuiASIEditingInfo request)
 	{
-		final ArrayKey key = createASIDescriptorCachingKey(info);
-		return asiDescriptorById.getOrLoad(key, () -> createASIDescriptor(info));
+		final ArrayKey key = createASIDescriptorCachingKey(request);
+		return asiDescriptorById.getOrLoad(key, () -> createASIDescriptor(request));
 	}
 
-	private static final ArrayKey createASIDescriptorCachingKey(final ASIEditingInfo info)
+	private static final ArrayKey createASIDescriptorCachingKey(final WebuiASIEditingInfo request)
 	{
 		return ArrayKey.builder()
-				.append(info.getWindowType())
-				.append(info.getAttributeSetId())
-				.append(info.getAvailableAttributeIds())
+				.append(request.getContextWindowType())
+				.append(request.getContextDocumentPath())
+				.append(request.getAttributeSetId())
+				.append(request.getAttributeIds())
 				.build();
 	}
 
-	private ASIDescriptor createASIDescriptor(final ASIEditingInfo info)
+	private ASIDescriptor createASIDescriptor(final WebuiASIEditingInfo info)
 	{
-		final DocumentId asiDescriptorId = DocumentId.ofString(info.getWindowType() + "_" + info.getAttributeSetId().getRepoId());
-		final DocumentEntityDescriptor entityDescriptor = createDocumentEntityDescriptor( //
-				asiDescriptorId //
-				, info.getM_AttributeSet_Name() // name
-				, info.getM_AttributeSet_Description() // description
-				, info.getAvailableAttributes() // attributes
+		final DocumentId asiDescriptorId = DocumentId.ofString(info.getContextWindowType() + "_" + info.getAttributeSetId().getRepoId());
+
+		final DocumentEntityDescriptor entityDescriptor = createDocumentEntityDescriptor(
+				asiDescriptorId,
+				info.getAttributeSetName(), // name
+				info.getAttributeSetDescription(), // description
+				info.getAttributes() // attributes
 		);
 
 		final ASILayout layout = createLayout(asiDescriptorId, entityDescriptor);
@@ -112,15 +115,15 @@ public class ASIDescriptorFactory
 				.attributeSetId(info.getAttributeSetId())
 				.entityDescriptor(entityDescriptor)
 				.layout(layout)
+				.contextDocumentPath(info.getContextDocumentPath())
 				.build();
 	}
 
-	private final DocumentEntityDescriptor createDocumentEntityDescriptor( //
-			DocumentId asiDescriptorId //
-			, final String name //
-			, final String description //
-			, final List<MAttribute> attributes //
-	)
+	private final DocumentEntityDescriptor createDocumentEntityDescriptor(
+			final DocumentId asiDescriptorId,
+			final String name,
+			final String description,
+			final List<I_M_Attribute> attributes)
 	{
 		if (attributes.isEmpty())
 		{
@@ -163,7 +166,7 @@ public class ASIDescriptorFactory
 		if (X_M_Attribute.ATTRIBUTEVALUETYPE_Date.equals(attributeValueType))
 		{
 			valueClass = java.util.Date.class;
-			widgetType = DocumentFieldWidgetType.Date;
+			widgetType = DocumentFieldWidgetType.LocalDate;
 			readMethod = I_M_AttributeInstance::getValueDate;
 			writeMethod = (aiRecord, field) -> aiRecord.setValueDate(TimeUtil.asTimestamp(field.getValueAs(java.util.Date.class)));
 		}
@@ -178,10 +181,21 @@ public class ASIDescriptorFactory
 		}
 		else if (X_M_Attribute.ATTRIBUTEVALUETYPE_Number.equals(attributeValueType))
 		{
-			valueClass = BigDecimal.class;
-			widgetType = DocumentFieldWidgetType.Number;
-			readMethod = I_M_AttributeInstance::getValueNumber;
-			writeMethod = (aiRecord, field) -> aiRecord.setValueNumber(field.getValueAs(BigDecimal.class));
+			final int displayType = Services.get(IAttributesBL.class).getNumberDisplayType(attribute);
+			if (displayType == DisplayType.Integer)
+			{
+				valueClass = Integer.class;
+				widgetType = DocumentFieldWidgetType.Integer;
+				readMethod = ai -> NumberUtils.asInteger(ai.getValueNumber(), null);
+				writeMethod = (aiRecord, field) -> aiRecord.setValueNumber(field.getValueAs(BigDecimal.class));
+			}
+			else
+			{
+				valueClass = BigDecimal.class;
+				widgetType = DocumentFieldWidgetType.Number;
+				readMethod = I_M_AttributeInstance::getValueNumber;
+				writeMethod = (aiRecord, field) -> aiRecord.setValueNumber(field.getValueAs(BigDecimal.class));
+			}
 		}
 		else if (X_M_Attribute.ATTRIBUTEVALUETYPE_StringMax40.equals(attributeValueType))
 		{
@@ -195,7 +209,7 @@ public class ASIDescriptorFactory
 			throw new IllegalArgumentException("@NotSupported@ @AttributeValueType@=" + attributeValueType + ", @M_Attribute_ID@=" + attribute);
 		}
 
-		final ILogicExpression readonlyLogic = ConstantLogicExpression.FALSE;
+		final ILogicExpression readonlyLogic = ConstantLogicExpression.of(attribute.isReadOnlyValues());
 		final ILogicExpression displayLogic = ConstantLogicExpression.TRUE;
 		final ILogicExpression mandatoryLogic = ConstantLogicExpression.of(attribute.isMandatory());
 
@@ -223,7 +237,8 @@ public class ASIDescriptorFactory
 
 	private LookupDescriptor getLookupDescriptor(final I_M_Attribute attribute)
 	{
-		return asiLookupDescriptorsByAttributeId.getOrLoad(attribute.getM_Attribute_ID(), () -> ASILookupDescriptor.of(attribute));
+		final AttributeId attributeId = AttributeId.ofRepoId(attribute.getM_Attribute_ID());
+		return asiLookupDescriptorsByAttributeId.getOrLoad(attributeId, () -> ASILookupDescriptor.of(attribute));
 	}
 
 	private static ASILayout createLayout(final DocumentId asiDescriptorId, final DocumentEntityDescriptor entityDescriptor)
@@ -246,7 +261,7 @@ public class ASIDescriptorFactory
 				.setCaption(fieldDescriptor.getCaption())
 				.setWidgetType(fieldDescriptor.getWidgetType())
 				.addField(DocumentLayoutElementFieldDescriptor.builder(fieldDescriptor.getFieldName())
-						.setLookupSource(fieldDescriptor.getLookupSourceType())
+						.setLookupInfos(fieldDescriptor.getLookupDescriptor().orElse(null))
 						.setPublicField(true)
 						.setSupportZoomInto(fieldDescriptor.isSupportZoomInto()));
 	}
@@ -264,7 +279,6 @@ public class ASIDescriptorFactory
 
 		private ASIDataBindingDescriptorBuilder()
 		{
-			super();
 		}
 
 		@Override
@@ -289,8 +303,6 @@ public class ASIDescriptorFactory
 				, final BiConsumer<I_M_AttributeInstance, IDocumentFieldView> writeMethod //
 		)
 		{
-			super();
-
 			Check.assume(attributeId > 0, "attributeId > 0");
 			this.attributeId = attributeId;
 
@@ -328,10 +340,11 @@ public class ASIDescriptorFactory
 			writeMethod.accept(ai, field);
 		}
 
-		private static final void writeValueFromLookup(final I_M_AttributeInstance ai, final IDocumentFieldView field)
+		private static void writeValueFromLookup(final I_M_AttributeInstance ai, final IDocumentFieldView field)
 		{
 			final StringLookupValue lookupValue = field.getValueAs(StringLookupValue.class);
-			final int attributeValueId = field.getDescriptor().getLookupDescriptor(LookupDescriptorProvider.LookupScope.DocumentField)
+			final int attributeValueId = field.getDescriptor().getLookupDescriptor()
+					.get()
 					.cast(ASILookupDescriptor.class)
 					.getM_AttributeValue_ID(lookupValue);
 

@@ -9,13 +9,14 @@ import javax.annotation.Nullable;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.RemovalNotification;
 import com.google.common.collect.ImmutableList;
 
 import de.metas.i18n.ITranslatableString;
+import de.metas.process.AdProcessId;
 import de.metas.process.IADProcessDAO;
 import de.metas.process.JavaProcess;
 import de.metas.process.RelatedProcessDescriptor;
+import de.metas.process.RelatedProcessDescriptor.DisplayPlace;
 import de.metas.purchasecandidate.PurchaseDemand;
 import de.metas.purchasecandidate.PurchaseDemandWithCandidates;
 import de.metas.purchasecandidate.PurchaseDemandWithCandidatesService;
@@ -26,14 +27,13 @@ import de.metas.ui.web.view.IView;
 import de.metas.ui.web.view.IViewFactory;
 import de.metas.ui.web.view.IViewsIndexStorage;
 import de.metas.ui.web.view.IViewsRepository;
-import de.metas.ui.web.view.ViewCloseReason;
+import de.metas.ui.web.view.ViewCloseAction;
 import de.metas.ui.web.view.ViewId;
 import de.metas.ui.web.view.ViewProfileId;
 import de.metas.ui.web.view.descriptor.ViewLayout;
 import de.metas.ui.web.view.json.JSONViewDataType;
 import de.metas.ui.web.window.datatypes.WindowId;
 import de.metas.util.Services;
-
 import lombok.NonNull;
 
 /*
@@ -73,7 +73,6 @@ public abstract class PurchaseViewFactoryTemplate implements IViewFactory, IView
 	//
 	private final Cache<ViewId, PurchaseView> views = CacheBuilder.newBuilder()
 			.expireAfterAccess(1, TimeUnit.HOURS)
-			.removalListener(notification -> onViewRemoved(notification))
 			.build();
 
 	public PurchaseViewFactoryTemplate(
@@ -152,8 +151,19 @@ public abstract class PurchaseViewFactoryTemplate implements IViewFactory, IView
 	}
 
 	@Override
-	public final void removeById(final ViewId viewId)
+	public final void closeById(@NonNull final ViewId viewId, @NonNull final ViewCloseAction closeAction)
 	{
+		final PurchaseView view = views.getIfPresent(viewId);
+		if (view == null || !view.isAllowClosingPerUserRequest())
+		{
+			return;
+		}
+
+		if (closeAction.isDone())
+		{
+			onViewClosedByUser(view);
+		}
+
 		views.invalidate(viewId);
 		views.cleanUp(); // also cleanup to prevent views cache to grow.
 	}
@@ -216,24 +226,12 @@ public abstract class PurchaseViewFactoryTemplate implements IViewFactory, IView
 
 	protected final RelatedProcessDescriptor createProcessDescriptor(@NonNull final Class<?> processClass)
 	{
-		final int processId = adProcessRepo.retriveProcessIdByClassIfUnique(processClass);
-		Preconditions.checkArgument(processId > 0, "No AD_Process_ID found for %s", processClass);
+		final AdProcessId processId = adProcessRepo.retrieveProcessIdByClassIfUnique(processClass);
+		Preconditions.checkArgument(processId != null, "No AD_Process_ID found for %s", processClass);
 
 		return RelatedProcessDescriptor.builder()
 				.processId(processId)
-				.webuiQuickAction(true)
+				.displayPlace(DisplayPlace.ViewQuickActions)
 				.build();
-	}
-
-	private final void onViewRemoved(final RemovalNotification<Object, Object> notification)
-	{
-		final PurchaseView view = PurchaseView.cast(notification.getValue());
-		final ViewCloseReason closeReason = ViewCloseReason.fromCacheEvictedFlag(notification.wasEvicted());
-		view.close(closeReason);
-
-		if (closeReason == ViewCloseReason.USER_REQUEST)
-		{
-			onViewClosedByUser(view);
-		}
 	}
 }

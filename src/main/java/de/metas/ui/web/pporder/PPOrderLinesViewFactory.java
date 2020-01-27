@@ -1,25 +1,29 @@
 package de.metas.ui.web.pporder;
 
 import java.util.List;
+import java.util.function.Supplier;
 
 import javax.annotation.Nullable;
 
 import org.adempiere.exceptions.AdempiereException;
 import org.springframework.beans.factory.annotation.Autowired;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 
 import de.metas.cache.CCache;
 import de.metas.handlingunits.reservation.HUReservationService;
+import de.metas.material.planning.pporder.PPOrderId;
+import de.metas.process.AdProcessId;
 import de.metas.process.IADProcessDAO;
 import de.metas.process.RelatedProcessDescriptor;
+import de.metas.process.RelatedProcessDescriptor.DisplayPlace;
 import de.metas.ui.web.handlingunits.DefaultHUEditorViewFactory;
 import de.metas.ui.web.pattribute.ASIRepository;
 import de.metas.ui.web.view.ASIViewRowAttributesProvider;
 import de.metas.ui.web.view.CreateViewRequest;
 import de.metas.ui.web.view.IView;
 import de.metas.ui.web.view.IViewFactory;
+import de.metas.ui.web.view.IViewsRepository;
 import de.metas.ui.web.view.ViewFactory;
 import de.metas.ui.web.view.ViewId;
 import de.metas.ui.web.view.ViewProfileId;
@@ -71,7 +75,7 @@ public class PPOrderLinesViewFactory implements IViewFactory
 	public PPOrderLinesView createView(final CreateViewRequest request)
 	{
 		final ViewId viewId = request.getViewId();
-		final int ppOrderId = request.getSingleFilterOnlyId();
+		final PPOrderId ppOrderId = PPOrderId.ofRepoId(request.getSingleFilterOnlyId());
 
 		final PPOrderLinesViewDataSupplier dataSupplier = PPOrderLinesViewDataSupplier
 				.builder()
@@ -95,7 +99,10 @@ public class PPOrderLinesViewFactory implements IViewFactory
 	}
 
 	@Override
-	public IView filterView(final IView view, final JSONFilterViewRequest filterViewRequest)
+	public IView filterView(
+			final IView view, 
+			final JSONFilterViewRequest filterViewRequest,
+			final Supplier<IViewsRepository> viewsRepo)
 	{
 		throw new AdempiereException("View does not support filtering")
 				.setParameter("view", view)
@@ -151,14 +158,13 @@ public class PPOrderLinesViewFactory implements IViewFactory
 	{
 		final IADProcessDAO adProcessDAO = Services.get(IADProcessDAO.class);
 
-		final int processId = adProcessDAO.retriveProcessIdByClassIfUnique(processClass);
-		Preconditions.checkArgument(processId > 0, "No AD_Process_ID found for %s", processClass);
+		final AdProcessId processId = adProcessDAO.retrieveProcessIdByClass(processClass);
 
 		return RelatedProcessDescriptor.builder()
 				.processId(processId)
-				.windowId(PPOrderConstants.AD_WINDOW_ID_IssueReceipt.toInt())
+				.windowId(PPOrderConstants.AD_WINDOW_ID_IssueReceipt.toAdWindowIdOrNull())
 				.anyTable()
-				.webuiQuickAction(true)
+				.displayPlace(DisplayPlace.ViewQuickActions)
 				.build();
 	}
 }

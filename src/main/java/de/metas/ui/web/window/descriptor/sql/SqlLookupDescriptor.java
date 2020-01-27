@@ -9,17 +9,18 @@ import java.util.Set;
 
 import javax.annotation.concurrent.Immutable;
 
+import org.adempiere.ad.element.api.AdWindowId;
 import org.adempiere.ad.expression.api.ICachedStringExpression;
 import org.adempiere.ad.expression.api.IStringExpression;
 import org.adempiere.ad.expression.api.TranslatableParameterizedStringExpression;
 import org.adempiere.ad.expression.api.impl.CompositeStringExpression;
-import org.adempiere.ad.security.IUserRolePermissions;
-import org.adempiere.ad.security.impl.AccessSqlStringExpression;
+import org.adempiere.ad.expression.api.impl.ConstantStringExpression;
 import org.adempiere.ad.validationRule.INamePairPredicate;
 import org.adempiere.ad.validationRule.IValidationRule;
 import org.adempiere.ad.validationRule.impl.CompositeValidationRule;
 import org.adempiere.ad.validationRule.impl.NullValidationRule;
 import org.adempiere.db.DBConstants;
+import org.adempiere.exceptions.AdempiereException;
 import org.adempiere.model.InterfaceWrapperHelper;
 import org.compiere.model.I_AD_Client;
 import org.compiere.model.I_AD_Org;
@@ -35,6 +36,9 @@ import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableSet;
 
 import de.metas.i18n.TranslatableParameterizedString;
+import de.metas.security.IUserRolePermissions;
+import de.metas.security.impl.AccessSqlStringExpression;
+import de.metas.security.permissions.Access;
 import de.metas.ui.web.window.WindowConstants;
 import de.metas.ui.web.window.datatypes.WindowId;
 import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
@@ -42,12 +46,14 @@ import de.metas.ui.web.window.descriptor.DocumentLayoutElementFieldDescriptor.Lo
 import de.metas.ui.web.window.descriptor.LookupDescriptor;
 import de.metas.ui.web.window.descriptor.LookupDescriptorProvider;
 import de.metas.ui.web.window.descriptor.LookupDescriptorProvider.LookupScope;
+import de.metas.ui.web.window.descriptor.LookupDescriptorProviders;
 import de.metas.ui.web.window.descriptor.factory.standard.DescriptorsFactoryHelper;
 import de.metas.ui.web.window.model.lookup.GenericSqlLookupDataSourceFetcher;
 import de.metas.ui.web.window.model.lookup.LookupDataSourceContext;
 import de.metas.ui.web.window.model.lookup.LookupDataSourceFetcher;
 import de.metas.ui.web.window.model.sql.DocActionValidationRule;
 import de.metas.util.Check;
+import lombok.ToString;
 
 /*
  * #%L
@@ -74,17 +80,17 @@ import de.metas.util.Check;
 @Immutable
 public final class SqlLookupDescriptor implements ISqlLookupDescriptor
 {
-	public static final Builder builder()
+	public static Builder builder()
 	{
 		return new Builder();
 	}
 
-	public static final SqlLookupDescriptor cast(final LookupDescriptor descriptor)
+	public static SqlLookupDescriptor cast(final LookupDescriptor descriptor)
 	{
 		return (SqlLookupDescriptor)descriptor;
 	}
 
-	public static final LookupDescriptorProvider searchInTable(final String lookupTableName)
+	public static LookupDescriptorProvider searchInTable(final String lookupTableName)
 	{
 		return builder()
 				.setCtxTableName(null) // tableName
@@ -94,7 +100,17 @@ public final class SqlLookupDescriptor implements ISqlLookupDescriptor
 				.buildProvider();
 	}
 
-	public static final LookupDescriptorProvider listByAD_Reference_Value_ID(final int AD_Reference_Value_ID)
+	public static LookupDescriptorProvider productAttributes()
+	{
+		return builder()
+				.setCtxTableName(null) // tableName
+				.setCtxColumnName(I_M_AttributeSetInstance.COLUMNNAME_M_AttributeSetInstance_ID)
+				.setDisplayType(DisplayType.PAttribute)
+				.setReadOnlyAccess()
+				.buildProvider();
+	}
+
+	public static LookupDescriptorProvider listByAD_Reference_Value_ID(final int AD_Reference_Value_ID)
 	{
 		Check.assumeGreaterThanZero(AD_Reference_Value_ID, "AD_Reference_Value_ID");
 
@@ -111,7 +127,7 @@ public final class SqlLookupDescriptor implements ISqlLookupDescriptor
 	 * @param AD_Reference_Value_ID has to be > 0
 	 * @param AD_Val_Rule_ID may be <= 0
 	 */
-	public static final LookupDescriptorProvider searchByAD_Val_Rule_ID(
+	public static LookupDescriptorProvider searchByAD_Val_Rule_ID(
 			final int AD_Reference_Value_ID,
 			final int AD_Val_Rule_ID)
 	{
@@ -138,17 +154,16 @@ public final class SqlLookupDescriptor implements ISqlLookupDescriptor
 	private final Optional<String> tableName;
 	private final Optional<WindowId> zoomIntoWindowId;
 	private final ICachedStringExpression sqlForFetchingExpression;
-	private final ICachedStringExpression sqlForFetchingDisplayNameByIdExpression;
+	private final ICachedStringExpression sqlForFetchingLookupByIdExpression;
 	private final int entityTypeIndex;
 	private final INamePairPredicate postQueryPredicate;
 
 	private final boolean highVolume;
 	private final boolean numericKey;
-	private final LookupSource lookupSourceType;
 
+	private final LookupSource lookupSourceType;
 	private final ImmutableSet<String> dependsOnFieldNames;
 	private final ImmutableSet<String> dependsOnTableNames;
-
 	private final GenericSqlLookupDataSourceFetcher lookupDataSourceFetcher;
 
 	private SqlLookupDescriptor(final Builder builder)
@@ -156,18 +171,17 @@ public final class SqlLookupDescriptor implements ISqlLookupDescriptor
 		tableName = Optional.of(builder.sqlTableName);
 		zoomIntoWindowId = builder.getZoomIntoWindowId();
 		sqlForFetchingExpression = builder.sqlForFetchingExpression;
-		sqlForFetchingDisplayNameByIdExpression = builder.sqlForFetchingDisplayNameByIdExpression;
+		sqlForFetchingLookupByIdExpression = builder.sqlForFetchingLookupByIdExpression;
 		entityTypeIndex = builder.entityTypeIndex;
 
 		postQueryPredicate = builder.getPostQueryPredicate();
 
 		numericKey = builder.numericKey;
 		highVolume = builder.isHighVolume();
-		lookupSourceType = builder.getLookupSourceType();
 
+		lookupSourceType = builder.getLookupSourceType();
 		dependsOnFieldNames = ImmutableSet.copyOf(builder.dependsOnFieldNames);
 		dependsOnTableNames = ImmutableSet.copyOf(builder.getDependsOnTableNames());
-
 		lookupDataSourceFetcher = GenericSqlLookupDataSourceFetcher.of(this); // keep it last!
 	}
 
@@ -177,6 +191,7 @@ public final class SqlLookupDescriptor implements ISqlLookupDescriptor
 		return MoreObjects.toStringHelper(this)
 				.omitNullValues()
 				.add("tableName", tableName)
+				.add("zoomIntoWindowId", zoomIntoWindowId.orElse(null))
 				.add("highVolume", highVolume ? highVolume : null)
 				.add("sqlForFetching", sqlForFetchingExpression.toOneLineString())
 				.add("postQueryPredicate", postQueryPredicate == null || postQueryPredicate == INamePairPredicate.NULL ? null : postQueryPredicate)
@@ -188,8 +203,9 @@ public final class SqlLookupDescriptor implements ISqlLookupDescriptor
 	{
 		return Objects.hash(
 				tableName,
+				zoomIntoWindowId,
 				sqlForFetchingExpression,
-				sqlForFetchingDisplayNameByIdExpression,
+				sqlForFetchingLookupByIdExpression,
 				entityTypeIndex,
 				postQueryPredicate,
 				//
@@ -220,8 +236,9 @@ public final class SqlLookupDescriptor implements ISqlLookupDescriptor
 
 		final SqlLookupDescriptor other = (SqlLookupDescriptor)obj;
 		return Objects.equals(tableName, other.tableName)
+				&& Objects.equals(zoomIntoWindowId, other.zoomIntoWindowId)
 				&& Objects.equals(sqlForFetchingExpression, other.sqlForFetchingExpression)
-				&& Objects.equals(sqlForFetchingDisplayNameByIdExpression, other.sqlForFetchingDisplayNameByIdExpression)
+				&& Objects.equals(sqlForFetchingLookupByIdExpression, other.sqlForFetchingLookupByIdExpression)
 				&& entityTypeIndex == other.entityTypeIndex
 				&& Objects.equals(postQueryPredicate, other.postQueryPredicate)
 				&& highVolume == other.highVolume
@@ -261,18 +278,20 @@ public final class SqlLookupDescriptor implements ISqlLookupDescriptor
 		return sqlForFetchingExpression;
 	}
 
-	public IStringExpression getSqlForFetchingDisplayNameByIdExpression()
+	public IStringExpression getSqlForFetchingLookupByIdExpression()
 	{
-		return sqlForFetchingDisplayNameByIdExpression;
+		return sqlForFetchingLookupByIdExpression;
 	}
 
 	@Override
-	public IStringExpression getSqlForFetchingDisplayNameByIdExpression(final String sqlKeyColumn)
+	public IStringExpression getSqlForFetchingLookupByIdExpression(final String sqlKeyColumn)
 	{
-		return sqlForFetchingDisplayNameByIdExpression.resolvePartial(Evaluatees.mapBuilder()
-				.put(SQL_PARAM_KeyId, sqlKeyColumn)
-				.put(SQL_PARAM_ShowInactive, SQL_PARAM_VALUE_ShowInactive_Yes)
-				.build());
+		return sqlForFetchingLookupByIdExpression
+				.resolvePartial(Evaluatees
+						.mapBuilder()
+						.put(SQL_PARAM_KeyId, sqlKeyColumn)
+						.put(SQL_PARAM_ShowInactive, SQL_PARAM_VALUE_ShowInactive_Yes)
+						.build());
 	}
 
 	public int getEntityTypeIndex()
@@ -316,6 +335,7 @@ public final class SqlLookupDescriptor implements ISqlLookupDescriptor
 		return lookupSourceType;
 	}
 
+	@ToString(of = { "sqlTableName", "ctxTableName", "ctxColumnName", "widgetType" })
 	public static final class Builder
 	{
 		// Parameters
@@ -327,7 +347,7 @@ public final class SqlLookupDescriptor implements ISqlLookupDescriptor
 		private int AD_Reference_Value_ID = -1;
 		private int AD_Val_Rule_ID = -1;
 		private LookupScope scope = LookupScope.DocumentField;
-		private Boolean readWriteAccess = null;
+		private Access requiredAccess = null;
 
 		//
 		// Built/prepared values
@@ -338,14 +358,13 @@ public final class SqlLookupDescriptor implements ISqlLookupDescriptor
 		private IValidationRule validationRuleEffective = NullValidationRule.instance;
 		private String sqlTableName;
 		private ICachedStringExpression sqlForFetchingExpression;
-		private ICachedStringExpression sqlForFetchingDisplayNameByIdExpression;
+		private ICachedStringExpression sqlForFetchingLookupByIdExpression;
 		private int entityTypeIndex = -1;
 
-		private int zoomIntoWindowId = -1;
+		private AdWindowId zoomIntoAdWindowId = null;
 
 		private Builder()
 		{
-			super();
 		}
 
 		public LookupDescriptorProvider buildProvider()
@@ -355,14 +374,11 @@ public final class SqlLookupDescriptor implements ISqlLookupDescriptor
 			return buildProvider(ctxTableName, ctxColumnName, widgetType, displayType, AD_Reference_Value_ID, AD_Val_Rule_ID, validationRules);
 		}
 
-		public LookupDescriptor buildForScope(final LookupScope scope)
-		{
-			return buildProvider().provideForScope(scope);
-		}
-
 		public LookupDescriptor buildForDefaultScope()
 		{
-			return buildProvider().provideForScope(LookupScope.DocumentField);
+			return buildProvider()
+					.provide()
+					.orElseThrow(() -> new AdempiereException("No lookup for " + this));
 		}
 
 		private static LookupDescriptorProvider buildProvider(
@@ -375,13 +391,12 @@ public final class SqlLookupDescriptor implements ISqlLookupDescriptor
 		{
 			if (widgetType == DocumentFieldWidgetType.ProcessButton)
 			{
-				return LookupDescriptorProvider.NULL;
+				return LookupDescriptorProviders.NULL;
 			}
-
-			if (DisplayType.isAnyLookup(displayType)
+			else if (DisplayType.isAnyLookup(displayType)
 					|| DisplayType.Button == displayType && AD_Reference_Value_ID > 0)
 			{
-				return LookupDescriptorProvider.fromMemoizingFunction(scope -> SqlLookupDescriptor.builder()
+				return LookupDescriptorProviders.fromMemoizingFunction(scope -> SqlLookupDescriptor.builder()
 						.setCtxTableName(sqlTableName)
 						.setCtxColumnName(sqlColumnName)
 						.setDisplayType(displayType)
@@ -391,7 +406,10 @@ public final class SqlLookupDescriptor implements ISqlLookupDescriptor
 						.addValidationRules(additionalValidationRules)
 						.build());
 			}
-			return LookupDescriptorProvider.NULL;
+			else
+			{
+				return LookupDescriptorProviders.NULL;
+			}
 		}
 
 		private SqlLookupDescriptor build()
@@ -465,10 +483,10 @@ public final class SqlLookupDescriptor implements ISqlLookupDescriptor
 			// Set the SQLs
 			{
 				sqlTableName = lookupInfo.getTableName();
-				zoomIntoWindowId = lookupInfo.getZoomAD_Window_ID_Override();
+				zoomIntoAdWindowId = lookupInfo.getZoomAD_Window_ID_Override();
 				sqlForFetchingExpression = buildSqlForFetching(lookupInfo, sqlWhereFinal, lookup_SqlOrderBy)
 						.caching();
-				sqlForFetchingDisplayNameByIdExpression = buildSqlForFetchingDisplayNameById(lookupInfo)
+				sqlForFetchingLookupByIdExpression = buildSqlForFetchingById(lookupInfo)
 						.caching();
 
 				if (lookupInfo.isQueryHasEntityType())
@@ -483,6 +501,7 @@ public final class SqlLookupDescriptor implements ISqlLookupDescriptor
 			final String tableName = I_M_AttributeSetInstance.Table_Name;
 			final String keyColumnNameFQ = tableName + "." + I_M_AttributeSetInstance.COLUMNNAME_M_AttributeSetInstance_ID;
 			final String displayColumnSql = tableName + "." + I_M_AttributeSetInstance.COLUMNNAME_Description;
+
 			final CompositeStringExpression.Builder sqlSelectFrom = IStringExpression.composer()
 					.append("SELECT ")
 					.append(" ").append(keyColumnNameFQ) // Key
@@ -524,10 +543,12 @@ public final class SqlLookupDescriptor implements ISqlLookupDescriptor
 					.append("\n ORDER BY ").append(lookup_SqlOrderBy) // ORDER BY
 					.append("\n OFFSET ").append(LookupDataSourceContext.PARAM_Offset.toStringWithMarkers())
 					.append("\n LIMIT ").append(LookupDataSourceContext.PARAM_Limit.toStringWithMarkers()) // LIMIT
-					.wrap(AccessSqlStringExpression.wrapper(tableName, IUserRolePermissions.SQL_FULLYQUALIFIED, isReadWriteAccessRequired(tableName))) // security
+					.wrap(AccessSqlStringExpression.wrapper(tableName, IUserRolePermissions.SQL_FULLYQUALIFIED, getRequiredAccess(tableName))) // security
 					.build();
-			final IStringExpression sqlForFetchingDisplayNameById = IStringExpression.composer()
-					.append("SELECT ").append(displayColumnSql) // SELECT
+
+			final IStringExpression sqlForFetchingLookupById = IStringExpression
+					.composer()
+					.append("SELECT ").append("ARRAY[").append(displayColumnSql).append(", NULL]")
 					.append("\n FROM ").append(tableName) // FROM
 					.append("\n WHERE ").append(keyColumnNameFQ).append("=").append(SQL_PARAM_KeyId)
 					.build();
@@ -537,11 +558,11 @@ public final class SqlLookupDescriptor implements ISqlLookupDescriptor
 			{
 				sqlTableName = tableName;
 				sqlForFetchingExpression = sqlForFetching.caching();
-				sqlForFetchingDisplayNameByIdExpression = sqlForFetchingDisplayNameById.caching();
+				sqlForFetchingLookupByIdExpression = sqlForFetchingLookupById.caching();
 			}
 		}
 
-		private static final IStringExpression buildSqlWhere(final MLookupInfo lookupInfo, final LookupScope scope, final IValidationRule validationRuleEffective)
+		private static IStringExpression buildSqlWhere(final MLookupInfo lookupInfo, final LookupScope scope, final IValidationRule validationRuleEffective)
 		{
 			final String tableName = lookupInfo.getTableName();
 			final String lookup_SqlWhere = lookupInfo.getWhereClauseSqlPart();
@@ -577,7 +598,7 @@ public final class SqlLookupDescriptor implements ISqlLookupDescriptor
 			return sqlWhereFinal.build();
 		}
 
-		private static final IStringExpression buildSqlWhereClauseFromValidationRule(final IValidationRule validationRule, final LookupScope scope)
+		private static IStringExpression buildSqlWhereClauseFromValidationRule(final IValidationRule validationRule, final LookupScope scope)
 		{
 			final IStringExpression validationRuleWhereClause = validationRule.getPrefilterWhereClause();
 			if (validationRuleWhereClause.isNullExpression())
@@ -594,7 +615,7 @@ public final class SqlLookupDescriptor implements ISqlLookupDescriptor
 			return validationRuleWhereClause;
 		}
 
-		private final IStringExpression buildSqlForFetching(final MLookupInfo lookupInfo, final IStringExpression sqlWhere, final String sqlOrderBy)
+		private IStringExpression buildSqlForFetching(final MLookupInfo lookupInfo, final IStringExpression sqlWhere, final String sqlOrderBy)
 		{
 			final String tableName = lookupInfo.getTableName();
 			return IStringExpression.composer()
@@ -603,30 +624,48 @@ public final class SqlLookupDescriptor implements ISqlLookupDescriptor
 					.append("\n ORDER BY ").append(sqlOrderBy) // ORDER BY
 					.append("\n OFFSET ").append(LookupDataSourceContext.PARAM_Offset) // OFFSET
 					.append("\n LIMIT ").append(LookupDataSourceContext.PARAM_Limit) // LIMIT
-					.wrapIfTrue(!lookupInfo.isSecurityDisabled(), AccessSqlStringExpression.wrapper(tableName, IUserRolePermissions.SQL_FULLYQUALIFIED, isReadWriteAccessRequired(tableName))) // security
+					.wrapIfTrue(!lookupInfo.isSecurityDisabled(), AccessSqlStringExpression.wrapper(tableName, IUserRolePermissions.SQL_FULLYQUALIFIED, getRequiredAccess(tableName))) // security
 					.build();
 		}
 
-		private final IStringExpression buildSqlForFetchingDisplayNameById(final MLookupInfo lookupInfo)
+		private IStringExpression buildSqlForFetchingById(final MLookupInfo lookupInfo)
 		{
 			final IStringExpression displayColumnSQL = TranslatableParameterizedStringExpression.of(lookupInfo.getDisplayColumnSql());
-			// useBaseLanguage ? lookupInfo.getDisplayColumnSQL_BaseLang() : lookupInfo.getDisplayColumnSQL_Trl();
+
+			final IStringExpression descriptionColumnSqlOrNull = TranslatableParameterizedStringExpression.of(lookupInfo.getDescriptionColumnSQL());
+			final IStringExpression descriptionColumnSQL;
+			if (descriptionColumnSqlOrNull == null || descriptionColumnSqlOrNull.isNullExpression())
+			{
+				descriptionColumnSQL = ConstantStringExpression.of("NULL");
+			}
+			else
+			{
+				descriptionColumnSQL = descriptionColumnSqlOrNull;
+			}
+
 			final IStringExpression fromSqlPart = TranslatableParameterizedStringExpression.of(lookupInfo.getFromSqlPart());
-			// useBaseLanguage ? lookupInfo.getFromSqlPart_BaseLang() : lookupInfo.getFromSqlPart_Trl();
+
 			final String keyColumnFQ = lookupInfo.getKeyColumnFQ();
 			final int displayType = lookupInfo.getDisplayType();
 			final String whereClauseSqlPart = lookupInfo.getWhereClauseSqlPart(); // assuming this is constant!
 
-			final IStringExpression sqlForFetchingDisplayNameById = IStringExpression.composer()
-					.append("SELECT ").append(displayColumnSQL) // SELECT ...
-					.append("\n FROM ").append(fromSqlPart) // FROM
-					.append("\n WHERE ").append(keyColumnFQ).append("=").append(SQL_PARAM_KeyId)
-					.append(" ")
-					// FIXME: make it better: this is actually adding the AD_Ref_List.AD_Reference_ID=....
-					.append(DisplayType.List == displayType || DisplayType.Button == displayType ? " AND " + whereClauseSqlPart : "")
-					.build();
+			final org.adempiere.ad.expression.api.impl.CompositeStringExpression.Builder composer = IStringExpression
+					.composer()
+					.append("SELECT ")
+					.append("\n ARRAY[").append(displayColumnSQL).append(", ").append(descriptionColumnSQL).append(",").append(lookupInfo.getActiveColumnSQL()).append("]")
+					.append("\n FROM ")
+					.append(fromSqlPart)
+					.append("\n WHERE ")
+					.append(keyColumnFQ).append("=").append(SQL_PARAM_KeyId)
+					.append(" ");
 
-			return sqlForFetchingDisplayNameById;
+			final boolean listOrButton = DisplayType.List == displayType || DisplayType.Button == displayType;
+			if (listOrButton)
+			{
+				// FIXME: make it better: this is actually adding the AD_Ref_List.AD_Reference_ID=....
+				composer.append(" AND " + whereClauseSqlPart);
+			}
+			return composer.build();
 		}
 
 		private INamePairPredicate getPostQueryPredicate()
@@ -695,8 +734,7 @@ public final class SqlLookupDescriptor implements ISqlLookupDescriptor
 
 		public Optional<WindowId> getZoomIntoWindowId()
 		{
-			final WindowId windowId = zoomIntoWindowId > 0 ? WindowId.of(zoomIntoWindowId) : null;
-			return Optional.ofNullable(windowId);
+			return Optional.ofNullable(WindowId.ofNullable(zoomIntoAdWindowId));
 		}
 
 		private LookupSource getLookupSourceType()
@@ -707,31 +745,26 @@ public final class SqlLookupDescriptor implements ISqlLookupDescriptor
 		/** Advice the lookup to show all records on which current user has at least read only access */
 		public Builder setReadOnlyAccess()
 		{
-			this.readWriteAccess = Boolean.FALSE;
+			this.requiredAccess = Access.READ;
 			return this;
 		}
 
-		private final boolean isReadWriteAccessRequired(final String tableName)
+		private Access getRequiredAccess(final String tableName)
 		{
-			if (readWriteAccess != null)
+			if (requiredAccess != null)
 			{
-				return readWriteAccess.booleanValue();
+				return requiredAccess;
 			}
 
-			return extractReadWriteAccessRequired(tableName);
-		}
-
-		private static final boolean extractReadWriteAccessRequired(final String tableName)
-		{
 			// AD_Client_ID/AD_Org_ID (security fields): shall display only those entries on which current user has read-write access
 			if (I_AD_Client.Table_Name.equals(tableName)
 					|| I_AD_Org.Table_Name.equals(tableName))
 			{
-				return IUserRolePermissions.SQL_RW;
+				return Access.WRITE;
 			}
 
 			// Default: all entries on which current user has at least readonly access
-			return IUserRolePermissions.SQL_RO;
+			return Access.READ;
 		}
 
 		public Builder addValidationRule(final IValidationRule validationRule)

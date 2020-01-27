@@ -1,11 +1,12 @@
 package de.metas.ui.web.document.filter;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.IntFunction;
 
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.Immutable;
@@ -15,10 +16,10 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
 import de.metas.i18n.ITranslatableString;
-import de.metas.i18n.ImmutableTranslatableString;
+import de.metas.i18n.TranslatableStrings;
 import de.metas.ui.web.document.filter.DocumentFilterParam.Operator;
 import de.metas.util.Check;
-
+import de.metas.util.lang.RepoIdAware;
 import lombok.NonNull;
 
 /*
@@ -52,7 +53,7 @@ import lombok.NonNull;
 @Immutable
 public final class DocumentFilter
 {
-	public static final Builder builder()
+	public static Builder builder()
 	{
 		return new Builder();
 	}
@@ -200,7 +201,13 @@ public final class DocumentFilter
 		return param.getValueAsBoolean(defaultValue);
 	}
 
-	public Date getParameterValueAsDate(@NonNull final String parameterName, final Date defaultValue)
+	public LocalDate getParameterValueAsLocalDateOrNull(@NonNull final String parameterName)
+	{
+		final LocalDate defaultValue = null;
+		return getParameterValueAsLocalDateOr(parameterName, defaultValue);
+	}
+
+	public LocalDate getParameterValueAsLocalDateOr(@NonNull final String parameterName, final LocalDate defaultValue)
 	{
 		final DocumentFilterParam param = getParameterOrNull(parameterName);
 		if (param == null)
@@ -208,7 +215,18 @@ public final class DocumentFilter
 			return defaultValue;
 		}
 
-		return param.getValueAsDate(defaultValue);
+		return param.getValueAsLocalDateOr(defaultValue);
+	}
+
+	public <T extends RepoIdAware> T getParameterValueAsRepoIdOrNull(@NonNull final String parameterName, @NonNull IntFunction<T> repoIdMapper)
+	{
+		final DocumentFilterParam param = getParameterOrNull(parameterName);
+		if (param == null)
+		{
+			return null;
+		}
+
+		return param.getValueAsRepoIdOrNull(repoIdMapper);
 	}
 
 	public <T> T getParameterValueAs(@NonNull final String parameterName)
@@ -233,7 +251,7 @@ public final class DocumentFilter
 	public static final class Builder
 	{
 		private String filterId;
-		private ITranslatableString caption = ImmutableTranslatableString.empty();
+		private ITranslatableString caption = TranslatableStrings.empty();
 		private List<DocumentFilterParam> parameters;
 		private Set<String> internalParameterNames;
 
@@ -261,7 +279,13 @@ public final class DocumentFilter
 
 		public Builder setCaption(@NonNull final String caption)
 		{
-			return setCaption(ImmutableTranslatableString.constant(caption));
+			return setCaption(TranslatableStrings.constant(caption));
+		}
+
+		public boolean hasParameters()
+		{
+			return !Check.isEmpty(parameters)
+					|| !Check.isEmpty(internalParameterNames);
 		}
 
 		public Builder setParameters(final List<DocumentFilterParam> parameters)
@@ -295,6 +319,5 @@ public final class DocumentFilter
 			}
 			internalParameterNames.add(parameterName);
 		}
-
 	}
 }

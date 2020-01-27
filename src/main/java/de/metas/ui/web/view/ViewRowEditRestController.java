@@ -2,7 +2,6 @@ package de.metas.ui.web.view;
 
 import java.util.List;
 
-import org.adempiere.exceptions.AdempiereException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -16,8 +15,10 @@ import de.metas.ui.web.session.UserSession;
 import de.metas.ui.web.view.IEditableView.RowEditingContext;
 import de.metas.ui.web.view.json.JSONViewRow;
 import de.metas.ui.web.window.datatypes.DocumentId;
+import de.metas.ui.web.window.datatypes.LookupValuesList;
 import de.metas.ui.web.window.datatypes.json.JSONDocumentChangedEvent;
 import de.metas.ui.web.window.datatypes.json.JSONLookupValuesList;
+import de.metas.ui.web.window.datatypes.json.JSONOptions;
 import de.metas.ui.web.window.model.DocumentCollection;
 
 /*
@@ -67,23 +68,15 @@ public class ViewRowEditRestController
 	@Autowired
 	private DocumentCollection documentsCollection;
 
-	private static IEditableView asEditableView(final IView view)
+	private JSONOptions newJSONOptions()
 	{
-		if (view instanceof IEditableView)
-		{
-			return (IEditableView)view;
-		}
-		else
-		{
-			throw new AdempiereException("View is not editable")
-					.setParameter("view", view);
-		}
+		return JSONOptions.of(userSession);
 	}
 
 	private final IEditableView getEditableView(final ViewId viewId)
 	{
 		final IView view = viewsRepo.getView(viewId);
-		return asEditableView(view);
+		return IEditableView.asEditableView(view);
 	}
 
 	private RowEditingContext createRowEditingContext(final DocumentId rowId)
@@ -112,7 +105,8 @@ public class ViewRowEditRestController
 
 		final IViewRow row = view.getById(rowId);
 		final IViewRowOverrides rowOverrides = ViewRowOverridesHelper.getViewRowOverrides(view);
-		return JSONViewRow.ofRow(row, rowOverrides, userSession.getAD_Language());
+		final JSONOptions jsonOpts = newJSONOptions();
+		return JSONViewRow.ofRow(row, rowOverrides, jsonOpts);
 	}
 
 	@GetMapping("/{fieldName}/typeahead")
@@ -131,7 +125,12 @@ public class ViewRowEditRestController
 		final IEditableView view = getEditableView(viewId);
 		final RowEditingContext editingCtx = createRowEditingContext(rowId);
 		return view.getFieldTypeahead(editingCtx, fieldName, query)
-				.transform(JSONLookupValuesList::ofLookupValuesList);
+				.transform(this::toJSONLookupValuesList);
+	}
+
+	private JSONLookupValuesList toJSONLookupValuesList(final LookupValuesList lookupValuesList)
+	{
+		return JSONLookupValuesList.ofLookupValuesList(lookupValuesList, userSession.getAD_Language());
 	}
 
 	@GetMapping("/{fieldName}/dropdown")
@@ -149,6 +148,6 @@ public class ViewRowEditRestController
 		final IEditableView view = getEditableView(viewId);
 		final RowEditingContext editingCtx = createRowEditingContext(rowId);
 		return view.getFieldDropdown(editingCtx, fieldName)
-				.transform(JSONLookupValuesList::ofLookupValuesList);
+				.transform(this::toJSONLookupValuesList);
 	}
 }

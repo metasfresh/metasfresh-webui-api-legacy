@@ -1,8 +1,12 @@
 package de.metas.ui.web.view;
 
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
+import java.util.stream.Collectors;
+
+import javax.annotation.Nullable;
 
 import org.adempiere.exceptions.AdempiereException;
 
@@ -11,17 +15,22 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
 
+import de.metas.i18n.Language;
 import de.metas.impexp.excel.AbstractExcelExporter;
 import de.metas.impexp.excel.CellValue;
 import de.metas.impexp.excel.CellValues;
+import de.metas.impexp.excel.ExcelExportConstants;
+import de.metas.impexp.excel.ExcelFormat;
 import de.metas.ui.web.view.descriptor.ViewLayout;
 import de.metas.ui.web.view.util.PageIndex;
 import de.metas.ui.web.window.datatypes.DocumentIdsSelection;
-import de.metas.ui.web.window.datatypes.json.JSONDate;
+import de.metas.ui.web.window.datatypes.json.DateTimeConverters;
 import de.metas.ui.web.window.datatypes.json.JSONLookupValue;
+import de.metas.ui.web.window.datatypes.json.JSONLookupValuesList;
+import de.metas.ui.web.window.datatypes.json.JSONNullValue;
+import de.metas.ui.web.window.datatypes.json.JSONOptions;
 import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
 import de.metas.ui.web.window.descriptor.DocumentLayoutElementFieldDescriptor;
-import de.metas.ui.web.window.model.DocumentQueryOrderBy;
 import de.metas.util.Check;
 import lombok.Builder;
 import lombok.NonNull;
@@ -52,21 +61,32 @@ import lombok.NonNull;
 {
 	private final RowsSupplier rows;
 	private final ViewLayout layout;
-	private final String adLanguage;
+	private final JSONOptions jsonOpts;
 
 	@Builder
 	private ViewExcelExporter(
+			@Nullable final ExcelFormat excelFormat,
+			@Nullable final ExcelExportConstants constants,
 			@NonNull final IView view,
 			@NonNull final DocumentIdsSelection rowIds,
 			@NonNull final ViewLayout layout,
-			@NonNull final String adLanguage)
+			@NonNull final Language language,
+			@NonNull final ZoneId zoneId)
 	{
+		super(excelFormat, constants);
 		this.layout = layout;
-		this.adLanguage = adLanguage;
+		setLanguage(language);
+		jsonOpts = JSONOptions.builder()
+				.adLanguage(language.getAD_Language())
+				.zoneId(zoneId)
+				.build();
 
 		if (rowIds.isAll())
 		{
-			this.rows = new AllRowsSupplier(view);
+			this.rows = new AllRowsSupplier(
+					view,
+					getConstants().getAllRowsPageSize(),
+					jsonOpts);
 		}
 		else if (rowIds.isEmpty())
 		{
@@ -123,7 +143,7 @@ import lombok.NonNull;
 	@Override
 	public String getHeaderName(final int col)
 	{
-		return layout.getElements().get(col).getCaption(adLanguage);
+		return layout.getElements().get(col).getCaption(getLanguage().getAD_Language());
 	}
 
 	@Override
@@ -143,8 +163,8 @@ import lombok.NonNull;
 			return null;
 		}
 
-		final Object value = row.getFieldNameAndJsonValues().get(fieldName);
-		if (value == null)
+		final Object value = row.getFieldValueAsJsonObject(fieldName, jsonOpts);
+		if (JSONNullValue.isNull(value))
 		{
 			return null;
 		}
@@ -152,12 +172,22 @@ import lombok.NonNull;
 		final DocumentFieldWidgetType widgetType = getWidgetType(columnIndex);
 		if (widgetType.isDateOrTime())
 		{
-			return CellValue.ofDate(JSONDate.fromJson(value.toString(), widgetType));
+			return CellValue.ofDate(DateTimeConverters.fromObject(value, widgetType));
 		}
 		else if (value instanceof JSONLookupValue)
 		{
 			final String valueStr = ((JSONLookupValue)value).getCaption();
 			return CellValues.toCellValue(valueStr, widgetType.getDisplayType());
+		}
+		else if (value instanceof JSONLookupValuesList)
+		{
+			final JSONLookupValuesList jsonLookupValuesList = (JSONLookupValuesList)value;
+			final String valueStr = jsonLookupValuesList
+					.getValues()
+					.stream()
+					.map(lookupValue -> lookupValue.getCaption())
+					.collect(Collectors.joining(", "));
+			return CellValue.ofString(valueStr);
 		}
 		else
 		{
@@ -171,7 +201,7 @@ import lombok.NonNull;
 		return false;
 	}
 
-	private static interface RowsSupplier
+	private interface RowsSupplier
 	{
 		IViewRow getRow(int rowIndex);
 
@@ -180,8 +210,10 @@ import lombok.NonNull;
 
 	private static class AllRowsSupplier implements RowsSupplier
 	{
-		private static final int PAGE_LENGTH = 100;
+		private final int pageSize;
 		private final IView view;
+		private final JSONOptions jsonOpts;
+
 		private LoadingCache<PageIndex, ViewResult> cache = CacheBuilder.newBuilder()
 				.maximumSize(2) // cache max 2 pages
 				.build(new CacheLoader<PageIndex, ViewResult>()
@@ -189,15 +221,20 @@ import lombok.NonNull;
 					@Override
 					public ViewResult load(final PageIndex pageIndex)
 					{
-						final List<DocumentQueryOrderBy> orderBys = ImmutableList.of(); // default
+						final ViewRowsOrderBy orderBys = ViewRowsOrderBy.empty(jsonOpts); // default
 						return view.getPage(pageIndex.getFirstRow(), pageIndex.getPageLength(), orderBys);
 					}
 
 				});
 
-		private AllRowsSupplier(@NonNull final IView view)
+		private AllRowsSupplier(
+				@NonNull final IView view,
+				final int pageSize,
+				@NonNull final JSONOptions jsonOpts)
 		{
 			this.view = view;
+			this.pageSize = pageSize;
+			this.jsonOpts = jsonOpts;
 		}
 
 		private ViewResult getPage(final PageIndex pageIndex)
@@ -215,7 +252,7 @@ import lombok.NonNull;
 		@Override
 		public IViewRow getRow(final int rowIndex)
 		{
-			final ViewResult page = getPage(PageIndex.getPageContainingRow(rowIndex, PAGE_LENGTH));
+			final ViewResult page = getPage(PageIndex.getPageContainingRow(rowIndex, pageSize));
 
 			final int rowIndexInPage = rowIndex - page.getFirstRow();
 			if (rowIndexInPage < 0)

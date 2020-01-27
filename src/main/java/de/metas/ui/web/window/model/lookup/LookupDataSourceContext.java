@@ -1,7 +1,9 @@
 package de.metas.ui.web.window.model.lookup;
 
 import java.io.Serializable;
+import java.sql.Timestamp;
 import java.util.Collection;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -13,8 +15,6 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.Immutable;
 
 import org.adempiere.ad.expression.exceptions.ExpressionEvaluationException;
-import org.adempiere.ad.security.UserRolePermissionsKey;
-import org.adempiere.ad.security.impl.AccessSqlStringExpression;
 import org.adempiere.ad.validationRule.INamePairPredicate;
 import org.adempiere.ad.validationRule.IValidationContext;
 import org.compiere.util.CtxName;
@@ -24,13 +24,21 @@ import org.compiere.util.Env;
 import org.compiere.util.Evaluatee;
 import org.compiere.util.Evaluatee2;
 import org.compiere.util.NamePair;
+import org.compiere.util.TimeUtil;
+import org.slf4j.Logger;
 
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableMap;
 
+import de.metas.logging.LogManager;
+import de.metas.security.UserRolePermissionsKey;
+import de.metas.security.impl.AccessSqlStringExpression;
+import de.metas.ui.web.window.datatypes.LookupValue;
 import de.metas.ui.web.window.descriptor.sql.SqlLookupDescriptor;
 import de.metas.ui.web.window.model.lookup.LookupValueFilterPredicates.LookupValueFilterPredicate;
 import de.metas.util.Check;
+import de.metas.util.NumberUtils;
+import de.metas.util.StringUtils;
 import lombok.NonNull;
 
 /*
@@ -65,15 +73,17 @@ import lombok.NonNull;
 @SuppressWarnings("serial")
 public final class LookupDataSourceContext implements Evaluatee2, IValidationContext, Serializable
 {
-	public static final Builder builder(final String lookupTableName)
+	public static Builder builder(final String lookupTableName)
 	{
 		return new Builder(lookupTableName);
 	}
 
-	public static final Builder builderWithoutTableName()
+	public static Builder builderWithoutTableName()
 	{
 		return new Builder(null);
 	}
+
+	private static final Logger logger = LogManager.getLogger(LookupDataSourceContext.class);
 
 	public static final String FILTER_Any = "%";
 	private static final String FILTER_Any_SQL = "'%'";
@@ -98,7 +108,7 @@ public final class LookupDataSourceContext implements Evaluatee2, IValidationCon
 			final INamePairPredicate postQueryPredicate)
 	{
 		this.lookupTableName = lookupTableName;
-		this.parameterValues = ImmutableMap.copyOf(values);
+		parameterValues = ImmutableMap.copyOf(values);
 		this.idToFilter = idToFilter;
 		this.postQueryPredicate = postQueryPredicate;
 	}
@@ -208,7 +218,99 @@ public final class LookupDataSourceContext implements Evaluatee2, IValidationCon
 	public String get_ValueAsString(final String variableName)
 	{
 		final Object value = parameterValues.get(variableName);
-		return value == null ? null : value.toString();
+		if (value == null)
+		{
+			return null;
+		}
+		else if (value instanceof LookupValue)
+		{
+			return ((LookupValue)value).getIdAsString();
+		}
+		else if (value instanceof Boolean)
+		{
+			return StringUtils.ofBoolean((Boolean)value);
+		}
+		else if (TimeUtil.isDateOrTimeObject(value))
+		{
+			// NOTE: because this evaluatee is used to build SQL expressions too,
+			// we have to make sure the dates are converted to JDBC format
+			final Timestamp jdbcTimestamp = TimeUtil.asTimestamp(value);
+			return Env.toString(jdbcTimestamp);
+		}
+		else
+		{
+			return value.toString();
+		}
+	}
+
+	@Override
+	public Integer get_ValueAsInt(final String variableName, final Integer defaultValue)
+	{
+		final Object value = parameterValues.get(variableName);
+		return convertValueToInteger(value, defaultValue);
+	}
+
+	private static Integer convertValueToInteger(final Object value, final Integer defaultValue)
+	{
+		if (value == null)
+		{
+			return defaultValue;
+		}
+
+		try
+		{
+			if (value instanceof Number)
+			{
+				return ((Number)value).intValue();
+			}
+			else if (value instanceof LookupValue)
+			{
+				return ((LookupValue)value).getIdAsInt();
+			}
+			else
+			{
+				return NumberUtils.asInteger(value, defaultValue);
+			}
+		}
+		catch (final Exception ex)
+		{
+			logger.warn("Failed lookup's ID to integer: {}. Returning default value={}.", value, defaultValue, ex);
+			return defaultValue;
+		}
+	}
+
+	@Override
+	public Date get_ValueAsDate(final String variableName, final Date defaultValue)
+	{
+		final Object value = parameterValues.get(variableName);
+		return convertValueToDate(value, defaultValue);
+	}
+
+	private static Date convertValueToDate(final Object value, final Date defaultValue)
+	{
+		if (value == null)
+		{
+			return null;
+		}
+
+		try
+		{
+			// note: always use TimeUtil.asDate to make sure that we really get a "Date"-date and not a "Timestamp"-date
+			// goal: avoid trouble with equals()
+			if (value instanceof String)
+			{
+				return TimeUtil.asDate(Env.parseTimestamp(value.toString()));
+			}
+			else
+			{
+				return TimeUtil.asDate(value);
+			}
+		}
+		catch (Exception ex)
+		{
+			logger.warn("Cannot convert '{}' ({}) to to Date. Returning default value: {}.", value, value.getClass(), defaultValue, ex);
+			return defaultValue;
+		}
 	}
 
 	@Override
@@ -367,6 +469,12 @@ public final class LookupDataSourceContext implements Evaluatee2, IValidationCon
 			return this;
 		}
 
+		public Builder requiresParameters(@NonNull final Collection<CtxName> requiredParameters)
+		{
+			requiredParameters.forEach(this::requiresParameter);
+			return this;
+		}
+
 		/**
 		 * Advises the builder that {@link LookupDataSourceContext#PARAM_AD_Language} shall be present the context that will be build
 		 */
@@ -425,7 +533,7 @@ public final class LookupDataSourceContext implements Evaluatee2, IValidationCon
 			return this;
 		}
 
-		private static final String convertFilterToSql(final String filter)
+		private static String convertFilterToSql(final String filter)
 		{
 			if (filter == FILTER_Any)
 			{
@@ -505,7 +613,7 @@ public final class LookupDataSourceContext implements Evaluatee2, IValidationCon
 			}
 		}
 
-		private final Object findContextValueOrNull(@NonNull final CtxName variableName)
+		private Object findContextValueOrNull(@NonNull final CtxName variableName)
 		{
 			//
 			// Check given parameters
@@ -521,7 +629,7 @@ public final class LookupDataSourceContext implements Evaluatee2, IValidationCon
 			// Fallback to document evaluatee
 			if (parentEvaluatee != null)
 			{
-				final Object value = parentEvaluatee.get_ValueAsObject(variableName.getName());
+				final Object value = parentEvaluatee.get_ValueIfExists(variableName.getName(), Object.class).orElse(null);
 				if (value != null)
 				{
 					return value;

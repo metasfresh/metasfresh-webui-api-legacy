@@ -16,10 +16,11 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
 
+import de.metas.process.BarcodeScannerType;
 import de.metas.ui.web.document.filter.DocumentFilterDescriptor;
 import de.metas.ui.web.document.filter.DocumentFilterInlineRenderMode;
 import de.metas.ui.web.window.datatypes.PanelLayoutType;
-import de.metas.ui.web.window.datatypes.json.JSONOptions;
+import de.metas.ui.web.window.datatypes.json.JSONDocumentLayoutOptions;
 import lombok.ToString;
 
 /*
@@ -48,7 +49,9 @@ import lombok.ToString;
 @JsonAutoDetect(fieldVisibility = Visibility.ANY, getterVisibility = Visibility.NONE, isGetterVisibility = Visibility.NONE, setterVisibility = Visibility.NONE)
 public final class JSONDocumentFilterDescriptor
 {
-	public static List<JSONDocumentFilterDescriptor> ofCollection(@Nullable final Collection<DocumentFilterDescriptor> filters, final JSONOptions jsonOpts)
+	public static List<JSONDocumentFilterDescriptor> ofCollection(
+			@Nullable final Collection<DocumentFilterDescriptor> filters,
+			final JSONDocumentLayoutOptions options)
 	{
 		if (filters == null || filters.isEmpty())
 		{
@@ -56,7 +59,7 @@ public final class JSONDocumentFilterDescriptor
 		}
 
 		return filters.stream()
-				.map(filter -> new JSONDocumentFilterDescriptor(filter, jsonOpts))
+				.map(filter -> new JSONDocumentFilterDescriptor(filter, options))
 				.collect(ImmutableList.toImmutableList());
 	}
 
@@ -72,6 +75,10 @@ public final class JSONDocumentFilterDescriptor
 	@JsonProperty("inlineRenderMode")
 	private final DocumentFilterInlineRenderMode inlineRenderMode;
 
+	@JsonProperty("barcodeScannerType")
+	@JsonInclude(JsonInclude.Include.NON_NULL)
+	private final BarcodeScannerType barcodeScannerType;
+
 	@JsonProperty("parametersLayoutType")
 	private final PanelLayoutType parametersLayoutType;
 
@@ -81,15 +88,16 @@ public final class JSONDocumentFilterDescriptor
 
 	private final Map<String, Object> debugProperties;
 
-	private JSONDocumentFilterDescriptor(final DocumentFilterDescriptor filter, final JSONOptions jsonOpts)
+	private JSONDocumentFilterDescriptor(final DocumentFilterDescriptor filter, final JSONDocumentLayoutOptions options)
 	{
 		filterId = filter.getFilterId();
-		caption = filter.getDisplayName(jsonOpts.getAD_Language());
+		caption = filter.getDisplayName(options.getAdLanguage());
 		frequentUsed = filter.isFrequentUsed();
 		inlineRenderMode = filter.getInlineRenderMode();
+		barcodeScannerType = filter.getBarcodeScannerType();
 
 		parametersLayoutType = filter.getParametersLayoutType();
-		parameters = JSONDocumentFilterParamDescriptor.ofCollection(filter.getParameters(), jsonOpts);
+		parameters = JSONDocumentFilterParamDescriptor.ofCollection(filter.getParameters(), options);
 
 		debugProperties = filter.getDebugProperties();
 	}
@@ -100,6 +108,7 @@ public final class JSONDocumentFilterDescriptor
 			@JsonProperty("caption") final String caption,
 			@JsonProperty("frequent") final boolean frequentUsed,
 			@JsonProperty("inlineRenderMode") final DocumentFilterInlineRenderMode inlineRenderMode,
+			@JsonProperty("barcodeScannerType") final BarcodeScannerType barcodeScannerType,
 			@JsonProperty("parametersLayoutType") final PanelLayoutType parametersLayoutType,
 			@JsonProperty("parameters") final List<JSONDocumentFilterParamDescriptor> parameters)
 	{
@@ -107,6 +116,7 @@ public final class JSONDocumentFilterDescriptor
 		this.caption = caption;
 		this.frequentUsed = frequentUsed;
 		this.inlineRenderMode = inlineRenderMode;
+		this.barcodeScannerType = barcodeScannerType;
 
 		this.parametersLayoutType = parametersLayoutType == null ? PanelLayoutType.Panel : parametersLayoutType;
 		this.parameters = parameters;

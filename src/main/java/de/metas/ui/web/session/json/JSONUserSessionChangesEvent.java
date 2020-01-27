@@ -5,7 +5,7 @@ import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-import de.metas.ui.web.window.datatypes.json.JSONDate;
+import de.metas.ui.web.window.datatypes.json.DateTimeConverters;
 import de.metas.ui.web.window.datatypes.json.JSONLookupValue;
 import de.metas.util.time.SystemTime;
 import lombok.Builder;
@@ -63,7 +63,7 @@ public class JSONUserSessionChangesEvent
 	private final JSONLookupValue language;
 
 	@JsonProperty("timestamp")
-	private final String timestamp = JSONDate.toJson(SystemTime.asTimestamp());
+	private final String timestamp = DateTimeConverters.toJson(SystemTime.asInstant(), SystemTime.zoneId());
 
 	public boolean isEmpty()
 	{

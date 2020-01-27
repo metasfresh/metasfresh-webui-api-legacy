@@ -9,7 +9,6 @@ import org.adempiere.exceptions.AdempiereException;
 import org.adempiere.model.InterfaceWrapperHelper;
 import org.adempiere.service.ISysConfigBL;
 import org.adempiere.util.lang.IAutoCloseable;
-import org.apache.catalina.connector.Connector;
 import org.apache.coyote.http11.AbstractHttp11Protocol;
 import org.compiere.Adempiere;
 import org.compiere.Adempiere.RunMode;
@@ -24,12 +23,17 @@ import org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactor
 import org.springframework.boot.web.server.WebServerFactoryCustomizer;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.MediaType;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import de.metas.JsonObjectMapperHolder;
+import de.metas.MetasfreshBeanNameGenerator;
 import de.metas.Profiles;
 import de.metas.ui.web.base.model.I_T_WEBUI_ViewSelection;
 import de.metas.ui.web.session.WebRestApiContextProvider;
@@ -101,6 +105,7 @@ public class WebRestApiApplication
 					.headless(Boolean.parseBoolean(headless)) // we need headless=false for initial connection setup popup (if any), usually this only applies on dev workstations.
 					.web(true)
 					.profiles(activeProfiles.toArray(new String[0]))
+					.beanNameGenerator(new MetasfreshBeanNameGenerator())
 					.run(args);
 		}
 
@@ -118,6 +123,13 @@ public class WebRestApiApplication
 				.map(Entry::getValue)
 				.collect(Collectors.toCollection(ArrayList::new));
 		return activeProfiles;
+	}
+
+	@Bean
+	@Primary
+	public ObjectMapper jsonObjectMapper()
+	{
+		return JsonObjectMapperHolder.sharedJsonObjectMapper();
 	}
 
 	@Bean(Adempiere.BEAN_NAME)
@@ -138,25 +150,15 @@ public class WebRestApiApplication
 	@Bean
 	public WebServerFactoryCustomizer<TomcatServletWebServerFactory> servletContainerCustomizer()
 	{
-		return new WebServerFactoryCustomizer<TomcatServletWebServerFactory>()
-		{
-			@Override
-			public void customize(final TomcatServletWebServerFactory tomcatContainerFactory)
-			{
-				tomcatContainerFactory.addConnectorCustomizers(new TomcatConnectorCustomizer()
-				{
-					@Override
-					public void customize(final Connector connector)
-					{
+		return servletContainer -> {
+			tomcatContainerFactory.addConnectorCustomizers(connector -> {
 						final AbstractHttp11Protocol<?> httpProtocol = (AbstractHttp11Protocol<?>)connector.getProtocolHandler();
 						httpProtocol.setCompression("on");
 						httpProtocol.setCompressionMinSize(256);
 						final String mimeTypes = httpProtocol.getCompressibleMimeType();
 						final String mimeTypesWithJson = mimeTypes + "," + MediaType.APPLICATION_JSON_VALUE + ",application/javascript";
 						httpProtocol.setCompressibleMimeType(mimeTypesWithJson);
-					}
 				});
-			}
 		};
 	}
 

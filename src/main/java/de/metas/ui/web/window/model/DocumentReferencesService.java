@@ -5,6 +5,7 @@ import java.util.Properties;
 
 import javax.annotation.Nullable;
 
+import org.adempiere.ad.element.api.AdWindowId;
 import org.adempiere.ad.table.api.IADTableDAO;
 import org.adempiere.ad.trx.api.ITrx;
 import org.adempiere.model.ZoomInfoFactory;
@@ -19,8 +20,8 @@ import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableList;
 
 import de.metas.i18n.ITranslatableString;
-import de.metas.i18n.ImmutableTranslatableString;
-import de.metas.ui.web.document.filter.MQueryDocumentFilterHelper;
+import de.metas.i18n.TranslatableStrings;
+import de.metas.ui.web.document.filter.provider.userQuery.MQueryDocumentFilterHelper;
 import de.metas.ui.web.window.WindowConstants;
 import de.metas.ui.web.window.datatypes.DocumentPath;
 import de.metas.ui.web.window.datatypes.WindowId;
@@ -28,7 +29,6 @@ import de.metas.ui.web.window.descriptor.DocumentEntityDescriptor;
 import de.metas.ui.web.window.descriptor.DocumentFieldDataBindingDescriptor;
 import de.metas.ui.web.window.descriptor.DocumentFieldDescriptor;
 import de.metas.util.Services;
-
 import lombok.Getter;
 import lombok.NonNull;
 
@@ -60,8 +60,14 @@ public class DocumentReferencesService
 	@Autowired
 	private DocumentCollection documentCollection;
 
-	public List<DocumentReference> getDocumentReferences(final DocumentPath documentPath)
+	public List<DocumentReference> getDocumentReferences(@NonNull final DocumentPath documentPath)
 	{
+		// Document with composed keys does not support references
+		if (documentPath.isComposedKey())
+		{
+			return ImmutableList.of();
+		}
+
 		return documentCollection.forDocumentReadonly(documentPath, document -> {
 
 			if (document.isNew())
@@ -89,7 +95,7 @@ public class DocumentReferencesService
 
 			final DocumentAsZoomSource zoomSource = new DocumentAsZoomSource(sourceDocument);
 
-			final ZoomInfo zoomInfo = ZoomInfoFactory.get().retrieveZoomInfo(zoomSource, targetWindowId.toInt());
+			final ZoomInfo zoomInfo = ZoomInfoFactory.get().retrieveZoomInfo(zoomSource, targetWindowId.toAdWindowId());
 			final ITranslatableString filterCaption = extractFilterCaption(sourceDocument);
 			return createDocumentReference(zoomInfo, filterCaption);
 		});
@@ -108,33 +114,36 @@ public class DocumentReferencesService
 		if (sourceDocument.hasField(WindowConstants.FIELDNAME_DocumentSummary))
 		{
 			final String documentSummaryStr = sourceDocument.getFieldView(WindowConstants.FIELDNAME_DocumentSummary).getValueAs(String.class);
-			documentSummary = ImmutableTranslatableString.constant(documentSummaryStr);
+			documentSummary = TranslatableStrings.constant(documentSummaryStr);
 		}
 		else if (sourceDocument.hasField(WindowConstants.FIELDNAME_DocumentNo))
 		{
 			final String documentNoStr = sourceDocument.getFieldView(WindowConstants.FIELDNAME_DocumentNo).getValueAs(String.class);
-			documentSummary = ImmutableTranslatableString.constant(documentNoStr);
+			documentSummary = TranslatableStrings.constant(documentNoStr);
 		}
 		else if (sourceDocument.hasField(WindowConstants.FIELDNAME_Name))
 		{
 			final String nameStr = sourceDocument.getFieldView(WindowConstants.FIELDNAME_Name).getValueAs(String.class);
-			documentSummary = ImmutableTranslatableString.constant(nameStr);
+			documentSummary = TranslatableStrings.constant(nameStr);
 		}
 		else
 		{
-			documentSummary = ImmutableTranslatableString.constant(sourceDocument.getDocumentId().toString());
+			documentSummary = TranslatableStrings.constant(sourceDocument.getDocumentId().toString());
 		}
 
 		// Window caption + document info
-		return ITranslatableString.compose(" ", windowCaption, documentSummary);
+		return TranslatableStrings.join(" ", windowCaption, documentSummary);
 	}
 
-	private static final DocumentReference createDocumentReference(final ZoomInfo zoomInfo, ITranslatableString filterCaption)
+	private static final DocumentReference createDocumentReference(
+			@NonNull final ZoomInfo zoomInfo,
+			@NonNull final ITranslatableString filterCaption)
 	{
 		return DocumentReference.builder()
 				.id(zoomInfo.getId())
+				.internalName(zoomInfo.getInternalName())
 				.caption(zoomInfo.getLabel())
-				.windowId(WindowId.of(zoomInfo.getAD_Window_ID()))
+				.windowId(WindowId.of(zoomInfo.getAdWindowId()))
 				.documentsCount(zoomInfo.getRecordCount())
 				.filter(MQueryDocumentFilterHelper.createDocumentFilterFromMQuery(zoomInfo.getQuery(), filterCaption))
 				.loadDuration(zoomInfo.getRecordCountDuration())
@@ -146,7 +155,7 @@ public class DocumentReferencesService
 		private final Properties ctx;
 		private final Evaluatee evaluationContext;
 
-		private final int adWindowId;
+		private final AdWindowId adWindowId;
 		private final int adTableId;
 		private final int recordId;
 		private final String keyColumnName;
@@ -165,7 +174,7 @@ public class DocumentReferencesService
 			evaluationContext = document.asEvaluatee();
 
 			final DocumentEntityDescriptor entityDescriptor = document.getEntityDescriptor();
-			adWindowId = entityDescriptor.getWindowId().toInt();
+			adWindowId = entityDescriptor.getWindowId().toAdWindowId();
 			tableName = entityDescriptor.getTableName();
 
 			adTableId = Services.get(IADTableDAO.class).retrieveTableId(tableName);
@@ -229,7 +238,7 @@ public class DocumentReferencesService
 		}
 
 		@Override
-		public int getAD_Window_ID()
+		public AdWindowId getAD_Window_ID()
 		{
 			return adWindowId;
 		}

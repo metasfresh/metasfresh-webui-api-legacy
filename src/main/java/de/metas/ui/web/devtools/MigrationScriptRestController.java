@@ -1,18 +1,19 @@
 package de.metas.ui.web.devtools;
 
-import lombok.NonNull;
-
-import javax.annotation.Nullable;
-
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
+import javax.annotation.Nullable;
+
 import org.adempiere.ad.migration.logger.MigrationScriptFileLogger;
 import org.adempiere.ad.migration.logger.MigrationScriptFileLoggerHolder;
+import org.adempiere.ad.service.IDeveloperModeBL;
 import org.adempiere.exceptions.AdempiereException;
 import org.apache.activemq.util.ByteArrayOutputStream;
 import org.compiere.util.Ini;
@@ -34,7 +35,9 @@ import com.google.common.collect.ImmutableList;
 import de.metas.logging.LogManager;
 import de.metas.ui.web.config.WebConfig;
 import de.metas.ui.web.session.UserSession;
+import de.metas.util.Services;
 import io.swagger.annotations.ApiParam;
+import lombok.NonNull;
 
 /*
  * #%L
@@ -71,11 +74,22 @@ public class MigrationScriptRestController
 
 	public MigrationScriptRestController()
 	{
+		configureMigrationScriptDirectoryIfNeeded();
+	}
+
+	private void configureMigrationScriptDirectoryIfNeeded()
+	{
+		if (Services.get(IDeveloperModeBL.class).isEnabled())
+		{
+			logger.warn("Use default migration scripts folder because we are running in developer mode");
+			return;
+		}
+
 		// Change the migration scripts directory to temporary directory,
 		// hoping that even in readonly filesystem (like docker) the temporary directory is still writable.
 		try
 		{
-			final Path migrationScriptsDirectory = Files.createTempDirectory("webui_migration_scripts");
+			final Path migrationScriptsDirectory = Files.createTempDirectory("webui_migration_scripts_" + LocalDate.now() + "_");
 			MigrationScriptFileLogger.setMigrationScriptDirectory(migrationScriptsDirectory);
 		}
 		catch (final IOException ex)
@@ -208,7 +222,7 @@ public class MigrationScriptRestController
 		deleteScript(currentScriptPath);
 	}
 
-	@GetMapping("/scripts/{filename}")
+	@GetMapping("/scripts/{filename:.*}")
 	public ResponseEntity<byte[]> getScript(
 
 			@PathVariable("filename") final String filename,
@@ -222,7 +236,7 @@ public class MigrationScriptRestController
 		return getScript(scriptPath, inline);
 	}
 
-	@DeleteMapping("/scripts/{filename}")
+	@DeleteMapping("/scripts/{filename:.*}")
 	public void deleteScript(@PathVariable("filename") final String filename)
 	{
 		assertAuth();
@@ -272,7 +286,7 @@ public class MigrationScriptRestController
 		{
 			lines.stream()
 					.map(s -> s + "\n")
-					.map(String::getBytes)
+					.map(s->s.getBytes(StandardCharsets.UTF_8))
 					.forEach(bytes -> {
 						try
 						{

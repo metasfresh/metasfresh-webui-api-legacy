@@ -37,7 +37,6 @@ import de.metas.util.Check;
 import de.metas.util.Services;
 import de.metas.util.collections.CollectionUtils;
 import de.metas.util.lang.Percent;
-
 import lombok.NonNull;
 
 /*
@@ -74,13 +73,13 @@ public class OrderLinePricingConditionsViewFactory extends PricingConditionsView
 	}
 
 	@Override
-	protected void onViewClosedByUser(final PricingConditionsView view)
+	protected void onViewClosedByUser(@NonNull final PricingConditionsView view)
 	{
 		view.updateSalesOrderLineIfPossible();
 	}
 
 	@Override
-	protected PricingConditionsRowData createPricingConditionsRowData(final CreateViewRequest request)
+	protected PricingConditionsRowData createPricingConditionsRowData(@NonNull final CreateViewRequest request)
 	{
 		final IOrderDAO ordersRepo = Services.get(IOrderDAO.class);
 
@@ -131,7 +130,7 @@ public class OrderLinePricingConditionsViewFactory extends PricingConditionsView
 				.build();
 	}
 
-	private final SourceDocumentLine createSourceDocumentLine(final I_C_OrderLine orderLineRecord, final SOTrx soTrx)
+	private final SourceDocumentLine createSourceDocumentLine(@NonNull final I_C_OrderLine orderLineRecord, @NonNull final SOTrx soTrx)
 	{
 		final IProductDAO productsRepo = Services.get(IProductDAO.class);
 		final ProductId productId = ProductId.ofRepoId(orderLineRecord.getM_Product_ID());
@@ -173,13 +172,13 @@ public class OrderLinePricingConditionsViewFactory extends PricingConditionsView
 
 		private Money calculate(final PricingConditionsBreak pricingConditionsBreak)
 		{
-			final IPricingResult prcingResult = orderLineBL.computePrices(OrderLinePriceUpdateRequest.builder()
+			final IPricingResult pricingResult = orderLineBL.computePrices(OrderLinePriceUpdateRequest.builder()
 					.orderLine(orderLine)
 					.pricingConditionsBreakOverride(pricingConditionsBreak)
 					.resultUOM(ResultUOM.PRICE_UOM_IF_ORDERLINE_IS_NEW)
 					.build());
 
-			return Money.of(prcingResult.getPriceStd(), prcingResult.getCurrencyId());
+			return Money.of(pricingResult.getPriceStd(), pricingResult.getCurrencyId());
 		}
 	}
 }

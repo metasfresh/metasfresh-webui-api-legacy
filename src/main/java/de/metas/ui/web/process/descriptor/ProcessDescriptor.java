@@ -3,24 +3,26 @@ package de.metas.ui.web.process.descriptor;
 import java.util.Optional;
 import java.util.function.Supplier;
 
-import org.adempiere.ad.security.IUserRolePermissions;
+import javax.annotation.Nullable;
+
 import org.adempiere.exceptions.AdempiereException;
 import org.slf4j.Logger;
 
 import com.google.common.base.MoreObjects;
 
 import de.metas.i18n.ITranslatableString;
+import de.metas.i18n.TranslatableStrings;
 import de.metas.logging.LogManager;
 import de.metas.process.IProcessDefaultParametersProvider;
 import de.metas.process.IProcessPreconditionsContext;
 import de.metas.process.ProcessPreconditionChecker;
 import de.metas.process.ProcessPreconditionsResolution;
+import de.metas.security.IUserRolePermissions;
 import de.metas.ui.web.cache.ETag;
 import de.metas.ui.web.cache.ETagAware;
 import de.metas.ui.web.process.ProcessId;
 import de.metas.ui.web.window.descriptor.DocumentEntityDescriptor;
 import de.metas.util.Check;
-
 import lombok.Getter;
 import lombok.NonNull;
 
@@ -50,28 +52,34 @@ public final class ProcessDescriptor implements ETagAware
 {
 	private static final Logger logger = LogManager.getLogger(ProcessDescriptor.class);
 
-	public static final Builder builder()
+	public static Builder builder()
 	{
 		return new Builder();
 	}
 
-	public static enum ProcessDescriptorType
+	public enum ProcessDescriptorType
 	{
 		Form, Workflow, Process, Report
-	};
+	}
 
 	@Getter
 	private final ProcessId processId;
 
 	@Getter
-	private final String internalName;
+	private final InternalName internalName;
 
+	@Getter
 	private final ProcessDescriptorType type;
-	private final Class<? extends IProcessDefaultParametersProvider> defaultParametersProviderClass;
+	@Getter
 	private final String processClassname;
+	private final Class<? extends IProcessDefaultParametersProvider> defaultParametersProviderClass;
 
-	private final DocumentEntityDescriptor parametersDescriptor;
+	@Getter
 	private final ProcessLayout layout;
+	private final DocumentEntityDescriptor parametersDescriptor;
+
+	@Getter
+	private final boolean startProcessDirectly;
 
 	// ETag support
 	private static final Supplier<ETag> nextETagSupplier = ETagAware.newETagGenerator();
@@ -89,6 +97,8 @@ public final class ProcessDescriptor implements ETagAware
 		parametersDescriptor = builder.getParametersDescriptor();
 
 		layout = builder.getLayout();
+
+		startProcessDirectly = builder.isStartProcessDirectly();
 	}
 
 	@Override
@@ -113,16 +123,6 @@ public final class ProcessDescriptor implements ETagAware
 	public ITranslatableString getDescription()
 	{
 		return getLayout().getDescription();
-	}
-
-	public ProcessDescriptorType getType()
-	{
-		return type;
-	}
-
-	public String getProcessClassname()
-	{
-		return processClassname;
 	}
 
 	public boolean isExecutionGranted(final IUserRolePermissions permissions)
@@ -156,7 +156,7 @@ public final class ProcessDescriptor implements ETagAware
 				.checkApplies();
 	}
 
-	public IProcessDefaultParametersProvider getDefaultParametersProvider()
+	@Nullable public IProcessDefaultParametersProvider getDefaultParametersProvider()
 	{
 		if (defaultParametersProviderClass == null)
 		{
@@ -167,7 +167,7 @@ public final class ProcessDescriptor implements ETagAware
 		{
 			return defaultParametersProviderClass.newInstance();
 		}
-		catch (InstantiationException | IllegalAccessException ex)
+		catch (final InstantiationException | IllegalAccessException ex)
 		{
 			throw new AdempiereException("Failed to instantiate the process", ex);
 		}
@@ -179,10 +179,11 @@ public final class ProcessDescriptor implements ETagAware
 		return parametersDescriptor;
 	}
 
-	public ProcessLayout getLayout()
-	{
-		return layout;
-	}
+	//
+	//
+	//
+	//
+	//
 
 	public static final class Builder
 	{
@@ -190,7 +191,7 @@ public final class ProcessDescriptor implements ETagAware
 		private ProcessId processId;
 
 		@Getter
-		private String internalName;
+		private InternalName internalName;
 
 		private String processClassname;
 		private Optional<Class<?>> processClass = Optional.empty();
@@ -198,9 +199,10 @@ public final class ProcessDescriptor implements ETagAware
 		private DocumentEntityDescriptor parametersDescriptor;
 		private ProcessLayout layout;
 
+		private Boolean startProcessDirectly;
+
 		private Builder()
 		{
-			super();
 		}
 
 		public ProcessDescriptor build()
@@ -208,7 +210,7 @@ public final class ProcessDescriptor implements ETagAware
 			return new ProcessDescriptor(this);
 		}
 
-		public Builder setInternalName(final String internalName)
+		public Builder setInternalName(final InternalName internalName)
 		{
 			this.internalName = internalName;
 			return this;
@@ -250,7 +252,7 @@ public final class ProcessDescriptor implements ETagAware
 			return processClassname;
 		}
 
-		private Class<?> getProcessClassOrNull()
+		@Nullable private Class<?> getProcessClassOrNull()
 		{
 			return processClass.orElse(null);
 		}
@@ -275,7 +277,7 @@ public final class ProcessDescriptor implements ETagAware
 			}
 		}
 
-		private Class<? extends IProcessDefaultParametersProvider> getProcessDefaultParametersProvider()
+		@Nullable private Class<? extends IProcessDefaultParametersProvider> getProcessDefaultParametersProvider()
 		{
 			final Class<?> processClass = getProcessClassOrNull();
 			if (processClass == null || !IProcessDefaultParametersProvider.class.isAssignableFrom(processClass))
@@ -315,6 +317,30 @@ public final class ProcessDescriptor implements ETagAware
 		{
 			Check.assumeNotNull(layout, "Parameter layout is not null");
 			return layout;
+		}
+
+		public Builder setStartProcessDirectly(final boolean startProcessDirectly)
+		{
+			this.startProcessDirectly = startProcessDirectly;
+			return this;
+		}
+
+		private boolean isStartProcessDirectly()
+		{
+			if (startProcessDirectly != null)
+			{
+				return startProcessDirectly;
+			}
+			else
+			{
+				return computeIsStartProcessDirectly();
+			}
+		}
+
+		private boolean computeIsStartProcessDirectly()
+		{
+			return (getParametersDescriptor() == null || getParametersDescriptor().getFields().isEmpty())
+					&& TranslatableStrings.isEmpty(getLayout().getDescription());
 		}
 	}
 

@@ -2,7 +2,7 @@ package de.metas.ui.web.dashboard.process;
 
 import java.util.Date;
 
-import org.compiere.Adempiere;
+import org.compiere.SpringContextHolder;
 import org.elasticsearch.client.Client;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Profile;
@@ -23,6 +23,7 @@ import de.metas.ui.web.dashboard.KPIDataResult;
 import de.metas.ui.web.dashboard.KPIRepository;
 import de.metas.ui.web.dashboard.TimeRange;
 import de.metas.ui.web.exceptions.EntityNotFoundException;
+import de.metas.ui.web.window.datatypes.json.JSONOptions;
 
 /*
  * #%L
@@ -73,7 +74,7 @@ public class WEBUI_KPI_TestQuery extends JavaProcess implements IProcessPrecondi
 
 	public WEBUI_KPI_TestQuery()
 	{
-		Adempiere.autowire(this);
+		SpringContextHolder.instance.autowire(this);
 	}
 
 	@Override
@@ -90,7 +91,7 @@ public class WEBUI_KPI_TestQuery extends JavaProcess implements IProcessPrecondi
 		final KPI kpi = kpisRepo.getKPI(kpiId);
 		final TimeRange timeRange = kpi.getTimeRangeDefaults().createTimeRange(p_DateFrom, p_DateTo);
 
-		final KPIDataResult kpiData = KPIDataLoader.newInstance(elasticsearchClient, kpi)
+		final KPIDataResult kpiData = KPIDataLoader.newInstance(elasticsearchClient, kpi, JSONOptions.newInstance())
 				.setTimeRange(timeRange)
 				.setFormatValues(true)
 				.assertESTypesExists()

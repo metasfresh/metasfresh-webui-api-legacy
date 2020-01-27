@@ -2,6 +2,7 @@ package de.metas.ui.web.handlingunits;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -22,17 +23,17 @@ import com.google.common.collect.ImmutableSet;
 import de.metas.handlingunits.HuId;
 import de.metas.handlingunits.model.I_M_HU;
 import de.metas.i18n.ITranslatableString;
-import de.metas.i18n.ImmutableTranslatableString;
+import de.metas.i18n.TranslatableStrings;
 import de.metas.process.RelatedProcessDescriptor;
 import de.metas.ui.web.document.filter.DocumentFilter;
-import de.metas.ui.web.document.filter.DocumentFilterDescriptorsProvider;
+import de.metas.ui.web.document.filter.provider.DocumentFilterDescriptorsProvider;
 import de.metas.ui.web.document.filter.sql.SqlDocumentFilterConverterContext;
 import de.metas.ui.web.exceptions.EntityNotFoundException;
 import de.metas.ui.web.process.view.ViewActionDescriptorsList;
 import de.metas.ui.web.view.IView;
-import de.metas.ui.web.view.ViewCloseReason;
 import de.metas.ui.web.view.ViewId;
 import de.metas.ui.web.view.ViewResult;
+import de.metas.ui.web.view.ViewRowsOrderBy;
 import de.metas.ui.web.view.event.ViewChangesCollector;
 import de.metas.ui.web.view.json.JSONViewDataType;
 import de.metas.ui.web.window.datatypes.DocumentId;
@@ -142,7 +143,7 @@ public class HUEditorView implements IView
 	@Override
 	public ITranslatableString getDescription()
 	{
-		return ImmutableTranslatableString.empty();
+		return TranslatableStrings.empty();
 	}
 
 	/**
@@ -173,7 +174,7 @@ public class HUEditorView implements IView
 	}
 
 	@Override
-	public void close(final ViewCloseReason reason)
+	public void afterDestroy()
 	{
 		invalidateAllNoNotify();
 	}
@@ -191,13 +192,16 @@ public class HUEditorView implements IView
 	}
 
 	@Override
-	public ViewResult getPage(final int firstRow, final int pageLength, final List<DocumentQueryOrderBy> orderBys)
+	public ViewResult getPage(
+			final int firstRow,
+			final int pageLength,
+			@NonNull final ViewRowsOrderBy orderBys)
 	{
 		final List<HUEditorRow> page = rowsBuffer
 				.streamPage(firstRow, pageLength, HUEditorRowFilter.ALL, orderBys)
 				.collect(GuavaCollectors.toImmutableList());
 
-		return ViewResult.ofViewAndPage(this, firstRow, pageLength, orderBys, page);
+		return ViewResult.ofViewAndPage(this, firstRow, pageLength, orderBys.toDocumentQueryOrderByList(), page);
 	}
 
 	@Override
@@ -212,17 +216,22 @@ public class HUEditorView implements IView
 		return additionalRelatedProcessDescriptors;
 	}
 
+	public ImmutableMap<String, Object> getParameters()
+	{
+		return parameters;
+	}
+
 	public boolean getParameterAsBoolean(final String name, final boolean defaultValue)
 	{
 		final Boolean value = (Boolean)parameters.get(name);
 		return value != null ? value.booleanValue() : defaultValue;
 	}
 
-	public <T extends RepoIdAware> T getParameterAsIdOrNull(final String name)
+	public <T extends RepoIdAware> Optional<T> getParameterAsId(final String name)
 	{
 		@SuppressWarnings("unchecked")
 		final T value = (T)parameters.get(name);
-		return value;
+		return Optional.ofNullable(value);
 	}
 
 	@Override
@@ -244,6 +253,7 @@ public class HUEditorView implements IView
 		return filterDescriptors.getByFilterId(filterId)
 				.getParameterByName(filterParameterName)
 				.getLookupDataSource()
+				.get()
 				.findEntities(ctx);
 	}
 
@@ -253,6 +263,7 @@ public class HUEditorView implements IView
 		return filterDescriptors.getByFilterId(filterId)
 				.getParameterByName(filterParameterName)
 				.getLookupDataSource()
+				.get()
 				.findEntities(ctx, query);
 	}
 
@@ -346,6 +357,11 @@ public class HUEditorView implements IView
 		{
 			invalidateAll();
 		}
+	}
+
+	public boolean addHUId(@NonNull final HuId huIdToAdd)
+	{
+		return rowsBuffer.addHUIds(ImmutableSet.of(huIdToAdd));
 	}
 
 	public boolean addHUIds(final Collection<HuId> huIdsToAdd)

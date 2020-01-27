@@ -5,11 +5,13 @@ import java.util.stream.Stream;
 
 import org.springframework.beans.factory.annotation.Autowired;
 
+import de.metas.bpartner.BPartnerId;
 import de.metas.handlingunits.IHUQueryBuilder;
 import de.metas.handlingunits.IHandlingUnitsDAO;
 import de.metas.process.IADProcessDAO;
 import de.metas.process.JavaProcess;
 import de.metas.process.RelatedProcessDescriptor;
+import de.metas.process.RelatedProcessDescriptor.DisplayPlace;
 import de.metas.ui.web.handlingunits.DefaultHUEditorViewFactory;
 import de.metas.ui.web.handlingunits.HUEditorView;
 import de.metas.ui.web.handlingunits.HUIdsFilterHelper;
@@ -21,6 +23,7 @@ import de.metas.ui.web.view.IView;
 import de.metas.ui.web.view.IViewFactory;
 import de.metas.ui.web.view.IViewsIndexStorage;
 import de.metas.ui.web.view.IViewsRepository;
+import de.metas.ui.web.view.ViewCloseAction;
 import de.metas.ui.web.view.ViewFactory;
 import de.metas.ui.web.view.ViewId;
 import de.metas.ui.web.view.ViewProfileId;
@@ -28,6 +31,7 @@ import de.metas.ui.web.view.descriptor.ViewLayout;
 import de.metas.ui.web.view.json.JSONViewDataType;
 import de.metas.ui.web.window.datatypes.WindowId;
 import de.metas.util.Services;
+import lombok.NonNull;
 
 /*
  * #%L
@@ -101,10 +105,10 @@ public class PackingHUsViewFactory implements IViewFactory, IViewsIndexStorage
 	}
 
 	@Override
-	public void removeById(final ViewId packingHUsViewId)
+	public void closeById(@NonNull final ViewId packingHUsViewId, @NonNull final ViewCloseAction closeAction)
 	{
 		final PickingSlotsClearingView pickingSlotsClearingView = getPickingSlotsClearingView(packingHUsViewId);
-		pickingSlotsClearingView.closePackingHUsView(packingHUsViewId);
+		pickingSlotsClearingView.closePackingHUsView(packingHUsViewId, closeAction);
 	}
 
 	private PickingSlotsClearingView getPickingSlotsClearingView(final ViewId packingHUsViewId)
@@ -163,7 +167,7 @@ public class PackingHUsViewFactory implements IViewFactory, IViewsIndexStorage
 		return RelatedProcessDescriptor.builder()
 				.processId(adProcessDAO.retrieveProcessIdByClass(processClass))
 				.anyTable().anyWindow()
-				.webuiQuickAction(true)
+				.displayPlace(DisplayPlace.ViewQuickActions)
 				.build();
 	}
 
@@ -178,7 +182,7 @@ public class PackingHUsViewFactory implements IViewFactory, IViewsIndexStorage
 
 		if (key.getBpartnerId() > 0)
 		{
-			huQuery.addOnlyInBPartnerId(key.getBpartnerId());
+			huQuery.addOnlyInBPartnerId(BPartnerId.ofRepoId(key.getBpartnerId()));
 		}
 		if (key.getBpartnerLocationId() > 0)
 		{

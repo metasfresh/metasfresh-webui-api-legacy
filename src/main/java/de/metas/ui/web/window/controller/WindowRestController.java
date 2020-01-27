@@ -27,6 +27,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
 import de.metas.i18n.IMsgBL;
+import de.metas.process.RelatedProcessDescriptor.DisplayPlace;
 import de.metas.ui.web.cache.ETagResponseEntityBuilder;
 import de.metas.ui.web.config.WebConfig;
 import de.metas.ui.web.exceptions.EntityNotFoundException;
@@ -40,25 +41,32 @@ import de.metas.ui.web.session.UserSession;
 import de.metas.ui.web.window.datatypes.DocumentId;
 import de.metas.ui.web.window.datatypes.DocumentIdsSelection;
 import de.metas.ui.web.window.datatypes.DocumentPath;
+import de.metas.ui.web.window.datatypes.LookupValuesList;
 import de.metas.ui.web.window.datatypes.WindowId;
 import de.metas.ui.web.window.datatypes.json.JSONDocument;
 import de.metas.ui.web.window.datatypes.json.JSONDocumentChangeLog;
 import de.metas.ui.web.window.datatypes.json.JSONDocumentChangedEvent;
 import de.metas.ui.web.window.datatypes.json.JSONDocumentLayout;
+import de.metas.ui.web.window.datatypes.json.JSONDocumentLayoutOptions;
+import de.metas.ui.web.window.datatypes.json.JSONDocumentLayoutOptions.JSONDocumentLayoutOptionsBuilder;
+import de.metas.ui.web.window.datatypes.json.JSONDocumentOptions;
+import de.metas.ui.web.window.datatypes.json.JSONDocumentOptions.JSONDocumentOptionsBuilder;
 import de.metas.ui.web.window.datatypes.json.JSONDocumentPath;
 import de.metas.ui.web.window.datatypes.json.JSONDocumentReference;
 import de.metas.ui.web.window.datatypes.json.JSONDocumentReferencesGroup;
 import de.metas.ui.web.window.datatypes.json.JSONDocumentReferencesGroupList;
 import de.metas.ui.web.window.datatypes.json.JSONLookupValuesList;
 import de.metas.ui.web.window.datatypes.json.JSONOptions;
+import de.metas.ui.web.window.datatypes.json.JSONOptions.JSONOptionsBuilder;
 import de.metas.ui.web.window.datatypes.json.JSONZoomInto;
 import de.metas.ui.web.window.descriptor.ButtonFieldActionDescriptor;
 import de.metas.ui.web.window.descriptor.DetailId;
 import de.metas.ui.web.window.descriptor.DocumentDescriptor;
+import de.metas.ui.web.window.descriptor.DocumentEntityDescriptor;
+import de.metas.ui.web.window.descriptor.DocumentFieldDescriptor;
 import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
 import de.metas.ui.web.window.descriptor.factory.NewRecordDescriptorsProvider;
 import de.metas.ui.web.window.events.DocumentWebsocketPublisher;
-import de.metas.ui.web.window.exceptions.InvalidDocumentPathException;
 import de.metas.ui.web.window.model.Document;
 import de.metas.ui.web.window.model.DocumentChangeLogService;
 import de.metas.ui.web.window.model.DocumentCollection;
@@ -75,6 +83,7 @@ import de.metas.util.Services;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
+import lombok.NonNull;
 
 /*
  * #%L
@@ -132,10 +141,21 @@ public class WindowRestController
 	@Autowired
 	private DocumentWebsocketPublisher websocketPublisher;
 
-	private JSONOptions.Builder newJSONOptions()
+	private JSONOptionsBuilder newJSONOptions()
 	{
-		return JSONOptions.builder(userSession)
-				.setNewRecordDescriptorsProvider(newRecordDescriptorsProvider);
+		return JSONOptions.prepareFrom(userSession);
+	}
+
+	private JSONDocumentLayoutOptionsBuilder newJSONLayoutOptions()
+	{
+		return JSONDocumentLayoutOptions.prepareFrom(userSession)
+				.newRecordDescriptorsProvider(newRecordDescriptorsProvider);
+	}
+
+	private JSONDocumentOptionsBuilder newJSONDocumentOptions()
+	{
+		return JSONDocumentOptions.builder()
+				.userSession(userSession);
 	}
 
 	@GetMapping("/{windowId}/layout")
@@ -155,8 +175,8 @@ public class WindowRestController
 				.cacheMaxAge(userSession.getHttpCacheMaxAge())
 				.map(DocumentDescriptor::getLayout)
 				//
-				.jsonOptions(() -> newJSONOptions().setShowAdvancedFields(advanced).build())
-				.toJson(JSONDocumentLayout::ofHeaderLayout);
+				.jsonLayoutOptions(() -> newJSONLayoutOptions().showAdvancedFields(advanced).build())
+				.toLayoutJson(JSONDocumentLayout::ofHeaderLayout);
 	}
 
 	@GetMapping("/{windowId}/{tabId}/layout")
@@ -179,8 +199,8 @@ public class WindowRestController
 				.cacheMaxAge(userSession.getHttpCacheMaxAge())
 				.map(desc -> desc.getLayout().getDetail(detailId))
 				//
-				.jsonOptions(() -> newJSONOptions().setShowAdvancedFields(advanced).build())
-				.toJson(JSONDocumentLayout::ofDetailTab);
+				.jsonLayoutOptions(() -> newJSONLayoutOptions().showAdvancedFields(advanced).build())
+				.toLayoutJson(JSONDocumentLayout::ofDetailTab);
 	}
 
 	@GetMapping("/{windowId}/{documentId}")
@@ -201,6 +221,7 @@ public class WindowRestController
 			@PathVariable("windowId") final String windowIdStr,
 			@PathVariable("documentId") final String documentIdStr,
 			@PathVariable("tabId") final String tabIdStr,
+			@RequestParam(name = "ids", required = false) @ApiParam("comma separated rowIds") final String rowIdsListStr,
 			@RequestParam(name = PARAM_FieldsList, required = false) @ApiParam("comma separated field names") final String fieldsListStr,
 			@RequestParam(name = PARAM_Advanced, required = false, defaultValue = PARAM_Advanced_DefaultValue) final boolean advanced,
 			@RequestParam(name = "orderBy", required = false) final String orderBysListStr)
@@ -208,7 +229,18 @@ public class WindowRestController
 		final WindowId windowId = WindowId.fromJson(windowIdStr);
 		final DocumentId documentId = DocumentId.of(documentIdStr);
 		final DetailId tabId = DetailId.fromJson(tabIdStr);
-		final DocumentPath documentPath = DocumentPath.includedDocumentPath(windowId, documentId, tabId);
+
+		final DocumentIdsSelection onlyRowIds = DocumentIdsSelection.ofCommaSeparatedString(rowIdsListStr);
+		final DocumentPath documentPath;
+		if (onlyRowIds.isEmpty() || onlyRowIds.isAll())
+		{
+			documentPath = DocumentPath.includedDocumentPath(windowId, documentId, tabId);
+		}
+		else
+		{
+			documentPath = DocumentPath.includedDocumentPath(windowId, documentId, tabId, onlyRowIds);
+		}
+
 		final List<DocumentQueryOrderBy> orderBys = DocumentQueryOrderBy.parseOrderBysList(orderBysListStr);
 		return getData(documentPath, fieldsListStr, advanced, orderBys);
 	}
@@ -233,9 +265,9 @@ public class WindowRestController
 	{
 		userSession.assertLoggedIn();
 
-		final JSONOptions jsonOpts = newJSONOptions()
-				.setShowAdvancedFields(advanced)
-				.setDataFieldsList(fieldsListStr)
+		final JSONDocumentOptions jsonOpts = newJSONDocumentOptions()
+				.showAdvancedFields(advanced)
+				.dataFieldsListStr(fieldsListStr)
 				.build();
 
 		return documentCollection.forRootDocumentReadonly(documentPath, rootDocument -> {
@@ -254,7 +286,7 @@ public class WindowRestController
 			}
 			else
 			{
-				throw new InvalidDocumentPathException(documentPath);
+				documents = rootDocument.getIncludedDocuments(documentPath.getDetailId(), documentPath.getRowIds()).toList();
 			}
 
 			return JSONDocument.ofDocumentsList(documents, jsonOpts);
@@ -305,18 +337,24 @@ public class WindowRestController
 		return patchDocument(documentPath, advanced, events);
 	}
 
-	private List<JSONDocument> patchDocument(final DocumentPath documentPath, final boolean advanced, final List<JSONDocumentChangedEvent> events)
+	private List<JSONDocument> patchDocument(
+			final DocumentPath documentPath,
+			final boolean advanced,
+			final List<JSONDocumentChangedEvent> events)
 	{
 		userSession.assertLoggedIn();
 
-		final JSONOptions jsonOpts = newJSONOptions()
-				.setShowAdvancedFields(advanced)
+		final JSONDocumentOptions jsonOpts = newJSONDocumentOptions()
+				.showAdvancedFields(advanced)
 				.build();
 
 		return Execution.callInNewExecution("window.commit", () -> patchDocument0(documentPath, events, jsonOpts));
 	}
 
-	private List<JSONDocument> patchDocument0(final DocumentPath documentPath, final List<JSONDocumentChangedEvent> events, final JSONOptions jsonOpts)
+	private List<JSONDocument> patchDocument0(
+			final DocumentPath documentPath,
+			final List<JSONDocumentChangedEvent> events,
+			final JSONDocumentOptions jsonOpts)
 	{
 		final IDocumentChangesCollector changesCollector = Execution.getCurrentDocumentChangesCollectorOrNull();
 		documentCollection.forDocumentWritable(
@@ -346,7 +384,8 @@ public class WindowRestController
 		final DocumentPath fromDocumentPath = DocumentPath.rootDocumentPath(WindowId.fromJson(windowIdStr), DocumentId.of(documentIdStr));
 
 		final Document documentCopy = documentCollection.duplicateDocument(fromDocumentPath);
-		return JSONDocument.ofDocument(documentCopy, newJSONOptions().setShowAdvancedFields(advanced).build());
+		final JSONDocumentOptions jsonOpts = newJSONDocumentOptions().showAdvancedFields(advanced).build();
+		return JSONDocument.ofDocument(documentCopy, jsonOpts);
 	}
 
 	@DeleteMapping("/{windowId}/{documentId}")
@@ -414,8 +453,8 @@ public class WindowRestController
 	{
 		userSession.assertLoggedIn();
 
-		final JSONOptions jsonOpts = newJSONOptions()
-				.setShowAdvancedFields(false)
+		final JSONDocumentOptions jsonOpts = newJSONDocumentOptions()
+				.showAdvancedFields(false)
 				.build();
 
 		return Execution.callInNewExecution("window.delete", () -> {
@@ -465,7 +504,12 @@ public class WindowRestController
 		userSession.assertLoggedIn();
 
 		return documentCollection.forDocumentReadonly(documentPath, document -> document.getFieldLookupValuesForQuery(fieldName, query))
-				.transform(JSONLookupValuesList::ofLookupValuesList);
+				.transform(this::toJSONLookupValuesList);
+	}
+
+	private JSONLookupValuesList toJSONLookupValuesList(final LookupValuesList lookupValuesList)
+	{
+		return JSONLookupValuesList.ofLookupValuesList(lookupValuesList, userSession.getAD_Language());
 	}
 
 	@GetMapping("/{windowId}/{documentId}/field/{fieldName}/dropdown")
@@ -502,7 +546,7 @@ public class WindowRestController
 				.forDocumentReadonly(
 						documentPath,
 						document -> document.getFieldLookupValues(fieldName))
-				.transform(JSONLookupValuesList::ofLookupValuesList);
+				.transform(this::toJSONLookupValuesList);
 	}
 
 	@ApiOperation("field current value's window layout to zoom into")
@@ -537,53 +581,8 @@ public class WindowRestController
 	{
 		userSession.assertLoggedIn();
 
-		final DocumentZoomIntoInfo zoomIntoInfo = documentCollection.forDocumentReadonly(documentPath, document -> {
-			final IDocumentFieldView field = document.getFieldView(fieldName);
-
-			// Generic ZoomInto button
-			if (field.getDescriptor().getWidgetType() == DocumentFieldWidgetType.ZoomIntoButton)
-			{
-				final ButtonFieldActionDescriptor buttonActionDescriptor = field.getDescriptor().getButtonActionDescriptor();
-				final String zoomIntoTableIdFieldName = buttonActionDescriptor.getZoomIntoTableIdFieldName();
-
-				final Integer adTableId = document.getFieldView(zoomIntoTableIdFieldName).getValueAs(Integer.class);
-				if (adTableId == null || adTableId <= 0)
-				{
-					throw new EntityNotFoundException("Cannot fetch ZoomInto infos from a null value. No AD_Table_ID.")
-							.setParameter("documentPath", documentPath)
-							.setParameter("fieldName", fieldName)
-							.setParameter("zoomIntoTableIdFieldName", zoomIntoTableIdFieldName);
-				}
-
-				final Integer recordId = field.getValueAs(Integer.class);
-				if (recordId == null)
-				{
-					throw new EntityNotFoundException("Cannot fetch ZoomInto infos from a null value. No Record_ID.")
-							.setParameter("documentPath", documentPath)
-							.setParameter("fieldName", fieldName)
-							.setParameter("zoomIntoTableIdFieldName", zoomIntoTableIdFieldName);
-				}
-
-				final String tableName = Services.get(IADTableDAO.class).retrieveTableName(adTableId);
-				return DocumentZoomIntoInfo.of(tableName, recordId);
-			}
-			// Key Field
-			else if (field.isKey())
-			{
-				// Allow zooming into key column. It shall open precisely this record in a new window.
-				// (see https://github.com/metasfresh/metasfresh/issues/1687 to understand the use-case)
-				final String tableName = document.getEntityDescriptor().getTableName();
-				final int recordId = document.getDocumentIdAsInt();
-				return DocumentZoomIntoInfo.of(tableName, recordId);
-			}
-			// Regular lookup value
-			else
-			{
-				return field.getZoomIntoInfo();
-			}
-		});
-
 		final JSONDocumentPath jsonZoomIntoDocumentPath;
+		final DocumentZoomIntoInfo zoomIntoInfo = documentCollection.forDocumentReadonly(documentPath, document -> getDocumentFieldZoomInto(document, fieldName));
 		if (zoomIntoInfo == null)
 		{
 			throw new EntityNotFoundException("ZoomInto not supported")
@@ -607,25 +606,100 @@ public class WindowRestController
 				.build();
 	}
 
+	private static DocumentZoomIntoInfo getDocumentFieldZoomInto(@NonNull final Document document, @NonNull final String fieldName)
+	{
+		final DocumentEntityDescriptor entityDescriptor = document.getEntityDescriptor();
+		final DocumentFieldDescriptor singleKeyFieldDescriptor = entityDescriptor.getSingleIdFieldOrNull();
+
+		final IDocumentFieldView field = document.getFieldView(fieldName);
+
+		// Generic ZoomInto button
+		if (field.getDescriptor().getWidgetType() == DocumentFieldWidgetType.ZoomIntoButton)
+		{
+			final ButtonFieldActionDescriptor buttonActionDescriptor = field.getDescriptor().getButtonActionDescriptor();
+			final String zoomIntoTableIdFieldName = buttonActionDescriptor.getZoomIntoTableIdFieldName();
+
+			final Integer adTableId = document.getFieldView(zoomIntoTableIdFieldName).getValueAs(Integer.class);
+			if (adTableId == null || adTableId <= 0)
+			{
+				throw new EntityNotFoundException("Cannot fetch ZoomInto infos from a null value. No AD_Table_ID.")
+						.setParameter("documentPath", document.getDocumentPath())
+						.setParameter("fieldName", fieldName)
+						.setParameter("zoomIntoTableIdFieldName", zoomIntoTableIdFieldName);
+			}
+
+			final Integer recordId = field.getValueAs(Integer.class);
+			if (recordId == null)
+			{
+				throw new EntityNotFoundException("Cannot fetch ZoomInto infos from a null value. No Record_ID.")
+						.setParameter("documentPath", document.getDocumentPath())
+						.setParameter("fieldName", fieldName)
+						.setParameter("zoomIntoTableIdFieldName", zoomIntoTableIdFieldName);
+			}
+
+			final String tableName = Services.get(IADTableDAO.class).retrieveTableName(adTableId);
+			return DocumentZoomIntoInfo.of(tableName, recordId);
+		}
+		// Key Field
+		else if (singleKeyFieldDescriptor != null && singleKeyFieldDescriptor.getFieldName().equals(fieldName))
+		{
+			// Allow zooming into key column. It shall open precisely this record in a new window.
+			// (see https://github.com/metasfresh/metasfresh/issues/1687 to understand the use-case)
+			final String tableName = entityDescriptor.getTableName();
+			final int recordId = document.getDocumentIdAsInt();
+			return DocumentZoomIntoInfo.of(tableName, recordId);
+		}
+		// Regular lookup value
+		else
+		{
+			return field.getZoomIntoInfo();
+		}
+	}
+
 	@GetMapping("/{windowId}/{documentId}/actions")
 	public JSONDocumentActionsList getDocumentActions(
 			@PathVariable("windowId") final String windowIdStr,
-			@PathVariable("documentId") final String documentId,
+			@PathVariable("documentId") final String documentIdStr,
 			@RequestParam(name = "selectedTabId", required = false) final String selectedTabIdStr,
 			@RequestParam(name = "selectedRowIds", required = false) final String selectedRowIdsAsStr,
 			@RequestParam(name = "disabled", defaultValue = "false") final boolean returnDisabled)
 	{
 		final WindowId windowId = WindowId.fromJson(windowIdStr);
-		final DocumentPath documentPath = DocumentPath.rootDocumentPath(windowId, documentId);
+		final DocumentPath rootDocumentPath = DocumentPath.rootDocumentPath(windowId, documentIdStr);
 
 		final DetailId selectedTabId = DetailId.fromJson(selectedTabIdStr);
 		final DocumentIdsSelection selectedRowIds = DocumentIdsSelection.ofCommaSeparatedString(selectedRowIdsAsStr);
 		final Set<TableRecordReference> selectedIncludedRecords = selectedRowIds.stream()
-				.map(rowId -> documentPath.createChildPath(selectedTabId, rowId))
+				.map(rowId -> rootDocumentPath.createChildPath(selectedTabId, rowId))
 				.map(documentCollection::getTableRecordReference)
 				.collect(ImmutableSet.toImmutableSet());
 
-		return getDocumentActions(documentPath, selectedIncludedRecords, returnDisabled);
+		return getDocumentActions(
+				rootDocumentPath,
+				selectedTabId,
+				selectedIncludedRecords,
+				returnDisabled,
+				DisplayPlace.SingleDocumentActionsMenu);
+	}
+
+	@GetMapping("/{windowId}/{documentId}/{tabId}/topActions")
+	public JSONDocumentActionsList getIncludedTabTopActions(
+			@PathVariable("windowId") final String windowIdStr,
+			@PathVariable("documentId") final String documentIdStr,
+			@PathVariable("tabId") final String tabIdStr)
+	{
+		final WindowId windowId = WindowId.fromJson(windowIdStr);
+		final DocumentPath rootDocumentPath = DocumentPath.rootDocumentPath(windowId, documentIdStr);
+		final DetailId selectedTabId = DetailId.fromJson(tabIdStr);
+		final Set<TableRecordReference> selectedIncludedRecords = ImmutableSet.of();
+		boolean returnDisabled = false;
+
+		return getDocumentActions(
+				rootDocumentPath,
+				selectedTabId,
+				selectedIncludedRecords,
+				returnDisabled,
+				DisplayPlace.IncludedTabTopActionsMenu);
 	}
 
 	@GetMapping("/{windowId}/{documentId}/{tabId}/{rowId}/actions")
@@ -637,33 +711,42 @@ public class WindowRestController
 			@RequestParam(name = "disabled", defaultValue = "false") final boolean returnDisabled)
 	{
 		final WindowId windowId = WindowId.fromJson(windowIdStr);
-		final DocumentPath documentPath = DocumentPath.includedDocumentPath(windowId, documentIdStr, tabIdStr, rowIdStr);
+		final DetailId selectedTabId = DetailId.fromJson(tabIdStr);
+
+		final DocumentPath includedDocumentPath = DocumentPath.includedDocumentPath(windowId, documentIdStr, selectedTabId.toJson(), rowIdStr);
 		final Set<TableRecordReference> selectedIncludedRecords = ImmutableSet.of();
-		return getDocumentActions(documentPath, selectedIncludedRecords, returnDisabled);
+		return getDocumentActions(
+				includedDocumentPath,
+				selectedTabId,
+				selectedIncludedRecords,
+				returnDisabled,
+				DisplayPlace.SingleDocumentActionsMenu);
 	}
 
 	private JSONDocumentActionsList getDocumentActions(
-			final DocumentPath documentPath,
-			final Set<TableRecordReference> selectedIncludedRecords,
-			final boolean returnDisabled)
+			@NonNull final DocumentPath documentPath,
+			final DetailId selectedTabId,
+			@NonNull final Set<TableRecordReference> selectedIncludedRecords,
+			final boolean returnDisabled,
+			@NonNull final DisplayPlace displayPlace)
 	{
 		userSession.assertLoggedIn();
 
-		final Predicate<WebuiRelatedProcessDescriptor> filter;
-		if (returnDisabled)
-		{
-			filter = WebuiRelatedProcessDescriptor::isEnabledOrNotSilent;
-		}
-		else
-		{
-			filter = WebuiRelatedProcessDescriptor::isEnabled;
-		}
+		final Predicate<WebuiRelatedProcessDescriptor> isEnabled = returnDisabled
+				? WebuiRelatedProcessDescriptor::isEnabledOrNotSilent
+				: WebuiRelatedProcessDescriptor::isEnabled;
 
 		return documentCollection.forDocumentReadonly(documentPath, document -> {
-			final DocumentPreconditionsAsContext preconditionsContext = DocumentPreconditionsAsContext.of(document, selectedIncludedRecords);
+			final DocumentPreconditionsAsContext preconditionsContext = DocumentPreconditionsAsContext.builder()
+					.document(document)
+					.selectedTabId(selectedTabId)
+					.selectedIncludedRecords(selectedIncludedRecords)
+					.displayPlace(displayPlace)
+					.build();
 
 			return processRestController.streamDocumentRelatedProcesses(preconditionsContext)
-					.filter(filter)
+					.filter(descriptor -> descriptor.isDisplayedOn(displayPlace))
+					.filter(isEnabled)
 					.collect(JSONDocumentActionsList.collect(newJSONOptions().build()));
 		});
 	}
@@ -708,8 +791,8 @@ public class WindowRestController
 
 		// Organize document references in groups (by top level menu) and return them as JSON
 		final JSONOptions jsonOpts = newJSONOptions().build();
-		final MenuTree menuTree = menuTreeRepository.getMenuTree(userSession.getUserRolePermissionsKey(), jsonOpts.getAD_Language());
-		final String othersMenuCaption = Services.get(IMsgBL.class).translatable("DocumentReferences.group.Others").translate(jsonOpts.getAD_Language());
+		final MenuTree menuTree = menuTreeRepository.getMenuTree(userSession.getUserRolePermissionsKey(), jsonOpts.getAdLanguage());
+		final String othersMenuCaption = Services.get(IMsgBL.class).translatable("DocumentReferences.group.Others").translate(jsonOpts.getAdLanguage());
 		return JSONDocumentReferencesGroupList.of(documentReferences, menuTree, othersMenuCaption, jsonOpts);
 	}
 

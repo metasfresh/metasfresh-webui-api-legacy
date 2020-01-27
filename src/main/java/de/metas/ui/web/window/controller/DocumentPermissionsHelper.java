@@ -2,15 +2,18 @@ package de.metas.ui.web.window.controller;
 
 import javax.annotation.Nullable;
 
-import org.adempiere.ad.security.IUserRolePermissions;
-import org.adempiere.ad.security.permissions.ElementPermission;
+import org.adempiere.ad.element.api.AdWindowId;
 import org.adempiere.ad.table.api.IADTableDAO;
 import org.adempiere.exceptions.AdempiereException;
+import org.adempiere.service.ClientId;
 import org.adempiere.service.IRolePermLoggingBL;
 import org.adempiere.service.IRolePermLoggingBL.NoSuchForeignKeyException;
 import org.slf4j.Logger;
 
 import de.metas.logging.LogManager;
+import de.metas.organization.OrgId;
+import de.metas.security.IUserRolePermissions;
+import de.metas.security.permissions.ElementPermission;
 import de.metas.ui.web.session.UserSession;
 import de.metas.ui.web.window.datatypes.DocumentPath;
 import de.metas.ui.web.window.datatypes.DocumentType;
@@ -51,7 +54,7 @@ public class DocumentPermissionsHelper
 
 	public static ElementPermission checkWindowAccess(@NonNull final DocumentEntityDescriptor entityDescriptor, final IUserRolePermissions permissions)
 	{
-		final int adWindowId = entityDescriptor.getWindowId().toInt();
+		final AdWindowId adWindowId = entityDescriptor.getWindowId().toAdWindowId();
 		final ElementPermission windowPermission = permissions.checkWindowPermission(adWindowId);
 		final boolean readAccess = windowPermission.hasReadAccess();
 		final boolean writeAccess = windowPermission.hasWriteAccess();
@@ -72,15 +75,15 @@ public class DocumentPermissionsHelper
 
 	/**
 	 * Asserts view access
-	 * 
+	 *
 	 * @param windowId
 	 * @param viewId optional viewId, used only for error reporting
 	 * @param permissions
 	 */
 	public static void assertViewAccess(final WindowId windowId, @Nullable final String viewId, final IUserRolePermissions permissions)
 	{
-		final int adWindowId = windowId.toIntOr(-1);
-		if (adWindowId < 0)
+		final AdWindowId adWindowId = windowId.toAdWindowIdOrNull();
+		if (adWindowId == null)
 		{
 			// cannot apply window access if the WindowId is not integer.
 			// usually those are special window placeholders.
@@ -103,7 +106,7 @@ public class DocumentPermissionsHelper
 
 	private static void logAccessIfWindowExistsAndThrowEx(
 			@NonNull final IUserRolePermissions permissions,
-			final int adWindowId,
+			@NonNull final AdWindowId adWindowId,
 			@NonNull final AdempiereException ex)
 	{
 		final IRolePermLoggingBL rolePermLoggingBL = Services.get(IRolePermLoggingBL.class);
@@ -111,7 +114,7 @@ public class DocumentPermissionsHelper
 
 		try
 		{
-			rolePermLoggingBL.logWindowAccess(permissions.getAD_Role_ID(), adWindowId, readWriteAccess, ex.getLocalizedMessage());
+			rolePermLoggingBL.logWindowAccess(permissions.getRoleId(), adWindowId, readWriteAccess, ex.getLocalizedMessage());
 		}
 		catch (final NoSuchForeignKeyException noSuchForeignKeyException)
 		{
@@ -119,7 +122,7 @@ public class DocumentPermissionsHelper
 		}
 		throw ex;
 	}
-	
+
 	public static void assertCanView(@NonNull final Document document, @NonNull final IUserRolePermissions permissions)
 	{
 		// In case document type is not Window, return OK because we cannot validate
@@ -129,23 +132,26 @@ public class DocumentPermissionsHelper
 		}
 
 		// Check if we have window read permission
-		final WindowId windowId = document.getDocumentPath().getWindowId();
-		final int windowIdInt = windowId.toIntOr(-1);
-		if (windowIdInt > 0 && !permissions.checkWindowPermission(windowIdInt).hasReadAccess())
+		final AdWindowId adWindowId = document.getDocumentPath().getWindowId().toAdWindowIdOrNull();
+		if (adWindowId != null && !permissions.checkWindowPermission(adWindowId).hasReadAccess())
 		{
 			throw DocumentPermissionException.of(DocumentPermission.View, "no window read permission");
 		}
 
-		final String tableName = document.getEntityDescriptor().getTableNameOrNull();
-		if (tableName == null)
+		final int adTableId = getAdTableId(document);
+		if (adTableId <= 0)
 		{
 			// cannot apply security because this is not table based
 			return;
 		}
 
-		final int adTableId = Services.get(IADTableDAO.class).retrieveTableId(tableName);
-		final int recordId = document.getDocumentId().toIntOr(-1);
-		final String errmsg = permissions.checkCanView(document.getAD_Client_ID(), document.getAD_Org_ID(), adTableId, recordId);
+		final int recordId = getRecordId(document);
+		final OrgId orgId = document.getOrgId();
+		if (orgId == null)
+		{
+			return; // the user cleared the field; field is flagged as mandatory; until the user set the field, don't make a fuss.
+		}
+		final String errmsg = permissions.checkCanView(document.getClientId(), orgId, adTableId, recordId);
 		if (errmsg != null)
 		{
 			throw DocumentPermissionException.of(DocumentPermission.View, errmsg);
@@ -155,11 +161,11 @@ public class DocumentPermissionsHelper
 	public static void assertCanEdit(final Document document)
 	{
 		// If running from a background thread, consider it editable
-		if(!UserSession.isWebuiThread())
+		if (!UserSession.isWebuiThread())
 		{
 			return;
 		}
-		
+
 		assertCanEdit(document, UserSession.getCurrentPermissions());
 	}
 
@@ -188,25 +194,50 @@ public class DocumentPermissionsHelper
 		}
 
 		// Check if we have window write permission
-		final WindowId windowId = documentPath.getWindowId();
-		final int windowIdInt = windowId.toIntOr(-1);
-		if (windowIdInt > 0 && !permissions.checkWindowPermission(windowIdInt).hasWriteAccess())
+		final AdWindowId adWindowId = documentPath.getWindowId().toAdWindowIdOrNull();
+		if (adWindowId != null && !permissions.checkWindowPermission(adWindowId).hasWriteAccess())
 		{
 			return "no window edit permission";
 		}
 
+		final int adTableId = getAdTableId(document);
+		if (adTableId <= 0)
+		{
+			return null; // not table based => OK
+		}
+		final int recordId = getRecordId(document);
+
+		final ClientId adClientId = document.getClientId();
+		final OrgId adOrgId = document.getOrgId();
+		if (adOrgId == null)
+		{
+			return null; // the user cleared the field; field is flagged as mandatory; until user set the field, don't make a fuss.
+		}
+		return permissions.checkCanUpdate(adClientId, adOrgId, adTableId, recordId);
+	}
+
+	private static int getAdTableId(final Document document)
+	{
 		final String tableName = document.getEntityDescriptor().getTableNameOrNull();
 		if (tableName == null)
 		{
 			// cannot apply security because this is not table based
-			return null; // OK
+			return -1; // OK
 		}
-		final int adTableId = Services.get(IADTableDAO.class).retrieveTableId(tableName);
 
-		int adClientId = document.getAD_Client_ID();
-		int adOrgId = document.getAD_Org_ID();
-		final int recordId = document.getDocumentId().toIntOr(-1);
-		return permissions.checkCanUpdate(adClientId, adOrgId, adTableId, recordId);
+		return Services.get(IADTableDAO.class).retrieveTableId(tableName);
+	}
+
+	private static int getRecordId(final Document document)
+	{
+		if (document.isNew())
+		{
+			return -1;
+		}
+		else
+		{
+			return document.getDocumentId().toIntOr(-1);
+		}
 	}
 
 }

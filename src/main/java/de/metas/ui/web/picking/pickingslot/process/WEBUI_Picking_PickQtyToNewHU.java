@@ -7,15 +7,16 @@ import java.math.BigDecimal;
 import java.util.Objects;
 import java.util.Properties;
 
-import javax.annotation.Nullable;
-
 import org.adempiere.exceptions.AdempiereException;
 import org.adempiere.warehouse.LocatorId;
 import org.adempiere.warehouse.WarehouseId;
 import org.adempiere.warehouse.api.IWarehouseBL;
+import org.compiere.model.I_C_UOM;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import de.metas.handlingunits.HUPIItemProductId;
 import de.metas.handlingunits.HuId;
+import de.metas.handlingunits.IHUPIItemProductBL;
 import de.metas.handlingunits.IHandlingUnitsDAO;
 import de.metas.handlingunits.hutransaction.IHUTrxBL;
 import de.metas.handlingunits.model.I_M_HU;
@@ -25,10 +26,10 @@ import de.metas.handlingunits.model.I_M_ShipmentSchedule;
 import de.metas.handlingunits.model.X_M_HU;
 import de.metas.handlingunits.picking.PickingCandidateService;
 import de.metas.handlingunits.picking.requests.AddQtyToHURequest;
-import de.metas.handlingunits.picking.requests.PickHURequest;
 import de.metas.handlingunits.report.HUReportService;
 import de.metas.handlingunits.report.HUToReportWrapper;
-import de.metas.inoutcandidate.api.ShipmentScheduleId;
+import de.metas.i18n.ITranslatableString;
+import de.metas.inoutcandidate.api.IShipmentScheduleEffectiveBL;
 import de.metas.picking.api.PickingConfigRepository;
 import de.metas.picking.api.PickingSlotId;
 import de.metas.process.IProcessDefaultParameter;
@@ -37,6 +38,7 @@ import de.metas.process.IProcessPrecondition;
 import de.metas.process.Param;
 import de.metas.process.ProcessPreconditionsResolution;
 import de.metas.product.ProductId;
+import de.metas.quantity.Quantity;
 import de.metas.ui.web.handlingunits.util.WEBUI_ProcessHelper;
 import de.metas.ui.web.picking.pickingslot.PickingSlotRow;
 import de.metas.ui.web.picking.pickingslot.PickingSlotViewFactory;
@@ -56,12 +58,12 @@ import lombok.NonNull;
  * it under the terms of the GNU General Public License as
  * published by the Free Software Foundation, either version 2 of the
  * License, or (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public
  * License along with this program. If not, see
  * <http://www.gnu.org/licenses/gpl-2.0.html>.
@@ -69,10 +71,10 @@ import lombok.NonNull;
  */
 
 /**
- * 
+ *
  * Note: this process is declared in the {@code AD_Process} table, but <b>not</b> added to it's respective window or table via application dictionary.<br>
  * Instead it is assigned to it's place by {@link PickingSlotViewFactory}.
- * 
+ *
  * @author metas-dev <dev@metasfresh.com>
  *
  */
@@ -116,81 +118,81 @@ public class WEBUI_Picking_PickQtyToNewHU
 		return ProcessPreconditionsResolution.accept();
 	}
 
+	private Quantity getQtyToPack()
+	{
+		final I_C_UOM uom = getCurrentShipmentScheuduleUOM();
+		return Quantity.of(qtyCU, uom);
+	}
+
 	@Override
 	protected String doIt()
 	{
-		final PickingSlotRow pickingSlotRow = getSingleSelectedRow();
+		final Quantity qtyToPack = getQtyToPack();
+		if (qtyToPack.signum() <= 0)
+		{
+			throw new AdempiereException("@QtyCU@ > 0");
+		}
 
-		final I_M_HU hu = createAndAddHU(pickingSlotRow);
-		addPickedQuantity(hu, pickingSlotRow);
+		final HuId packToHuId = createNewHuId();
+		pickFromSourceHUsAndPackTo(qtyToPack, packToHuId);
 
-		final HUToReportWrapper huToReport = HUToReportWrapper.of(hu);
-		printPickingLabel(huToReport);
+		printPickingLabel(packToHuId);
 
-		invalidateView();
-		invalidateParentView();
+		invalidatePackablesView(); // left side view
+		invalidatePickingSlotsView(); // right side view
 
 		return MSG_OK;
 	}
 
-	private void printPickingLabel(@Nullable final HUToReportWrapper huToReport)
+	private void printPickingLabel(@NonNull final HuId huId)
 	{
 		final HUReportService huReportService = HUReportService.get();
-		huReportService.printPickingLabel(huToReport, true);
+		final IHandlingUnitsDAO handlingUnitsRepo = Services.get(IHandlingUnitsDAO.class);
+
+		final I_M_HU hu = handlingUnitsRepo.getById(huId);
+		final HUToReportWrapper huToReport = HUToReportWrapper.of(hu);
+		final boolean onlyIfAutoPrintIsEnabled = true;
+		huReportService.printPickingLabel(huToReport, onlyIfAutoPrintIsEnabled);
 	}
 
-	private void addPickedQuantity(
-			@NonNull final I_M_HU hu,
-			@NonNull final PickingSlotRow pickingSlotRow)
+	private void pickFromSourceHUsAndPackTo(@NonNull final Quantity qtyToPack, @NonNull final HuId packToHuId)
 	{
-		if (qtyCU.signum() > 0)
-		{
-			final boolean allowOverDelivery = pickingConfigRepo.getPickingConfig().isAllowOverDelivery();
+		final boolean allowOverDelivery = pickingConfigRepo.getPickingConfig().isAllowOverDelivery();
 
-			pickingCandidateService.addQtyToHU(AddQtyToHURequest.builder()
-					.qtyCU(qtyCU)
-					.packToHuId(HuId.ofRepoId(hu.getM_HU_ID()))
-					.pickingSlotId(pickingSlotRow.getPickingSlotId())
-					.shipmentScheduleId(getView().getCurrentShipmentScheduleId())
-					.allowOverDelivery(allowOverDelivery)
-					.build());
-		}
-	}
-
-	private I_M_HU createAndAddHU(@NonNull final PickingSlotRow pickingSlotRow)
-	{
-		final LocatorId pickingSlotLocatorId = getPickingSlotLocatorId(pickingSlotRow);
-
-		// Create a new empty TU
-		final I_M_HU hu = createTU(huPIItemProduct, pickingSlotLocatorId);
-
-		// Add the TU to picking slot (as candidate)
+		final PickingSlotRow pickingSlotRow = getSingleSelectedRow();
 		final PickingSlotId pickingSlotId = pickingSlotRow.getPickingSlotId();
-		final ShipmentScheduleId shipmentScheduleId = getView().getCurrentShipmentScheduleId();
 
-		pickingCandidateService.pickHU(PickHURequest.builder()
-				.shipmentScheduleId(shipmentScheduleId)
-				.pickFromHuId(HuId.ofRepoId(hu.getM_HU_ID()))
+		pickingCandidateService.addQtyToHU(AddQtyToHURequest.builder()
+				.qtyToPack(qtyToPack)
+				.packToHuId(packToHuId)
 				.pickingSlotId(pickingSlotId)
+				.shipmentScheduleId(getCurrentShipmentScheduleId())
+				.allowOverDelivery(allowOverDelivery)
 				.build());
+	}
 
-		return hu;
+	private HuId createNewHuId()
+	{
+		final PickingSlotRow pickingSlotRow = getSingleSelectedRow();
+		final LocatorId pickingSlotLocatorId = getPickingSlotLocatorId(pickingSlotRow);
+		final I_M_HU hu = createTU(huPIItemProduct, pickingSlotLocatorId);
+		return HuId.ofRepoId(hu.getM_HU_ID());
 	}
 
 	/**
-	 * 
+	 *
 	 * @return a list of PI item products that match the selected shipment schedule's product and partner, sorted by name.
 	 */
 	@ProcessParamLookupValuesProvider(parameterName = PARAM_M_HU_PI_Item_Product_ID, dependsOn = {}, numericKey = true, lookupTableName = I_M_HU_PI_Item_Product.Table_Name)
 	private LookupValuesList getM_HU_PI_Item_Products()
 	{
 		final Properties ctx = getCtx();
-		final I_M_ShipmentSchedule shipmentSchedule = getView().getCurrentShipmentSchedule(); // can't be null
+		final I_M_ShipmentSchedule shipmentSchedule = getCurrentShipmentSchedule();
 
 		final ProductId productId = ProductId.ofRepoId(shipmentSchedule.getM_Product_ID());
 		return WEBUI_ProcessHelper.retrieveHUPIItemProducts(ctx,
 				productId,
-				shipmentSchedule.getC_BPartner(),
+				Services.get(IShipmentScheduleEffectiveBL.class).getBPartnerId(shipmentSchedule),
 				true); // includeVirtualItem = true..similar case as with production
 	}
 
@@ -199,18 +201,23 @@ public class WEBUI_Picking_PickQtyToNewHU
 	{
 		if (Objects.equals(PARAM_QTY_CU, parameter.getColumnName()))
 		{
-			return retrieveQtyToPick();
+			return retrieveQtyToPick().toBigDecimal();
 		}
 		else if (Objects.equals(PARAM_M_HU_PI_Item_Product_ID, parameter.getColumnName()))
 		{
-			final I_M_ShipmentSchedule shipmentSchedule = getView().getCurrentShipmentSchedule();
-			final I_M_HU_PI_Item_Product huPIItemProduct = shipmentSchedule.getM_HU_PI_Item_Product();
-			if (huPIItemProduct == null)
+			final I_M_ShipmentSchedule shipmentSchedule = getCurrentShipmentSchedule();
+			final HUPIItemProductId piItemProductId = HUPIItemProductId.ofRepoIdOrNull(shipmentSchedule.getM_HU_PI_Item_Product_ID());
+			if (piItemProductId == null)
 			{
 				return IProcessDefaultParametersProvider.DEFAULT_VALUE_NOTAVAILABLE;
 			}
+			else
+			{
+				final IHUPIItemProductBL hupiItemProductBL = Services.get(IHUPIItemProductBL.class);
 
-			return IntegerLookupValue.of(huPIItemProduct.getM_HU_PI_Item_Product_ID(), huPIItemProduct.getName());
+				final ITranslatableString displayName = hupiItemProductBL.getDisplayName(piItemProductId);
+				return IntegerLookupValue.of(piItemProductId, displayName);
+			}
 		}
 		else
 		{
@@ -235,7 +242,7 @@ public class WEBUI_Picking_PickQtyToNewHU
 
 	/**
 	 * Creates a new M_HU within the processe's interited trx.
-	 * 
+	 *
 	 * @param itemProduct
 	 * @param locatorId
 	 * @return

@@ -1,6 +1,6 @@
 package de.metas.purchasecandidate.reminder;
 
-import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -11,9 +11,9 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.ScheduledFuture;
 
+import org.adempiere.ad.element.api.AdWindowId;
 import org.adempiere.model.RecordZoomWindowFinder;
 import org.adempiere.util.lang.impl.TableRecordReference;
-import org.compiere.Adempiere;
 import org.compiere.model.I_C_BPartner;
 import org.compiere.util.TimeUtil;
 import org.slf4j.Logger;
@@ -26,8 +26,8 @@ import com.google.common.collect.ImmutableList;
 
 import de.metas.bpartner.BPartnerId;
 import de.metas.bpartner.service.IBPartnerBL;
-import de.metas.i18n.DateTimeTranslatableString;
 import de.metas.i18n.ITranslatableString;
+import de.metas.i18n.TranslatableStrings;
 import de.metas.logging.LogManager;
 import de.metas.notification.INotificationBL;
 import de.metas.notification.NotificationGroupName;
@@ -44,10 +44,10 @@ import de.metas.ui.web.document.filter.DocumentFilterParam.Operator;
 import de.metas.ui.web.view.CreateViewRequest;
 import de.metas.ui.web.view.IView;
 import de.metas.ui.web.view.IViewsRepository;
+import de.metas.ui.web.view.ViewCloseAction;
 import de.metas.ui.web.view.ViewId;
 import de.metas.ui.web.window.datatypes.WindowId;
 import de.metas.util.Services;
-
 import lombok.NonNull;
 
 /*
@@ -85,6 +85,7 @@ public class PurchaseCandidateReminderScheduler implements InitializingBean
 	private final TaskScheduler taskScheduler;
 	private final IViewsRepository viewsRepo;
 	private final PurchaseCandidateRepository purchaseCandidateRepo;
+	private final IBPartnerBL bpartnersService;
 
 	private static final NotificationGroupName NOTIFICATION_GROUP_NAME = NotificationGroupName.of("de.metas.purchasecandidate.UserNotifications.Due");
 	private static final String MSG_PurchaseCandidatesDue = "de.metas.purchasecandidates.PurchaseCandidatesDueNotification";
@@ -96,11 +97,12 @@ public class PurchaseCandidateReminderScheduler implements InitializingBean
 			@Qualifier(WebRestApiApplication.BEANNAME_WebuiTaskScheduler) @NonNull final TaskScheduler taskScheduler,
 			@NonNull final IViewsRepository viewsRepo,
 			@NonNull final PurchaseCandidateRepository purchaseCandidateRepo,
-			final Adempiere databaseAvailable)
+			@NonNull final IBPartnerBL bpartnersService)
 	{
 		this.taskScheduler = taskScheduler;
 		this.viewsRepo = viewsRepo;
 		this.purchaseCandidateRepo = purchaseCandidateRepo;
+		this.bpartnersService = bpartnersService;
 	}
 
 	@Override
@@ -128,12 +130,12 @@ public class PurchaseCandidateReminderScheduler implements InitializingBean
 		return reminders.toList();
 	}
 
-	public synchronized LocalDateTime getNextDispatchTime()
+	public synchronized ZonedDateTime getNextDispatchTime()
 	{
 		return nextDispatch != null ? nextDispatch.getNotificationTime() : null;
 	}
 
-	public void scheduleNotification(final BPartnerId vendorBPartnerId, final LocalDateTime notificationTime)
+	public void scheduleNotification(final BPartnerId vendorBPartnerId, final ZonedDateTime notificationTime)
 	{
 		scheduleNotification(PurchaseCandidateReminder.builder()
 				.vendorBPartnerId(vendorBPartnerId)
@@ -153,7 +155,7 @@ public class PurchaseCandidateReminderScheduler implements InitializingBean
 
 	private synchronized void scheduleNextDispatch()
 	{
-		final LocalDateTime minNotificationTime = reminders.getMinNotificationTime();
+		final ZonedDateTime minNotificationTime = reminders.getMinNotificationTime();
 		if (minNotificationTime == null)
 		{
 			return;
@@ -173,7 +175,7 @@ public class PurchaseCandidateReminderScheduler implements InitializingBean
 	{
 		try
 		{
-			final List<PurchaseCandidateReminder> remindersToDispatch = removeAllRemindersUntil(LocalDateTime.now());
+			final List<PurchaseCandidateReminder> remindersToDispatch = removeAllRemindersUntil(ZonedDateTime.now());
 			remindersToDispatch.forEach(this::dispatchNotificationNoFail);
 		}
 		finally
@@ -182,7 +184,7 @@ public class PurchaseCandidateReminderScheduler implements InitializingBean
 		}
 	}
 
-	private synchronized List<PurchaseCandidateReminder> removeAllRemindersUntil(final LocalDateTime maxNotificationTime)
+	private synchronized List<PurchaseCandidateReminder> removeAllRemindersUntil(final ZonedDateTime maxNotificationTime)
 	{
 		return reminders.removeAllUntil(maxNotificationTime);
 	}
@@ -233,7 +235,7 @@ public class PurchaseCandidateReminderScheduler implements InitializingBean
 				.build());
 		if (view.size() <= 0)
 		{
-			viewsRepo.deleteView(view.getViewId());
+			viewsRepo.closeView(view.getViewId(), ViewCloseAction.CANCEL);
 			return null;
 		}
 		else
@@ -245,12 +247,12 @@ public class PurchaseCandidateReminderScheduler implements InitializingBean
 	private final DocumentFilter createViewStickyFilter(final PurchaseCandidateReminder reminder)
 	{
 		final BPartnerId vendorBPartnerId = reminder.getVendorBPartnerId();
-		final String vendorName = Services.get(IBPartnerBL.class).getBPartnerValueAndName(vendorBPartnerId);
-		final LocalDateTime notificationTime = reminder.getNotificationTime();
+		final String vendorName = bpartnersService.getBPartnerValueAndName(vendorBPartnerId);
+		final ZonedDateTime notificationTime = reminder.getNotificationTime();
 
-		final ITranslatableString caption = ITranslatableString.compose(" / ",
+		final ITranslatableString caption = TranslatableStrings.join(" / ",
 				vendorName,
-				DateTimeTranslatableString.ofDateTime(notificationTime));
+				TranslatableStrings.dateAndTime(notificationTime));
 
 		return DocumentFilter.builder()
 				.setFilterId("filterByVendorIdAndReminderDate")
@@ -262,8 +264,8 @@ public class PurchaseCandidateReminderScheduler implements InitializingBean
 
 	private WindowId getWindowId(final String tableName)
 	{
-		final int windowIdInt = RecordZoomWindowFinder.findAD_Window_ID(tableName);
-		return WindowId.of(windowIdInt);
+		final AdWindowId adWindowId = RecordZoomWindowFinder.findAdWindowId(tableName).get();
+		return WindowId.of(adWindowId);
 	}
 
 	private static class RemindersQueue
@@ -286,13 +288,13 @@ public class PurchaseCandidateReminderScheduler implements InitializingBean
 			this.reminders.addAll(reminders);
 		}
 
-		public List<PurchaseCandidateReminder> removeAllUntil(final LocalDateTime maxNotificationTime)
+		public List<PurchaseCandidateReminder> removeAllUntil(final ZonedDateTime maxNotificationTime)
 		{
 			final List<PurchaseCandidateReminder> result = new ArrayList<>();
 			for (final Iterator<PurchaseCandidateReminder> it = reminders.iterator(); it.hasNext();)
 			{
 				final PurchaseCandidateReminder reminder = it.next();
-				final LocalDateTime notificationTime = reminder.getNotificationTime();
+				final ZonedDateTime notificationTime = reminder.getNotificationTime();
 				if (notificationTime.compareTo(maxNotificationTime) <= 0)
 				{
 					it.remove();
@@ -303,7 +305,7 @@ public class PurchaseCandidateReminderScheduler implements InitializingBean
 			return result;
 		}
 
-		public LocalDateTime getMinNotificationTime()
+		public ZonedDateTime getMinNotificationTime()
 		{
 			if (reminders.isEmpty())
 			{
@@ -318,9 +320,9 @@ public class PurchaseCandidateReminderScheduler implements InitializingBean
 	@lombok.Builder
 	private static class NextDispatch
 	{
-		public static NextDispatch schedule(final Runnable task, final LocalDateTime date, final TaskScheduler taskScheduler)
+		public static NextDispatch schedule(final Runnable task, final ZonedDateTime date, final TaskScheduler taskScheduler)
 		{
-			final ScheduledFuture<?> scheduledFuture = taskScheduler.schedule(task, TimeUtil.asTimestamp(date));
+			final ScheduledFuture<?> scheduledFuture = taskScheduler.schedule(task, TimeUtil.asDate(date));
 			return builder()
 					.task(task)
 					.scheduledFuture(scheduledFuture)
@@ -330,7 +332,7 @@ public class PurchaseCandidateReminderScheduler implements InitializingBean
 
 		Runnable task;
 		ScheduledFuture<?> scheduledFuture;
-		LocalDateTime notificationTime;
+		ZonedDateTime notificationTime;
 
 		public void cancel()
 		{
@@ -338,7 +340,7 @@ public class PurchaseCandidateReminderScheduler implements InitializingBean
 			logger.trace("Cancel requested for {} (result was: {})", this, canceled);
 		}
 
-		public NextDispatch rescheduleIfAfter(final LocalDateTime date, final TaskScheduler taskScheduler)
+		public NextDispatch rescheduleIfAfter(final ZonedDateTime date, final TaskScheduler taskScheduler)
 		{
 			if (!notificationTime.isAfter(date) && !scheduledFuture.isDone())
 			{

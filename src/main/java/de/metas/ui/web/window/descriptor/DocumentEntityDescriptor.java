@@ -7,7 +7,6 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.OptionalInt;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
@@ -22,12 +21,15 @@ import org.adempiere.ad.callout.api.impl.CalloutExecutor;
 import org.adempiere.ad.callout.api.impl.NullCalloutExecutor;
 import org.adempiere.ad.callout.spi.ICalloutProvider;
 import org.adempiere.ad.callout.spi.ImmutablePlainCalloutProvider;
+import org.adempiere.ad.element.api.AdTabId;
+import org.adempiere.ad.element.api.AdWindowId;
 import org.adempiere.ad.expression.api.ConstantLogicExpression;
 import org.adempiere.ad.expression.api.ILogicExpression;
 import org.adempiere.ad.ui.api.ITabCalloutFactory;
 import org.adempiere.ad.ui.spi.ITabCallout;
 import org.adempiere.exceptions.AdempiereException;
 import org.adempiere.model.CopyRecordFactory;
+import org.compiere.SpringContextHolder;
 import org.slf4j.Logger;
 
 import com.google.common.base.MoreObjects;
@@ -37,11 +39,13 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Ordering;
 
 import de.metas.i18n.ITranslatableString;
-import de.metas.i18n.ImmutableTranslatableString;
+import de.metas.i18n.TranslatableStrings;
+import de.metas.lang.SOTrx;
 import de.metas.logging.LogManager;
 import de.metas.printing.esb.base.util.Check;
-import de.metas.ui.web.document.filter.DocumentFilterDescriptorsProvider;
-import de.metas.ui.web.document.filter.DocumentFilterDescriptorsProviderFactory;
+import de.metas.process.AdProcessId;
+import de.metas.ui.web.document.filter.provider.DocumentFilterDescriptorsProvider;
+import de.metas.ui.web.document.filter.provider.DocumentFilterDescriptorsProvidersService;
 import de.metas.ui.web.window.datatypes.DataTypes;
 import de.metas.ui.web.window.datatypes.DocumentId;
 import de.metas.ui.web.window.datatypes.DocumentType;
@@ -55,9 +59,10 @@ import de.metas.ui.web.window.model.HighVolumeReadWriteIncludedDocumentsCollecti
 import de.metas.ui.web.window.model.HighVolumeReadonlyIncludedDocumentsCollection;
 import de.metas.ui.web.window.model.IIncludedDocumentsCollection;
 import de.metas.ui.web.window.model.IIncludedDocumentsCollectionFactory;
+import de.metas.ui.web.window.model.SingleRowDetailIncludedDocumentsCollection;
 import de.metas.util.GuavaCollectors;
 import de.metas.util.Services;
-
+import lombok.Getter;
 import lombok.NonNull;
 
 /*
@@ -89,31 +94,46 @@ public class DocumentEntityDescriptor
 		return new Builder();
 	}
 
+	@Getter
 	private final DocumentType documentType;
+	@Getter
 	private final DocumentId documentTypeId;
 	private final String id;
+	@Getter
 	private final String internalName;
 
+	@Getter
 	private final ITranslatableString caption;
+	@Getter
 	private final ITranslatableString description;
 
 	@Nullable
+	@Getter
 	private final DetailId detailId;
 
+	@Getter
 	private final ILogicExpression allowCreateNewLogic;
+	@Getter
 	private final ILogicExpression allowDeleteLogic;
+	@Getter
 	private final ILogicExpression readonlyLogic;
+	@Getter
 	private final ILogicExpression displayLogic;
+	@Getter
+	private final boolean allowQuickInput;
 
 	private final ImmutableMap<String, DocumentFieldDescriptor> fields;
+	@Getter
 	private final ImmutableList<DocumentFieldDescriptor> idFields;
 	private final DocumentFieldDescriptor parentLinkField;
 
 	private final ImmutableMap<DetailId, DocumentEntityDescriptor> includedEntitiesByDetailId;
-	private final IIncludedDocumentsCollectionFactory includedDocumentsCollectionFactory;
+	private final transient IIncludedDocumentsCollectionFactory includedDocumentsCollectionFactory;
 
+	@Getter
 	private final DocumentEntityDataBindingDescriptor dataBinding;
 
+	@Getter
 	private final DocumentFieldDependencyMap dependencies;
 
 	private final ConcurrentHashMap<Characteristic, Set<String>> _fieldNamesByCharacteristic = new ConcurrentHashMap<>();
@@ -122,16 +142,24 @@ public class DocumentEntityDescriptor
 	// Callouts
 	private final boolean calloutsEnabled;
 	private final boolean defaultTableCalloutsEnabled;
-	private final ICalloutExecutor calloutExecutorFactory;
+	private final transient ICalloutExecutor calloutExecutorFactory;
 
+	private final AdProcessId printProcessId;
+
+	//
+	// View related
+	@Getter
 	private final DocumentFilterDescriptorsProvider filterDescriptors;
-
-	private final OptionalInt printProcessId;
+	@Getter
+	private final boolean refreshViewOnChangeEvents;
 
 	// Legacy
-	private final OptionalInt AD_Tab_ID;
+	private final Optional<AdTabId> adTabId;
 	private final Optional<String> tableName;
-	private final Optional<Boolean> isSOTrx;
+	private final Optional<SOTrx> soTrx;
+
+	@Getter
+	private final boolean cloneEnabled;
 
 	private DocumentEntityDescriptor(@NonNull final Builder builder)
 	{
@@ -145,6 +173,7 @@ public class DocumentEntityDescriptor
 		allowDeleteLogic = builder.getAllowDeleteLogic();
 		readonlyLogic = builder.getReadonlyLogic();
 		displayLogic = builder.getDisplayLogic();
+		allowQuickInput = builder.isAllowQuickInput();
 
 		fields = ImmutableMap.copyOf(builder.getFields());
 		idFields = builder.getIdFields();
@@ -165,14 +194,18 @@ public class DocumentEntityDescriptor
 		defaultTableCalloutsEnabled = builder.isDefaultTableCalloutsEnabled();
 		calloutExecutorFactory = builder.buildCalloutExecutorFactory(fields.values());
 
+		printProcessId = builder.getPrintProcessId();
+
+		//
+		// View
 		filterDescriptors = builder.createFilterDescriptors();
-
-		printProcessId = builder.getPrintAD_Process_ID();
-
+		refreshViewOnChangeEvents = builder.isRefreshViewOnChangeEvents();
 		// legacy:
-		AD_Tab_ID = builder.getAD_Tab_ID();
+		adTabId = builder.getAdTabId();
 		tableName = builder.getTableName();
-		isSOTrx = builder.getIsSOTrx();
+		soTrx = builder.getSOTrx();
+
+		cloneEnabled = builder.isCloneEnabled();
 	}
 
 	@Override
@@ -210,21 +243,6 @@ public class DocumentEntityDescriptor
 		return DataTypes.equals(id, other.id);
 	}
 
-	public DocumentType getDocumentType()
-	{
-		return documentType;
-	}
-
-	public DocumentId getDocumentTypeId()
-	{
-		return documentTypeId;
-	}
-
-	public String getInternalName()
-	{
-		return internalName;
-	}
-
 	/**
 	 * @return AD_Window_ID
 	 */
@@ -234,49 +252,9 @@ public class DocumentEntityDescriptor
 		return WindowId.of(documentTypeId);
 	}
 
-	public ITranslatableString getCaption()
-	{
-		return caption;
-	}
-
-	public ITranslatableString getDescription()
-	{
-		return description;
-	}
-
-	public DetailId getDetailId()
-	{
-		return detailId;
-	}
-
-	public ILogicExpression getAllowCreateNewLogic()
-	{
-		return allowCreateNewLogic;
-	}
-
-	public ILogicExpression getAllowDeleteLogic()
-	{
-		return allowDeleteLogic;
-	}
-
-	public ILogicExpression getReadonlyLogic()
-	{
-		return readonlyLogic;
-	}
-
-	public ILogicExpression getDisplayLogic()
-	{
-		return displayLogic;
-	}
-
 	public boolean hasIdFields()
 	{
 		return !idFields.isEmpty();
-	}
-
-	public List<DocumentFieldDescriptor> getIdFields()
-	{
-		return idFields;
 	}
 
 	public DocumentFieldDescriptor getSingleIdFieldOrNull()
@@ -364,6 +342,12 @@ public class DocumentEntityDescriptor
 		return includedEntityDescriptor;
 	}
 
+	public List<DocumentEntityDescriptor> getIncludedEntitiesByTableName(@NonNull final String tableName)
+	{
+		return streamIncludedEntitiesByTableName(tableName)
+				.collect(ImmutableList.toImmutableList());
+	}
+
 	public Stream<DocumentEntityDescriptor> streamIncludedEntitiesByTableName(@NonNull final String tableName)
 	{
 		return includedEntitiesByDetailId.values()
@@ -371,31 +355,20 @@ public class DocumentEntityDescriptor
 				.filter(includedEntity -> tableName.equals(includedEntity.getTableNameOrNull()));
 	}
 
-	public DocumentEntityDataBindingDescriptor getDataBinding()
-	{
-		return dataBinding;
-	}
-
 	public <T extends DocumentEntityDataBindingDescriptor> T getDataBinding(final Class<T> bindingType)
 	{
 		@SuppressWarnings("unchecked")
-		final T dataBindingCasted = (T)dataBinding;
+		final T dataBindingCasted = (T)getDataBinding();
 		return dataBindingCasted;
-	}
-
-	public DocumentFieldDependencyMap getDependencies()
-	{
-		return dependencies;
 	}
 
 	// legacy
 	/**
-	 * @return AD_Tab_ID
 	 * @throws IllegalArgumentException if AD_Tab_ID is not defined
 	 */
-	public int getAD_Tab_ID()
+	public AdTabId getAdTabId()
 	{
-		return AD_Tab_ID.orElseThrow(() -> new IllegalStateException("No TableName defined for " + this));
+		return adTabId.orElseThrow(() -> new IllegalStateException("No TableName defined for " + this));
 	}
 
 	// legacy
@@ -415,9 +388,9 @@ public class DocumentEntityDescriptor
 	}
 
 	// legacy
-	public Optional<Boolean> getIsSOTrx()
+	public Optional<SOTrx> getSOTrx()
 	{
-		return isSOTrx;
+		return soTrx;
 	}
 
 	public ITabCallout createAndInitializeDocumentCallout(final ICalloutRecord documentAsCalloutRecord)
@@ -438,35 +411,18 @@ public class DocumentEntityDescriptor
 		return calloutExecutorFactory.newInstanceSharingMasterData();
 	}
 
-	public DocumentFilterDescriptorsProvider getFilterDescriptors()
+	public AdProcessId getPrintProcessId()
 	{
-		return filterDescriptors;
-	}
-
-	public int getPrintProcessId()
-	{
-		return printProcessId.orElseThrow(() -> new IllegalStateException("No print process configured for " + this));
+		if (printProcessId == null)
+		{
+			new AdempiereException("No print process configured for " + this);
+		}
+		return printProcessId;
 	}
 
 	public boolean isPrintable()
 	{
-		return printProcessId.orElse(-1) > 0;
-	}
-
-	public boolean isCloneEnabled()
-	{
-		if (!CopyRecordFactory.isEnabled())
-		{
-			return false;
-		}
-
-		final String tableName = getTableNameOrNull();
-		if (tableName == null)
-		{
-			return false;
-		}
-
-		return CopyRecordFactory.isEnabledForTableName(tableName);
+		return printProcessId != null;
 	}
 
 	//
@@ -478,6 +434,7 @@ public class DocumentEntityDescriptor
 	public static final class Builder
 	{
 		private static final Logger logger = LogManager.getLogger(DocumentEntityDescriptor.Builder.class);
+		private DocumentFilterDescriptorsProvidersService filterDescriptorsProvidersService;
 
 		private boolean _built = false;
 
@@ -486,8 +443,8 @@ public class DocumentEntityDescriptor
 
 		private String _internalName;
 
-		private ITranslatableString _caption = ImmutableTranslatableString.empty();
-		private ITranslatableString _description = ImmutableTranslatableString.empty();
+		private ITranslatableString _caption = TranslatableStrings.empty();
+		private ITranslatableString _description = TranslatableStrings.empty();
 
 		private final Map<String, DocumentFieldDescriptor.Builder> _fieldBuilders = new LinkedHashMap<>();
 		private Map<String, DocumentFieldDescriptor> _fields = null; // will be built
@@ -501,18 +458,25 @@ public class DocumentEntityDescriptor
 		private ILogicExpression _allowDeleteLogic = ConstantLogicExpression.TRUE;
 		private ILogicExpression _displayLogic = ConstantLogicExpression.TRUE;
 		private ILogicExpression _readonlyLogic = ConstantLogicExpression.FALSE;
+		private boolean _allowQuickInput = false;
+		private boolean _refreshViewOnChangeEvents = false;
 
 		//
 		// Callouts
 		private boolean _calloutsEnabled = true; // enabled by default
 		private boolean _defaultTableCalloutsEnabled = true; // enabled by default
 
-		private OptionalInt _printProcessId = OptionalInt.empty();
+		private AdProcessId _printProcessId = null;
+
+		private Boolean _cloneEnabled = null;
+
+		@Getter
+		private boolean singleRowDetail = false;
 
 		// Legacy
-		private OptionalInt _AD_Tab_ID = OptionalInt.empty();
+		private Optional<AdTabId> _adTabId = Optional.empty();
 		private Optional<String> _tableName = Optional.empty();
-		private Optional<Boolean> _isSOTrx = Optional.empty();
+		private Optional<SOTrx> _soTrx = Optional.empty();
 
 		private Builder()
 		{
@@ -539,7 +503,7 @@ public class DocumentEntityDescriptor
 			return new DocumentEntityDescriptor(this);
 		}
 
-		private final void assertNotBuilt()
+		private void assertNotBuilt()
 		{
 			if (_built)
 			{
@@ -601,7 +565,7 @@ public class DocumentEntityDescriptor
 			return _detailId;
 		}
 
-		private final void assertFieldsNotBuilt()
+		private void assertFieldsNotBuilt()
 		{
 			assertNotBuilt();
 			Check.assumeNull(_fields, "Fields not already built");
@@ -655,7 +619,7 @@ public class DocumentEntityDescriptor
 			return _fieldBuilders.size();
 		}
 
-		private final void updateFieldBuilders(final Consumer<DocumentFieldDescriptor.Builder> fieldUpdater)
+		private void updateFieldBuilders(final Consumer<DocumentFieldDescriptor.Builder> fieldUpdater)
 		{
 			assertFieldsNotBuilt();
 
@@ -735,7 +699,16 @@ public class DocumentEntityDescriptor
 			}
 		}
 
-		public Builder addIncludedEntity(final DocumentEntityDescriptor includedEntity)
+		public Builder addAllIncludedEntities(@NonNull final Collection<DocumentEntityDescriptor> includedEntities)
+		{
+			for (final DocumentEntityDescriptor includedEntity : includedEntities)
+			{
+				addIncludedEntity(includedEntity);
+			}
+			return this;
+		}
+
+		public Builder addIncludedEntity(@NonNull final DocumentEntityDescriptor includedEntity)
 		{
 			final DetailId detailId = includedEntity.getDetailId();
 			Check.assumeNotNull(detailId, "detailId is not null for {}", includedEntity);
@@ -750,6 +723,11 @@ public class DocumentEntityDescriptor
 
 		public IIncludedDocumentsCollectionFactory getIncludedDocumentsCollectionFactory()
 		{
+			if (isSingleRowDetail())
+			{
+				return SingleRowDetailIncludedDocumentsCollection::new;
+			}
+
 			if (isHighVolume())
 			{
 				if (getReadonlyLogic().isConstantTrue())
@@ -762,12 +740,8 @@ public class DocumentEntityDescriptor
 				}
 			}
 
-			//
 			// Fallback
-			// NOTE: it turned out that HighVolumeReadWriteIncludedDocumentsCollection is behaving nice on document lines too (e.g. C_Order->C_OrderLine)
-			// so we are considering not using IncludedDocumentsCollection.
 			return HighVolumeReadWriteIncludedDocumentsCollection::newInstance;
-			// return IncludedDocumentsCollection::newInstance;
 		}
 
 		public Builder setDataBinding(final DocumentEntityDataBindingDescriptorBuilder dataBindingBuilder)
@@ -800,6 +774,12 @@ public class DocumentEntityDescriptor
 			return _highVolume;
 		}
 
+		public Builder setSingleRowDetail(final boolean singleRowDetail)
+		{
+			this.singleRowDetail = singleRowDetail;
+			return this;
+		}
+
 		public boolean isQueryIncludedTabOnActivate()
 		{
 			return true;
@@ -824,10 +804,9 @@ public class DocumentEntityDescriptor
 			return this;
 		}
 
-		public Builder setDocumentType(final DocumentType documentType, final int documentTypeIdInt)
+		public Builder setDocumentType(@NonNull final AdWindowId adWindowId)
 		{
-			setDocumentType(documentType, DocumentId.of(documentTypeIdInt));
-			return this;
+			return setDocumentType(DocumentType.Window, DocumentId.of(adWindowId.getRepoId()));
 		}
 
 		public DocumentType getDocumentType()
@@ -844,19 +823,13 @@ public class DocumentEntityDescriptor
 
 		public Builder setAD_Tab_ID(final int AD_Tab_ID)
 		{
-			_AD_Tab_ID = AD_Tab_ID > 0 ? OptionalInt.of(AD_Tab_ID) : OptionalInt.empty();
+			_adTabId = Optional.ofNullable(AdTabId.ofRepoIdOrNull(AD_Tab_ID));
 			return this;
 		}
 
-		public Builder setAD_Tab_ID(final OptionalInt AD_Tab_ID)
+		public Optional<AdTabId> getAdTabId()
 		{
-			_AD_Tab_ID = AD_Tab_ID != null ? AD_Tab_ID : OptionalInt.empty();
-			return this;
-		}
-
-		public OptionalInt getAD_Tab_ID()
-		{
-			return _AD_Tab_ID;
+			return _adTabId;
 		}
 
 		public Builder setTableName(final String tableName)
@@ -888,7 +861,7 @@ public class DocumentEntityDescriptor
 
 		public Builder setCaption(final Map<String, String> captionTrls, final String defaultCaption)
 		{
-			_caption = ImmutableTranslatableString.ofMap(captionTrls, defaultCaption);
+			_caption = TranslatableStrings.ofMap(captionTrls, defaultCaption);
 			return this;
 		}
 
@@ -901,7 +874,7 @@ public class DocumentEntityDescriptor
 
 		public Builder setCaption(final String caption)
 		{
-			_caption = ImmutableTranslatableString.constant(caption);
+			_caption = TranslatableStrings.constant(caption);
 			return this;
 		}
 
@@ -912,7 +885,7 @@ public class DocumentEntityDescriptor
 
 		public Builder setDescription(final Map<String, String> descriptionTrls, final String defaultDescription)
 		{
-			_description = ImmutableTranslatableString.ofMap(descriptionTrls, defaultDescription);
+			_description = TranslatableStrings.ofMap(descriptionTrls, defaultDescription);
 			return this;
 		}
 
@@ -925,7 +898,7 @@ public class DocumentEntityDescriptor
 
 		public Builder setDescription(final String description)
 		{
-			_description = ImmutableTranslatableString.constant(description);
+			_description = TranslatableStrings.constant(description);
 			return this;
 		}
 
@@ -936,19 +909,19 @@ public class DocumentEntityDescriptor
 
 		public Builder setIsSOTrx(final boolean isSOTrx)
 		{
-			_isSOTrx = Optional.of(isSOTrx);
+			_soTrx = Optional.of(SOTrx.ofBoolean(isSOTrx));
 			return this;
 		}
 
-		public Builder setIsSOTrx(final Optional<Boolean> isSOTrx)
+		public Builder setIsSOTrx(final Optional<SOTrx> soTrx)
 		{
-			_isSOTrx = isSOTrx != null ? isSOTrx : Optional.empty();
+			_soTrx = soTrx != null ? soTrx : Optional.empty();
 			return this;
 		}
 
-		public Optional<Boolean> getIsSOTrx()
+		public Optional<SOTrx> getSOTrx()
 		{
-			return _isSOTrx;
+			return _soTrx;
 		}
 
 		public Builder setAllowCreateNewLogic(final ILogicExpression allowCreateNewLogic)
@@ -996,6 +969,17 @@ public class DocumentEntityDescriptor
 		private ILogicExpression getReadonlyLogic()
 		{
 			return _readonlyLogic;
+		}
+
+		public Builder setAllowQuickInput(final boolean allowQuickInput)
+		{
+			this._allowQuickInput = allowQuickInput;
+			return this;
+		}
+
+		public boolean isAllowQuickInput()
+		{
+			return _allowQuickInput;
 		}
 
 		/**
@@ -1076,23 +1060,74 @@ public class DocumentEntityDescriptor
 			return calloutExecutorBuilder.build();
 		}
 
-		private final DocumentFilterDescriptorsProvider createFilterDescriptors()
+		private DocumentFilterDescriptorsProvider createFilterDescriptors()
 		{
+			final DocumentFilterDescriptorsProvidersService filterDescriptorsProvidersService = this.filterDescriptorsProvidersService != null
+					? this.filterDescriptorsProvidersService
+					: SpringContextHolder.instance.getBean(DocumentFilterDescriptorsProvidersService.class);
+
 			final String tableName = getTableName().orElse(null);
-			final int adTabId = getAD_Tab_ID().orElse(-1);
+			final AdTabId adTabId = getAdTabId().orElse(null);
 			final Collection<DocumentFieldDescriptor> fields = getFields().values();
-			return DocumentFilterDescriptorsProviderFactory.instance.createFiltersProvider(adTabId, tableName, fields);
+
+			return filterDescriptorsProvidersService.createFiltersProvider(adTabId, tableName, fields);
 		}
 
-		public Builder setPrintAD_Process_ID(final int printProcessId)
+		public Builder setFilterDescriptorsProvidersService(final DocumentFilterDescriptorsProvidersService filterDescriptorsProvidersService)
 		{
-			_printProcessId = printProcessId > 0 ? OptionalInt.of(printProcessId) : OptionalInt.empty();
+			this.filterDescriptorsProvidersService = filterDescriptorsProvidersService;
 			return this;
 		}
 
-		private OptionalInt getPrintAD_Process_ID()
+		public Builder setRefreshViewOnChangeEvents(final boolean refreshViewOnChangeEvents)
+		{
+			this._refreshViewOnChangeEvents = refreshViewOnChangeEvents;
+			return this;
+		}
+
+		private boolean isRefreshViewOnChangeEvents()
+		{
+			return _refreshViewOnChangeEvents;
+		}
+
+		public Builder setPrintProcessId(final AdProcessId printProcessId)
+		{
+			_printProcessId = printProcessId;
+			return this;
+		}
+
+		private AdProcessId getPrintProcessId()
 		{
 			return _printProcessId;
+		}
+
+		public Builder setCloneEnabled(final boolean cloneEnabled)
+		{
+			_cloneEnabled = cloneEnabled;
+			return this;
+		}
+
+		private boolean isCloneEnabled()
+		{
+			if (_cloneEnabled != null)
+			{
+				return _cloneEnabled;
+			}
+			return isCloneEnabled(_tableName);
+		}
+
+		private static boolean isCloneEnabled(@Nullable final Optional<String> tableName)
+		{
+			if (tableName == null || !tableName.isPresent())
+			{
+				return false;
+			}
+
+			if (!CopyRecordFactory.isEnabled())
+			{
+				return false;
+			}
+			return CopyRecordFactory.isEnabledForTableName(tableName.get());
 		}
 
 		public List<DocumentQueryOrderBy> getDefaultOrderBys()

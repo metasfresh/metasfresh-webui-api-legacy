@@ -16,7 +16,6 @@ import org.adempiere.util.lang.MutableInt;
 import org.adempiere.util.lang.impl.TableRecordReferenceSet;
 import org.compiere.Adempiere;
 import org.compiere.util.DB;
-import org.compiere.util.Util.ArrayKey;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -71,7 +70,7 @@ public class ViewsRepository implements IViewsRepository
 {
 	private static final Logger logger = LogManager.getLogger(ViewsRepository.class);
 
-	private final ImmutableMap<ArrayKey, IViewFactory> factories;
+	private final ImmutableMap<ViewFactoryKey, IViewFactory> factories;
 	@Autowired
 	private SqlViewFactory defaultFactory;
 
@@ -131,16 +130,20 @@ public class ViewsRepository implements IViewsRepository
 		}
 	}
 
-	private static ImmutableMap<ArrayKey, IViewFactory> createFactoriesMap(final Collection<IViewFactory> viewFactories)
+	private static ImmutableMap<ViewFactoryKey, IViewFactory> createFactoriesMap(final Collection<IViewFactory> viewFactories)
 	{
-		final Map<ArrayKey, IViewFactory> factories = new HashMap<>();
+		final Map<ViewFactoryKey, IViewFactory> factories = new HashMap<>();
 		for (final IViewFactory factory : viewFactories)
 		{
 			final ViewFactory annotation = factory.getClass().getAnnotation(ViewFactory.class);
 			if (annotation == null)
 			{
-				// this might be a development bug
-				logger.warn("Skip {} because it's not annotated with {}", factory, ViewFactory.class);
+				// Don't need to warn about this one. It's a known case.
+				if (!SqlViewFactory.class.equals(factory.getClass()))
+				{
+					// this might be a development bug
+					logger.warn("Skip {} because it's not annotated with {}", factory, ViewFactory.class);
+				}
 				continue;
 			}
 
@@ -153,7 +156,7 @@ public class ViewsRepository implements IViewsRepository
 
 			for (final JSONViewDataType viewType : viewTypes)
 			{
-				factories.put(mkFactoryKey(windowId, viewType), factory);
+				factories.put(ViewFactoryKey.of(windowId, viewType), factory);
 			}
 		}
 
@@ -183,24 +186,19 @@ public class ViewsRepository implements IViewsRepository
 
 	private final IViewFactory getFactory(final WindowId windowId, final JSONViewDataType viewType)
 	{
-		IViewFactory factory = factories.get(mkFactoryKey(windowId, viewType));
+		IViewFactory factory = factories.get(ViewFactoryKey.of(windowId, viewType));
 		if (factory != null)
 		{
 			return factory;
 		}
 
-		factory = factories.get(mkFactoryKey(windowId, null));
+		factory = factories.get(ViewFactoryKey.of(windowId, null));
 		if (factory != null)
 		{
 			return factory;
 		}
 
 		return defaultFactory;
-	}
-
-	private static final ArrayKey mkFactoryKey(final WindowId windowId, final JSONViewDataType viewType)
-	{
-		return ArrayKey.of(windowId, viewType);
 	}
 
 	@Override
@@ -362,7 +360,7 @@ public class ViewsRepository implements IViewsRepository
 		final IView view = getViewsStorageFor(viewId).getByIdOrNull(viewId);
 		if (view == null)
 		{
-			throw new EntityNotFoundException("No view found for viewId=" + viewId);
+			throw new EntityNotFoundException("View not found: " + viewId.toJson());
 		}
 
 		DocumentPermissionsHelper.assertViewAccess(viewId.getWindowId(), viewId.getViewId(), UserSession.getCurrentPermissions());
@@ -371,10 +369,10 @@ public class ViewsRepository implements IViewsRepository
 	}
 
 	@Override
-	public void deleteView(final ViewId viewId)
+	public void closeView(@NonNull final ViewId viewId, @NonNull final ViewCloseAction closeAction)
 	{
-		getViewsStorageFor(viewId).removeById(viewId);
-		logger.trace("Removed view {}", viewId);
+		getViewsStorageFor(viewId).closeById(viewId, closeAction);
+		logger.trace("Closed/Removed view {} using close action {}", viewId, closeAction);
 	}
 
 	@Override
@@ -382,6 +380,12 @@ public class ViewsRepository implements IViewsRepository
 	{
 		getViewsStorageFor(viewId).invalidateView(viewId);
 		logger.trace("Invalided view {}", viewId);
+	}
+
+	@Override
+	public void invalidateView(final IView view)
+	{
+		invalidateView(view.getViewId());
 	}
 
 	@Override
@@ -399,11 +403,25 @@ public class ViewsRepository implements IViewsRepository
 			final MutableInt notifiedCount = MutableInt.zero();
 			streamAllViews()
 					.forEach(view -> {
-						view.notifyRecordsChanged(recordRefs);
-						notifiedCount.incrementAndGet();
+						try
+						{
+							view.notifyRecordsChanged(recordRefs);
+							notifiedCount.incrementAndGet();
+						}
+						catch (final Exception ex)
+						{
+							logger.warn("Failed calling notifyRecordsChanged for view={} with recordRefs={}. Ignored.", view, recordRefs, ex);
+						}
 					});
 
 			logger.debug("Notified {} views about changed records: {}", notifiedCount, recordRefs);
 		}
+	}
+
+	@lombok.Value(staticConstructor = "of")
+	private static class ViewFactoryKey
+	{
+		WindowId windowId;
+		JSONViewDataType viewType;
 	}
 }

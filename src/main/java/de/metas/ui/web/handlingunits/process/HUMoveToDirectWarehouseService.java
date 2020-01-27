@@ -13,6 +13,7 @@ import org.slf4j.Logger;
 import com.google.common.collect.ImmutableSet;
 
 import de.metas.handlingunits.HuId;
+import de.metas.handlingunits.IHandlingUnitsBL;
 import de.metas.handlingunits.model.I_M_HU;
 import de.metas.handlingunits.movement.api.IHUMovementBL;
 import de.metas.handlingunits.movement.api.impl.HUMovementBuilder;
@@ -22,7 +23,7 @@ import de.metas.ui.web.handlingunits.HUEditorView;
 import de.metas.ui.web.view.event.ViewChangesCollector;
 import de.metas.ui.web.window.model.DocumentCollection;
 import de.metas.util.ILoggable;
-import de.metas.util.NullLoggable;
+import de.metas.util.Loggables;
 import de.metas.util.Services;
 import lombok.NonNull;
 
@@ -71,7 +72,7 @@ public class HUMoveToDirectWarehouseService
 	private String _description = null;
 	private boolean _failOnFirstError = false;
 	private boolean _failIfNoHUs = false; // default false for backward compatibility
-	private ILoggable loggable = NullLoggable.instance;
+	private ILoggable loggable = Loggables.nop();
 	private HUEditorView huView;
 
 	// state
@@ -135,7 +136,7 @@ public class HUMoveToDirectWarehouseService
 			// Move the HU
 			final I_M_Movement movement = new HUMovementBuilder()
 					.setContextInitial(PlainContextAware.newWithThreadInheritedTrx())
-					.setWarehouseFrom(hu.getM_Locator().getM_Warehouse())
+					.setWarehouseFrom(IHandlingUnitsBL.extractWarehouse(hu))
 					.setWarehouseTo(targetWarehouse)
 					.setMovementDate(getMovementDate())
 					.setDescription(getDescription())

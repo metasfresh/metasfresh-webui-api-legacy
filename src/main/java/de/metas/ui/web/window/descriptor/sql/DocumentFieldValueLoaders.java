@@ -2,13 +2,16 @@ package de.metas.ui.web.window.descriptor.sql;
 
 import java.awt.Color;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.sql.Array;
 import java.sql.Blob;
 import java.sql.Clob;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZonedDateTime;
 
 import org.compiere.util.DisplayType;
@@ -16,7 +19,8 @@ import org.compiere.util.SecureEngine;
 import org.compiere.util.TimeUtil;
 import org.slf4j.Logger;
 
-import de.metas.i18n.ImmutableTranslatableString;
+import de.metas.i18n.ITranslatableString;
+import de.metas.i18n.TranslatableStrings;
 import de.metas.logging.LogManager;
 import de.metas.ui.web.window.datatypes.ColorValue;
 import de.metas.ui.web.window.datatypes.LookupValue.IntegerLookupValue;
@@ -30,7 +34,6 @@ import de.metas.util.IColorRepository;
 import de.metas.util.MFColor;
 import de.metas.util.NumberUtils;
 import de.metas.util.Services;
-
 import lombok.Builder;
 import lombok.NonNull;
 import lombok.Value;
@@ -59,13 +62,13 @@ import lombok.Value;
 
 /**
  * Factory methods to create specific {@link DocumentFieldValueLoader} instances.
- * 
+ *
  * @author metas-dev <dev@metasfresh.com>
  *
  */
 public final class DocumentFieldValueLoaders
 {
-	public static final DocumentFieldValueLoader toString(final String sqlColumnName, final boolean encrypted)
+	public static DocumentFieldValueLoader toString(final String sqlColumnName, final boolean encrypted)
 	{
 		if (encrypted)
 		{
@@ -77,7 +80,7 @@ public final class DocumentFieldValueLoaders
 		}
 	}
 
-	public static final DocumentFieldValueLoader toPassword(final String sqlColumnName, final boolean encrypted)
+	public static DocumentFieldValueLoader toPassword(final String sqlColumnName, final boolean encrypted)
 	{
 		if (encrypted)
 		{
@@ -89,37 +92,42 @@ public final class DocumentFieldValueLoaders
 		}
 	}
 
-	public static final DocumentFieldValueLoader toByteArray(final String sqlColumnName, final boolean encrypted)
+	public static DocumentFieldValueLoader toByteArray(final String sqlColumnName, final boolean encrypted)
 	{
 		return new ByteArrayDocumentFieldValueLoader(sqlColumnName, encrypted);
 	}
 
-	public static final DocumentFieldValueLoader toBoolean(final String sqlColumnName, final boolean encrypted)
+	public static DocumentFieldValueLoader toBoolean(final String sqlColumnName, final boolean encrypted)
 	{
 		return new BooleanDocumentFieldValueLoader(sqlColumnName, encrypted);
 	}
 
-	public static final DocumentFieldValueLoader toJULDate(final String sqlColumnName, final boolean encrypted)
+	public static DocumentFieldValueLoader toJULDate(final String sqlColumnName, final boolean encrypted)
 	{
 		return new JULDateDocumentFieldValueLoader(sqlColumnName, encrypted);
 	}
 
-	public static final DocumentFieldValueLoader toZonedDateTime(final String sqlColumnName, final boolean encrypted)
+	public static DocumentFieldValueLoader toZonedDateTime(final String sqlColumnName, final boolean encrypted)
 	{
 		return new ZonedDateTimeDocumentFieldValueLoader(sqlColumnName, encrypted);
 	}
 
-	public static final DocumentFieldValueLoader toLocalDateTime(final String sqlColumnName, final boolean encrypted)
+	public static DocumentFieldValueLoader toInstant(final String sqlColumnName, final boolean encrypted)
 	{
-		return new LocalDateTimeDocumentFieldValueLoader(sqlColumnName, encrypted);
+		return new InstantDocumentFieldValueLoader(sqlColumnName, encrypted);
 	}
 
-	public static final DocumentFieldValueLoader toLocalDate(final String sqlColumnName, final boolean encrypted)
+	public static DocumentFieldValueLoader toLocalDate(final String sqlColumnName, final boolean encrypted)
 	{
 		return new LocalDateDocumentFieldValueLoader(sqlColumnName, encrypted);
 	}
 
-	public static final DocumentFieldValueLoader toBigDecimal(final String sqlColumnName, final boolean encrypted, final Integer precision)
+	public static DocumentFieldValueLoader toLocalTime(final String sqlColumnName, final boolean encrypted)
+	{
+		return new LocalTimeDocumentFieldValueLoader(sqlColumnName, encrypted);
+	}
+
+	public static DocumentFieldValueLoader toBigDecimal(final String sqlColumnName, final boolean encrypted, final Integer precision)
 	{
 		if (precision != null)
 		{
@@ -131,12 +139,15 @@ public final class DocumentFieldValueLoaders
 		}
 	}
 
-	public static final DocumentFieldValueLoader toInteger(final String sqlColumnName, final boolean encrypted)
+	public static DocumentFieldValueLoader toInteger(final String sqlColumnName, final boolean encrypted)
 	{
 		return new IntegerDocumentFieldValueLoader(sqlColumnName, encrypted);
 	}
 
-	public static final DocumentFieldValueLoader toLookupValue(final String sqlColumnName, final String sqlDisplayColumnName, final boolean numericKey)
+	public static DocumentFieldValueLoader toLookupValue(
+			@NonNull final String sqlColumnName,
+			@NonNull final String sqlDisplayColumnName,
+			final boolean numericKey)
 	{
 		if (Check.isEmpty(sqlDisplayColumnName, true))
 		{
@@ -145,20 +156,20 @@ public final class DocumentFieldValueLoaders
 
 		if (numericKey)
 		{
-			return new IntegerLookupValueDocumentFieldValueLoader(sqlColumnName, sqlDisplayColumnName);
+			return new IntegerLookupValueDocumentFieldValueLoader(sqlColumnName, sqlDisplayColumnName/* , sqlDescriptionColumnName */);
 		}
 		else
 		{
-			return new StringLookupValueDocumentFieldValueLoader(sqlColumnName, sqlDisplayColumnName);
+			return new StringLookupValueDocumentFieldValueLoader(sqlColumnName, sqlDisplayColumnName/* , sqlDescriptionColumnName */);
 		}
 	}
 
-	public static final DocumentFieldValueLoader toLabelValues(final String sqlColumnName)
+	public static DocumentFieldValueLoader toLabelValues(final String sqlColumnName)
 	{
 		return new LabelsLookupValueDocumentFieldValueLoader(sqlColumnName);
 	}
 
-	public static final DocumentFieldValueLoader toColor(final String sqlColumnName)
+	public static DocumentFieldValueLoader toColor(final String sqlColumnName)
 	{
 		return new ColorDocumentFieldValueLoader(sqlColumnName);
 	}
@@ -175,7 +186,7 @@ public final class DocumentFieldValueLoaders
 	{
 	}
 
-	private static final Object decrypt(final Object value)
+	private static Object decrypt(final Object value)
 	{
 		if (value == null)
 		{
@@ -190,7 +201,7 @@ public final class DocumentFieldValueLoaders
 		private final String sqlColumnName;
 
 		@Override
-		public Object retrieveFieldValue(final ResultSet rs, final boolean isDisplayColumnAvailable, final String adLanguage, final LookupDescriptor lookupDescriptor) throws SQLException
+		public Object retrieveFieldValue(final ResultSet rs, final boolean isDisplayColumnAvailable, final String adLanguage, final LookupDescriptor lookupDescriptor_NOTUSED) throws SQLException
 		{
 			final String value = rs.getString(sqlColumnName);
 			return value;
@@ -203,7 +214,7 @@ public final class DocumentFieldValueLoaders
 		private final String sqlColumnName;
 
 		@Override
-		public Object retrieveFieldValue(final ResultSet rs, final boolean isDisplayColumnAvailable, final String adLanguage, final LookupDescriptor lookupDescriptor) throws SQLException
+		public Object retrieveFieldValue(final ResultSet rs, final boolean isDisplayColumnAvailable, final String adLanguage, final LookupDescriptor lookupDescriptor_NOTUSED) throws SQLException
 		{
 			final String value = rs.getString(sqlColumnName);
 			return decrypt(value);
@@ -216,7 +227,7 @@ public final class DocumentFieldValueLoaders
 		private final String sqlColumnName;
 
 		@Override
-		public Password retrieveFieldValue(final ResultSet rs, final boolean isDisplayColumnAvailable, final String adLanguage, final LookupDescriptor lookupDescriptor) throws SQLException
+		public Password retrieveFieldValue(final ResultSet rs, final boolean isDisplayColumnAvailable, final String adLanguage, final LookupDescriptor lookupDescriptor_NOTUSED) throws SQLException
 		{
 			final String value = rs.getString(sqlColumnName);
 			return Password.ofNullableString(value);
@@ -229,7 +240,7 @@ public final class DocumentFieldValueLoaders
 		private final String sqlColumnName;
 
 		@Override
-		public Password retrieveFieldValue(final ResultSet rs, final boolean isDisplayColumnAvailable, final String adLanguage, final LookupDescriptor lookupDescriptor) throws SQLException
+		public Password retrieveFieldValue(final ResultSet rs, final boolean isDisplayColumnAvailable, final String adLanguage, final LookupDescriptor lookupDescriptor_NOTUSED) throws SQLException
 		{
 			final String value = rs.getString(sqlColumnName);
 			final Object valueDecrypted = decrypt(value);
@@ -248,7 +259,7 @@ public final class DocumentFieldValueLoaders
 		private final boolean encrypted;
 
 		@Override
-		public byte[] retrieveFieldValue(final ResultSet rs, final boolean isDisplayColumnAvailable, final String adLanguage, final LookupDescriptor lookupDescriptor) throws SQLException
+		public byte[] retrieveFieldValue(final ResultSet rs, final boolean isDisplayColumnAvailable, final String adLanguage, final LookupDescriptor lookupDescriptor_NOTUSED) throws SQLException
 		{
 			final Object valueObj = rs.getObject(sqlColumnName);
 			final byte[] valueBytes;
@@ -260,7 +271,7 @@ public final class DocumentFieldValueLoaders
 			{
 				final Clob lob = (Clob)valueObj;
 				final long length = lob.length();
-				valueBytes = lob.getSubString(1, (int)length).getBytes();
+				valueBytes = lob.getSubString(1, (int)length).getBytes(StandardCharsets.UTF_8);
 			}
 			else if (valueObj instanceof Blob)
 			{
@@ -270,7 +281,7 @@ public final class DocumentFieldValueLoaders
 			}
 			else if (valueObj instanceof String)
 			{
-				valueBytes = ((String)valueObj).getBytes();
+				valueBytes = ((String)valueObj).getBytes(StandardCharsets.UTF_8);
 			}
 			else if (valueObj instanceof byte[])
 			{
@@ -293,7 +304,7 @@ public final class DocumentFieldValueLoaders
 		private final boolean encrypted;
 
 		@Override
-		public Boolean retrieveFieldValue(final ResultSet rs, final boolean isDisplayColumnAvailable, final String adLanguage, final LookupDescriptor lookupDescriptor) throws SQLException
+		public Boolean retrieveFieldValue(final ResultSet rs, final boolean isDisplayColumnAvailable, final String adLanguage, final LookupDescriptor lookupDescriptor_NOTUSED) throws SQLException
 		{
 			String valueStr = rs.getString(sqlColumnName);
 			if (encrypted)
@@ -312,7 +323,7 @@ public final class DocumentFieldValueLoaders
 		private final boolean encrypted;
 
 		@Override
-		public Object retrieveFieldValue(final ResultSet rs, final boolean isDisplayColumnAvailable, final String adLanguage, final LookupDescriptor lookupDescriptor) throws SQLException
+		public Object retrieveFieldValue(final ResultSet rs, final boolean isDisplayColumnAvailable, final String adLanguage, final LookupDescriptor lookupDescriptor_NOTUSED) throws SQLException
 		{
 			final Timestamp valueTS = rs.getTimestamp(sqlColumnName);
 			final java.util.Date value = valueTS == null ? null : new java.util.Date(valueTS.getTime());
@@ -327,7 +338,7 @@ public final class DocumentFieldValueLoaders
 		private final boolean encrypted;
 
 		@Override
-		public Object retrieveFieldValue(final ResultSet rs, final boolean isDisplayColumnAvailable, final String adLanguage, final LookupDescriptor lookupDescriptor) throws SQLException
+		public Object retrieveFieldValue(final ResultSet rs, final boolean isDisplayColumnAvailable, final String adLanguage, final LookupDescriptor lookupDescriptor_NOTUSED) throws SQLException
 		{
 			final ZonedDateTime value = TimeUtil.asZonedDateTime(rs.getTimestamp(sqlColumnName));
 			return encrypted ? decrypt(value) : value;
@@ -335,15 +346,15 @@ public final class DocumentFieldValueLoaders
 	}
 
 	@Value
-	private static final class LocalDateTimeDocumentFieldValueLoader implements DocumentFieldValueLoader
+	private static final class InstantDocumentFieldValueLoader implements DocumentFieldValueLoader
 	{
 		private final String sqlColumnName;
 		private final boolean encrypted;
 
 		@Override
-		public Object retrieveFieldValue(final ResultSet rs, final boolean isDisplayColumnAvailable, final String adLanguage, final LookupDescriptor lookupDescriptor) throws SQLException
+		public Object retrieveFieldValue(final ResultSet rs, final boolean isDisplayColumnAvailable, final String adLanguage, final LookupDescriptor lookupDescriptor_NOTUSED) throws SQLException
 		{
-			final LocalDateTime value = TimeUtil.asLocalDateTime(rs.getTimestamp(sqlColumnName));
+			final Instant value = TimeUtil.asInstant(rs.getTimestamp(sqlColumnName));
 			return encrypted ? decrypt(value) : value;
 		}
 	}
@@ -355,9 +366,23 @@ public final class DocumentFieldValueLoaders
 		private final boolean encrypted;
 
 		@Override
-		public Object retrieveFieldValue(final ResultSet rs, final boolean isDisplayColumnAvailable, final String adLanguage, final LookupDescriptor lookupDescriptor) throws SQLException
+		public Object retrieveFieldValue(final ResultSet rs, final boolean isDisplayColumnAvailable, final String adLanguage, final LookupDescriptor lookupDescriptor_NOTUSED) throws SQLException
 		{
 			final LocalDate value = TimeUtil.asLocalDate(rs.getTimestamp(sqlColumnName));
+			return encrypted ? decrypt(value) : value;
+		}
+	}
+
+	@Value
+	private static final class LocalTimeDocumentFieldValueLoader implements DocumentFieldValueLoader
+	{
+		private final String sqlColumnName;
+		private final boolean encrypted;
+
+		@Override
+		public Object retrieveFieldValue(final ResultSet rs, final boolean isDisplayColumnAvailable, final String adLanguage, final LookupDescriptor lookupDescriptor_NOTUSED) throws SQLException
+		{
+			final LocalTime value = TimeUtil.asLocalTime(rs.getTimestamp(sqlColumnName));
 			return encrypted ? decrypt(value) : value;
 		}
 	}
@@ -369,7 +394,7 @@ public final class DocumentFieldValueLoaders
 		private final boolean encrypted;
 
 		@Override
-		public Object retrieveFieldValue(final ResultSet rs, final boolean isDisplayColumnAvailable, final String adLanguage, final LookupDescriptor lookupDescriptor) throws SQLException
+		public Object retrieveFieldValue(final ResultSet rs, final boolean isDisplayColumnAvailable, final String adLanguage, final LookupDescriptor lookupDescriptor_NOTUSED) throws SQLException
 		{
 			final BigDecimal value = rs.getBigDecimal(sqlColumnName);
 			return encrypted ? decrypt(value) : value;
@@ -384,7 +409,7 @@ public final class DocumentFieldValueLoaders
 		private final int precision;
 
 		@Override
-		public Object retrieveFieldValue(final ResultSet rs, final boolean isDisplayColumnAvailable, final String adLanguage, final LookupDescriptor lookupDescriptor) throws SQLException
+		public Object retrieveFieldValue(final ResultSet rs, final boolean isDisplayColumnAvailable, final String adLanguage, final LookupDescriptor lookupDescriptor_NOTUSED) throws SQLException
 		{
 			BigDecimal value = rs.getBigDecimal(sqlColumnName);
 			value = value == null ? null : NumberUtils.setMinimumScale(value, precision);
@@ -399,7 +424,7 @@ public final class DocumentFieldValueLoaders
 		private final boolean encrypted;
 
 		@Override
-		public Object retrieveFieldValue(final ResultSet rs, final boolean isDisplayColumnAvailable, final String adLanguage, final LookupDescriptor lookupDescriptor) throws SQLException
+		public Object retrieveFieldValue(final ResultSet rs, final boolean isDisplayColumnAvailable, final String adLanguage, final LookupDescriptor lookupDescriptor_NOTUSED) throws SQLException
 		{
 			final int valueInt = rs.getInt(sqlColumnName);
 			final Integer value = rs.wasNull() ? null : valueInt;
@@ -410,21 +435,37 @@ public final class DocumentFieldValueLoaders
 	@Value
 	private static final class IntegerLookupValueDocumentFieldValueLoader implements DocumentFieldValueLoader
 	{
+		@NonNull
 		private final String sqlColumnName;
+
+		@NonNull
 		private final String sqlDisplayColumnName;
 
 		@Override
-		public IntegerLookupValue retrieveFieldValue(final ResultSet rs, final boolean isDisplayColumnAvailable, final String adLanguage, final LookupDescriptor lookupDescriptor) throws SQLException
+		public IntegerLookupValue retrieveFieldValue(
+				final ResultSet rs,
+				final boolean isDisplayColumnAvailable,
+				final String adLanguage,
+				final LookupDescriptor lookupDescriptor_NOTUSED) throws SQLException
 		{
 			final int id = rs.getInt(sqlColumnName);
 			if (rs.wasNull())
 			{
 				return null;
 			}
+
 			if (isDisplayColumnAvailable)
 			{
-				final String displayName = rs.getString(sqlDisplayColumnName);
-				return IntegerLookupValue.of(id, ImmutableTranslatableString.singleLanguage(adLanguage, displayName));
+				final DisplayNameAndDescription result = DocumentFieldValueLoaders.extractDisplayNameAndDescription(
+						rs,
+						sqlDisplayColumnName,
+						adLanguage);
+
+				return IntegerLookupValue.builder()
+						.id(id)
+						.displayName(result.getDisplayName())
+						.description(result.getDescription())
+						.build();
 			}
 			else
 			{
@@ -436,21 +477,37 @@ public final class DocumentFieldValueLoaders
 	@Value
 	private static final class StringLookupValueDocumentFieldValueLoader implements DocumentFieldValueLoader
 	{
+		@NonNull
 		private final String sqlColumnName;
+
+		@NonNull
 		private final String sqlDisplayColumnName;
 
 		@Override
-		public StringLookupValue retrieveFieldValue(final ResultSet rs, final boolean isDisplayColumnAvailable, final String adLanguage, final LookupDescriptor lookupDescriptor) throws SQLException
+		public StringLookupValue retrieveFieldValue(
+				@NonNull final ResultSet rs,
+				final boolean isDisplayColumnAvailable,
+				final String adLanguage,
+				final LookupDescriptor lookupDescriptor_NOTUSED) throws SQLException
 		{
 			final String key = rs.getString(sqlColumnName);
 			if (rs.wasNull())
 			{
 				return null;
 			}
+
 			if (isDisplayColumnAvailable)
 			{
-				final String displayName = rs.getString(sqlDisplayColumnName);
-				return StringLookupValue.of(key, ImmutableTranslatableString.singleLanguage(adLanguage, displayName));
+				final DisplayNameAndDescription result = DocumentFieldValueLoaders.extractDisplayNameAndDescription(
+						rs,
+						sqlDisplayColumnName,
+						adLanguage);
+
+				return StringLookupValue.builder()
+						.id(key)
+						.displayName(result.getDisplayName())
+						.description(result.getDescription())
+						.build();
 			}
 			else
 			{
@@ -459,8 +516,50 @@ public final class DocumentFieldValueLoaders
 		}
 	}
 
+	private static DisplayNameAndDescription extractDisplayNameAndDescription(
+			@NonNull final ResultSet rs,
+			final String sqlDisplayColumnName,
+			final String adLanguage) throws SQLException
+	{
+		final ITranslatableString displayName;
+		final ITranslatableString description;
+
+		final Array array = rs.getArray(sqlDisplayColumnName);
+		if (array == null)
+		{
+			displayName = TranslatableStrings.empty();
+			description = TranslatableStrings.empty();
+		}
+		else
+		{
+			final String[] nameAndDescription = (String[])array.getArray();
+			displayName = TranslatableStrings.singleLanguage(adLanguage, nameAndDescription[0]);
+
+			final boolean hasDescription = nameAndDescription.length > 1;
+			if (hasDescription)
+			{
+				description = TranslatableStrings.singleLanguage(adLanguage, nameAndDescription[1]);
+			}
+			else
+			{
+				description = TranslatableStrings.empty();
+			}
+		}
+		return new DisplayNameAndDescription(displayName, description);
+	}
+
 	@Value
-	private static final class LabelsLookupValueDocumentFieldValueLoader implements DocumentFieldValueLoader
+	private static class DisplayNameAndDescription
+	{
+		@NonNull
+		ITranslatableString displayName;
+
+		@NonNull
+		ITranslatableString description;
+	}
+
+	@Value
+	private static class LabelsLookupValueDocumentFieldValueLoader implements DocumentFieldValueLoader
 	{
 		private final String sqlColumnName;
 		private final String sqlDisplayColumnName = null;

@@ -1,6 +1,7 @@
 package de.metas.ui.web.material.cockpit.rowfactory;
 
 import static de.metas.quantity.Quantity.addToNullable;
+import static de.metas.util.Check.assumeNotNull;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -12,6 +13,8 @@ import de.metas.material.cockpit.model.I_MD_Cockpit;
 import de.metas.material.cockpit.model.I_MD_Stock;
 import de.metas.quantity.Quantity;
 import de.metas.ui.web.material.cockpit.MaterialCockpitRow;
+import de.metas.uom.IUOMDAO;
+import de.metas.util.Services;
 import lombok.Data;
 import lombok.NonNull;
 
@@ -81,7 +84,9 @@ public class DimensionGroupSubRowBucket
 
 	public void addCockpitRecord(@NonNull final I_MD_Cockpit cockpitRecord)
 	{
-		final I_C_UOM uom = cockpitRecord.getM_Product().getC_UOM();
+		final IUOMDAO uomDAO = Services.get(IUOMDAO.class);
+
+		final I_C_UOM uom = uomDAO.getById(cockpitRecord.getM_Product().getC_UOM_ID());
 
 		pmmQtyPromised = addToNullable(pmmQtyPromised, cockpitRecord.getPMM_QtyPromised_OnDate(), uom);
 		qtyMaterialentnahme = addToNullable(qtyMaterialentnahme, cockpitRecord.getQtyMaterialentnahme(), uom);
@@ -95,7 +100,9 @@ public class DimensionGroupSubRowBucket
 
 	public void addStockRecord(@NonNull final I_MD_Stock stockRecord)
 	{
-		final I_C_UOM uom = stockRecord.getM_Product().getC_UOM();
+		final IUOMDAO uomDAO = Services.get(IUOMDAO.class);
+
+		final I_C_UOM uom = uomDAO.getById(stockRecord.getM_Product().getC_UOM_ID());
 
 		qtyOnHandStock = addToNullable(qtyOnHandStock, stockRecord.getQtyOnHand(), uom);
 
@@ -104,11 +111,13 @@ public class DimensionGroupSubRowBucket
 
 	public MaterialCockpitRow createIncludedRow(@NonNull final MainRowWithSubRows mainRowBucket)
 	{
-		final MainRowBucketId productIdAndDate = mainRowBucket.getProductIdAndDate();
+		final MainRowBucketId productIdAndDate = assumeNotNull(
+				mainRowBucket.getProductIdAndDate(),
+				"productIdAndDate may not be null; mainRowBucket={}", mainRowBucket);
 
 		return MaterialCockpitRow.attributeSubRowBuilder()
 				.date(productIdAndDate.getDate())
-				.productId(productIdAndDate.getProductId())
+				.productId(productIdAndDate.getProductId().getRepoId())
 
 				.dimensionGroup(dimensionSpecGroup)
 				.pmmQtyPromised(getPmmQtyPromised())

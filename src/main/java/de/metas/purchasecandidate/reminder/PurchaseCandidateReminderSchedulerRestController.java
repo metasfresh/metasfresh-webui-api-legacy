@@ -1,8 +1,9 @@
 package de.metas.purchasecandidate.reminder;
 
-import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 import java.util.List;
 
+import org.adempiere.ad.element.api.AdWindowId;
 import org.adempiere.exceptions.AdempiereException;
 import org.adempiere.model.RecordZoomWindowFinder;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -59,15 +60,10 @@ public class PurchaseCandidateReminderSchedulerRestController
 	{
 		userSession.assertLoggedIn();
 
-		final int purchaseCandidatesWindowId = RecordZoomWindowFinder.findAD_Window_ID(I_C_PurchaseCandidate.Table_Name);
-		final Boolean accessRW = userSession.getUserRolePermissions().checkWindowAccess(purchaseCandidatesWindowId);
-		if (accessRW == null)
+		final AdWindowId purchaseCandidatesWindowId = RecordZoomWindowFinder.findAdWindowId(I_C_PurchaseCandidate.Table_Name).get();
+		if (!userSession.getUserRolePermissions().checkWindowPermission(purchaseCandidatesWindowId).hasWriteAccess())
 		{
-			throw new AdempiereException("No access to purchase candidates window");
-		}
-		else if (accessRW == false)
-		{
-			throw new AdempiereException("No read/writeaccess to purchase candidates window");
+			throw new AdempiereException("No read/write access to purchase candidates window");
 		}
 	}
 
@@ -88,7 +84,7 @@ public class PurchaseCandidateReminderSchedulerRestController
 	}
 
 	@GetMapping("/nextDispatchTime")
-	public LocalDateTime getNextDispatchTime()
+	public ZonedDateTime getNextDispatchTime()
 	{
 		assertAuth();
 

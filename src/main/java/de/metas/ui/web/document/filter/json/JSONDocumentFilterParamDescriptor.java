@@ -8,12 +8,14 @@ import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import de.metas.process.BarcodeScannerType;
 import de.metas.ui.web.document.filter.DocumentFilterParamDescriptor;
 import de.metas.ui.web.window.datatypes.Values;
+import de.metas.ui.web.window.datatypes.json.JSONDocumentLayoutOptions;
 import de.metas.ui.web.window.datatypes.json.JSONLayoutType;
 import de.metas.ui.web.window.datatypes.json.JSONLayoutWidgetType;
-import de.metas.ui.web.window.datatypes.json.JSONOptions;
 import de.metas.util.GuavaCollectors;
+import io.swagger.annotations.ApiModelProperty;
 import lombok.ToString;
 
 /*
@@ -42,14 +44,16 @@ import lombok.ToString;
 @ToString
 /* package */final class JSONDocumentFilterParamDescriptor
 {
-	/* package */static List<JSONDocumentFilterParamDescriptor> ofCollection(final Collection<DocumentFilterParamDescriptor> params, final JSONOptions jsonOpts)
+	/* package */static List<JSONDocumentFilterParamDescriptor> ofCollection(
+			final Collection<DocumentFilterParamDescriptor> params,
+			final JSONDocumentLayoutOptions options)
 	{
 		return params.stream()
-				.map(filter -> of(filter, jsonOpts))
+				.map(filter -> of(filter, options))
 				.collect(GuavaCollectors.toImmutableList());
 	}
 
-	private static final JSONDocumentFilterParamDescriptor of(final DocumentFilterParamDescriptor param, final JSONOptions jsonOpts)
+	private static JSONDocumentFilterParamDescriptor of(final DocumentFilterParamDescriptor param, final JSONDocumentLayoutOptions jsonOpts)
 	{
 		return new JSONDocumentFilterParamDescriptor(param, jsonOpts);
 	}
@@ -69,6 +73,7 @@ import lombok.ToString;
 	@JsonProperty("defaultValue")
 	@JsonInclude(JsonInclude.Include.NON_EMPTY)
 	private final Object defaultValue;
+
 	@JsonProperty("defaultValueTo")
 	@JsonInclude(JsonInclude.Include.NON_EMPTY)
 	private final Object defaultValueTo;
@@ -82,7 +87,7 @@ import lombok.ToString;
 	@JsonProperty("readonly")
 	private final boolean readonly;
 
-	/** Type: primary, secondary */
+	@ApiModelProperty(allowEmptyValue = false)
 	@JsonProperty("type")
 	private final JSONLayoutType type;
 
@@ -90,25 +95,29 @@ import lombok.ToString;
 	@JsonInclude(JsonInclude.Include.NON_NULL)
 	private Boolean showIncrementDecrementButtons;
 
-	private JSONDocumentFilterParamDescriptor(final DocumentFilterParamDescriptor param, final JSONOptions jsonOpts)
+	@JsonProperty("barcodeScannerType")
+	@JsonInclude(JsonInclude.Include.NON_NULL)
+	private final BarcodeScannerType barcodeScannerType;
+
+	private JSONDocumentFilterParamDescriptor(final DocumentFilterParamDescriptor param, final JSONDocumentLayoutOptions options)
 	{
 		parameterName = param.getParameterName();
 
-		if (jsonOpts.isDebugShowColumnNamesForCaption())
+		if (options.isDebugShowColumnNamesForCaption())
 		{
 			caption = parameterName;
 		}
 		else
 		{
-			final String adLanguage = jsonOpts.getAD_Language();
+			final String adLanguage = options.getAdLanguage();
 			caption = param.getDisplayName(adLanguage);
 		}
 
 		widgetType = JSONLayoutWidgetType.fromNullable(param.getWidgetType());
 		rangeParameter = param.isRange();
 
-		defaultValue = Values.valueToJsonObject(param.getDefaultValueConverted());
-		defaultValueTo = Values.valueToJsonObject(param.getDefaultValueToConverted());
+		defaultValue = Values.valueToJsonObject(param.getDefaultValueConverted(), options.getJsonOpts());
+		defaultValueTo = Values.valueToJsonObject(param.getDefaultValueToConverted(), options.getJsonOpts());
 
 		mandatory = param.isMandatory();
 		displayed = true;
@@ -117,9 +126,11 @@ import lombok.ToString;
 		type = toJSONLayoutType(widgetType);
 
 		showIncrementDecrementButtons = param.isShowIncrementDecrementButtons() ? Boolean.TRUE : null;
+
+		barcodeScannerType = param.getBarcodeScannerType();
 	}
 
-	private static final JSONLayoutType toJSONLayoutType(final JSONLayoutWidgetType widgetType)
+	private static JSONLayoutType toJSONLayoutType(final JSONLayoutWidgetType widgetType)
 	{
 		// Checkboxes
 		// see https://github.com/metasfresh/metasfresh-webui-api/issues/352

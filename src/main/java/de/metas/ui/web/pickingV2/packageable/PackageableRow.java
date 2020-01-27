@@ -1,16 +1,14 @@
 package de.metas.ui.web.pickingV2.packageable;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 import java.util.Collection;
-import java.util.Map;
 
-import org.adempiere.user.UserId;
 import org.adempiere.warehouse.WarehouseTypeId;
+import org.compiere.util.TimeUtil;
 
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 
 import de.metas.i18n.ITranslatableString;
@@ -19,17 +17,19 @@ import de.metas.inoutcandidate.api.ShipmentScheduleId;
 import de.metas.inoutcandidate.model.I_M_Packageable_V;
 import de.metas.order.OrderId;
 import de.metas.ui.web.view.IViewRow;
+import de.metas.ui.web.view.ViewRowFieldNameAndJsonValues;
+import de.metas.ui.web.view.ViewRowFieldNameAndJsonValuesHolder;
 import de.metas.ui.web.view.descriptor.annotation.ViewColumn;
-import de.metas.ui.web.view.descriptor.annotation.ViewColumnHelper;
 import de.metas.ui.web.window.datatypes.DocumentId;
 import de.metas.ui.web.window.datatypes.DocumentPath;
 import de.metas.ui.web.window.datatypes.LookupValue;
 import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
+import de.metas.user.UserId;
 import de.metas.util.Check;
-
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NonNull;
+import lombok.Singular;
 import lombok.ToString;
 
 /*
@@ -54,7 +54,7 @@ import lombok.ToString;
  * #L%
  */
 
-@ToString(exclude = "_fieldNameAndJsonValues")
+@ToString(exclude = "values")
 public final class PackageableRow implements IViewRow
 {
 	public static PackageableRow cast(final IViewRow row)
@@ -63,9 +63,11 @@ public final class PackageableRow implements IViewRow
 	}
 
 	@ViewColumn(widgetType = DocumentFieldWidgetType.Text, captionKey = I_M_Packageable_V.COLUMNNAME_C_OrderSO_ID, seqNo = 10)
+	@Getter
 	private final String orderDocumentNo;
 
 	@ViewColumn(widgetType = DocumentFieldWidgetType.Lookup, captionKey = I_M_Packageable_V.COLUMNNAME_C_BPartner_Customer_ID, seqNo = 20)
+	@Getter
 	private final LookupValue customer;
 
 	@ViewColumn(widgetType = DocumentFieldWidgetType.Text, captionKey = I_M_Packageable_V.COLUMNNAME_M_Warehouse_Type_ID, seqNo = 30)
@@ -74,23 +76,24 @@ public final class PackageableRow implements IViewRow
 	@ViewColumn(widgetType = DocumentFieldWidgetType.Integer, captionKey = "Lines", seqNo = 40)
 	private final int lines;
 
-	@ViewColumn(widgetType = DocumentFieldWidgetType.Text, captionKey = "AD_User_ID", seqNo = 50)
+	@ViewColumn(widgetType = DocumentFieldWidgetType.Text, captionKey = "Picking_User_ID", seqNo = 50)
 	private final LookupValue lockedByUser;
 
 	@ViewColumn(widgetType = DocumentFieldWidgetType.Lookup, captionKey = I_M_Packageable_V.COLUMNNAME_M_Shipper_ID, seqNo = 60)
 	private final LookupValue shipper;
 
-	@ViewColumn(widgetType = DocumentFieldWidgetType.Date, captionKey = I_M_Packageable_V.COLUMNNAME_DeliveryDate, seqNo = 70)
+	@ViewColumn(widgetType = DocumentFieldWidgetType.LocalDate, captionKey = I_M_Packageable_V.COLUMNNAME_DeliveryDate, seqNo = 70)
 	private final LocalDate deliveryDate;
 
 	@ViewColumn(widgetType = DocumentFieldWidgetType.Text, captionKey = "LineNetAmt", seqNo = 80)
 	private final ITranslatableString lineNetAmt;
 
-	@ViewColumn(widgetType = DocumentFieldWidgetType.Date, captionKey = I_M_Packageable_V.COLUMNNAME_PreparationDate, seqNo = 80)
-	private final LocalDateTime preparationDate;
+	@ViewColumn(widgetType = DocumentFieldWidgetType.ZonedDateTime, captionKey = I_M_Packageable_V.COLUMNNAME_PreparationDate, seqNo = 90)
+	@Getter
+	private final ZonedDateTime preparationDate;
 
 	//
-	private transient ImmutableMap<String, Object> _fieldNameAndJsonValues; // lazy
+	private final ViewRowFieldNameAndJsonValuesHolder<PackageableRow> values = ViewRowFieldNameAndJsonValuesHolder.newInstance(PackageableRow.class);
 	private final PackageableRowId rowId;
 	@Getter
 	private final ImmutableList<Packageable> packageables;
@@ -108,7 +111,7 @@ public final class PackageableRow implements IViewRow
 			final LookupValue lockedByUser,
 			final LookupValue shipper,
 			final ITranslatableString lineNetAmt,
-			final Collection<Packageable> packageables)
+			@NonNull @Singular final Collection<Packageable> packageables)
 	{
 		Check.assumeNotEmpty(packageables, "packageables is not empty");
 
@@ -131,17 +134,17 @@ public final class PackageableRow implements IViewRow
 		return packageables.stream()
 				.map(Packageable::getDeliveryDate)
 				.filter(Predicates.notNull())
-				.map(LocalDateTime::toLocalDate)
+				.map(TimeUtil::asLocalDate)
 				.min(LocalDate::compareTo)
 				.orElse(null);
 	}
 
-	private static LocalDateTime calculateEarliestPreparationTime(final Collection<Packageable> packageables)
+	private static ZonedDateTime calculateEarliestPreparationTime(final Collection<Packageable> packageables)
 	{
 		return packageables.stream()
 				.map(Packageable::getPreparationDate)
 				.filter(Predicates.notNull())
-				.min(LocalDateTime::compareTo)
+				.min(ZonedDateTime::compareTo)
 				.orElse(null);
 	}
 
@@ -172,13 +175,15 @@ public final class PackageableRow implements IViewRow
 	}
 
 	@Override
-	public Map<String, Object> getFieldNameAndJsonValues()
+	public ImmutableSet<String> getFieldNames()
 	{
-		if (_fieldNameAndJsonValues == null)
-		{
-			_fieldNameAndJsonValues = ViewColumnHelper.extractJsonMap(this);
-		}
-		return _fieldNameAndJsonValues;
+		return values.getFieldNames();
+	}
+
+	@Override
+	public ViewRowFieldNameAndJsonValues getFieldNameAndJsonValues()
+	{
+		return values.get(this);
 	}
 
 	public boolean isLocked()

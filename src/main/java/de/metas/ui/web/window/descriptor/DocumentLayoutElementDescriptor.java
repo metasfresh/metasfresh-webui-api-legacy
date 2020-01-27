@@ -3,6 +3,7 @@ package de.metas.ui.web.window.descriptor;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
 
@@ -16,14 +17,14 @@ import com.google.common.collect.ImmutableSet;
 
 import de.metas.i18n.IMsgBL;
 import de.metas.i18n.ITranslatableString;
-import de.metas.i18n.ImmutableTranslatableString;
+import de.metas.i18n.TranslatableStrings;
 import de.metas.logging.LogManager;
+import de.metas.process.BarcodeScannerType;
 import de.metas.ui.web.window.datatypes.MediaType;
 import de.metas.ui.web.window.exceptions.DocumentLayoutBuildException;
 import de.metas.util.Check;
 import de.metas.util.GuavaCollectors;
 import de.metas.util.Services;
-
 import lombok.NonNull;
 
 /*
@@ -50,12 +51,12 @@ import lombok.NonNull;
 
 public final class DocumentLayoutElementDescriptor
 {
-	public static final Builder builder()
+	public static Builder builder()
 	{
 		return new Builder();
 	}
 
-	public static final Builder builder(final DocumentFieldDescriptor... fields)
+	public static Builder builder(final DocumentFieldDescriptor... fields)
 	{
 		Check.assumeNotEmpty(fields, "fields is not empty");
 
@@ -70,16 +71,16 @@ public final class DocumentLayoutElementDescriptor
 		for (final DocumentFieldDescriptor field : fields)
 		{
 			elementBuilder.addField(DocumentLayoutElementFieldDescriptor.builder(field.getFieldName())
+					.setCaption(field.getCaption())
 					.setPublicField(true)
-					.setLookupSource(field.getLookupSourceType())
-					.setLookupTableName(field.getLookupTableName())
+					.setLookupInfos(field.getLookupDescriptor().orElse(null))
 					.setSupportZoomInto(field.isSupportZoomInto()));
 		}
 
 		return elementBuilder;
 	}
 
-	public static final Builder builder(
+	public static Optional<Builder> builderOrEmpty(
 			@NonNull final DocumentEntityDescriptor entityDescriptor,
 			@NonNull final String... fieldNames)
 	{
@@ -90,7 +91,11 @@ public final class DocumentLayoutElementDescriptor
 				.filter(Predicates.notNull())
 				.toArray(size -> new DocumentFieldDescriptor[size]);
 
-		return builder(elementFields);
+		if (elementFields.length == 0)
+		{
+			return Optional.empty();
+		}
+		return Optional.of(builder(elementFields));
 	}
 
 	private final String internalName;
@@ -104,6 +109,7 @@ public final class DocumentLayoutElementDescriptor
 	private final boolean multilineText; // in case widgetType is Text
 	private final int multilineTextLines; // in case widgetType is Text
 	private final ButtonFieldActionDescriptor buttonActionDescriptor;
+	private final BarcodeScannerType barcodeScannerType;
 
 	private final LayoutType layoutType;
 	private final WidgetSize widgetSize;
@@ -129,10 +135,12 @@ public final class DocumentLayoutElementDescriptor
 		description = builder.getDescription();
 
 		widgetType = builder.getWidgetType();
+
 		allowShowPassword = builder.isAllowShowPassword();
 		multilineText = builder.isMultilineText();
 		multilineTextLines = builder.getMultilineTextLines();
 		buttonActionDescriptor = builder.getButtonActionDescriptor();
+		barcodeScannerType = builder.getBarcodeScannerType();
 
 		layoutType = builder.getLayoutType();
 		widgetSize = builder.getWidgetSize();
@@ -264,6 +272,11 @@ public final class DocumentLayoutElementDescriptor
 		return buttonActionDescriptor;
 	}
 
+	public BarcodeScannerType getBarcodeScannerType()
+	{
+		return barcodeScannerType;
+	}
+
 	public static final class Builder
 	{
 		private static final Logger logger = LogManager.getLogger(DocumentLayoutElementDescriptor.Builder.class);
@@ -276,7 +289,8 @@ public final class DocumentLayoutElementDescriptor
 		private boolean _allowShowPassword = false; // in case widgetType is Password
 		private boolean _multilineText = false; // in case widgetType is Text
 		private int _multilineTextLines = 0; // in case widgetType is Text
-		private ButtonFieldActionDescriptor buttonActionDescriptor = null;
+		private ButtonFieldActionDescriptor buttonActionDescriptor;
+		private BarcodeScannerType barcodeScannerType;
 
 		private LayoutType _layoutType;
 		private WidgetSize _widgetSize;
@@ -321,12 +335,40 @@ public final class DocumentLayoutElementDescriptor
 
 		private Set<DocumentLayoutElementFieldDescriptor> buildFields()
 		{
+			updateFieldsEmptyTexts();
+
 			return _fieldsBuilders
 					.values()
 					.stream()
 					.filter(fieldBuilder -> checkValid(fieldBuilder))
 					.map(fieldBuilder -> fieldBuilder.build())
 					.collect(GuavaCollectors.toImmutableSet());
+		}
+
+		private void updateFieldsEmptyTexts()
+		{
+			if (!isComposedField())
+			{
+				return;
+			}
+
+			for (final DocumentLayoutElementFieldDescriptor.Builder field : _fieldsBuilders.values())
+			{
+				if (field.isRegularField()
+						&& !TranslatableStrings.isBlank(field.getCaption()))
+				{
+					field.setEmptyText(field.getCaption());
+				}
+			}
+		}
+
+		private boolean isComposedField()
+		{
+			final long countRegularFields = _fieldsBuilders.values().stream()
+					.filter(DocumentLayoutElementFieldDescriptor.Builder::isRegularField)
+					.count();
+
+			return countRegularFields > 1;
 		}
 
 		private boolean checkValid(final DocumentLayoutElementFieldDescriptor.Builder fieldBuilder)
@@ -365,13 +407,13 @@ public final class DocumentLayoutElementDescriptor
 
 		public Builder setCaption(final ITranslatableString caption)
 		{
-			_caption = caption == null ? ImmutableTranslatableString.empty() : caption;
+			_caption = caption == null ? TranslatableStrings.empty() : caption;
 			return this;
 		}
 
 		public Builder setCaption(final String caption)
 		{
-			setCaption(ImmutableTranslatableString.constant(caption));
+			setCaption(TranslatableStrings.constant(caption));
 			return this;
 		}
 
@@ -383,7 +425,7 @@ public final class DocumentLayoutElementDescriptor
 
 		public Builder setCaptionNone()
 		{
-			setCaption(ImmutableTranslatableString.empty());
+			setCaption(TranslatableStrings.empty());
 			return this;
 		}
 
@@ -401,23 +443,18 @@ public final class DocumentLayoutElementDescriptor
 				return Services.get(IMsgBL.class).translatable(fieldName);
 			}
 
-			return ImmutableTranslatableString.empty();
+			return TranslatableStrings.empty();
 		}
 
 		public Builder setDescription(final ITranslatableString description)
 		{
-			_description = description == null ? ImmutableTranslatableString.empty() : description;
+			_description = TranslatableStrings.nullToEmpty(description);
 			return this;
 		}
 
 		private ITranslatableString getDescription()
 		{
-			if (_description != null)
-			{
-				return _description;
-			}
-
-			return ImmutableTranslatableString.empty();
+			return TranslatableStrings.nullToEmpty(_description);
 		}
 
 		public Builder setWidgetType(final DocumentFieldWidgetType widgetType)
@@ -529,6 +566,12 @@ public final class DocumentLayoutElementDescriptor
 		public boolean isAdvancedField()
 		{
 			return _advancedField;
+		}
+
+		public Builder removeFieldByFieldName(final String fieldName)
+		{
+			_fieldsBuilders.remove(fieldName);
+			return this;
 		}
 
 		public Builder addField(@NonNull final DocumentLayoutElementFieldDescriptor.Builder fieldBuilder)
@@ -647,6 +690,17 @@ public final class DocumentLayoutElementDescriptor
 		/* package */ ButtonFieldActionDescriptor getButtonActionDescriptor()
 		{
 			return buttonActionDescriptor;
+		}
+
+		public Builder barcodeScannerType(final BarcodeScannerType barcodeScannerType)
+		{
+			this.barcodeScannerType = barcodeScannerType;
+			return this;
+		}
+
+		private BarcodeScannerType getBarcodeScannerType()
+		{
+			return barcodeScannerType;
 		}
 	}
 }

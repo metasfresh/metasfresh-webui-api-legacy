@@ -1,13 +1,16 @@
 package de.metas.ui.web.document.filter.json;
 
-import java.io.Serializable;
 import java.util.Optional;
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import de.metas.ui.web.document.filter.DocumentFilterParam;
 import de.metas.ui.web.window.datatypes.Values;
+import de.metas.ui.web.window.datatypes.json.JSONOptions;
+import lombok.Value;
 
 /*
  * #%L
@@ -22,18 +25,18 @@ import de.metas.ui.web.window.datatypes.Values;
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public
- * License along with this program.  If not, see
+ * License along with this program. If not, see
  * <http://www.gnu.org/licenses/gpl-2.0.html>.
  * #L%
  */
 
-@SuppressWarnings("serial")
-@lombok.Data
-final class JSONDocumentFilterParam implements Serializable
+@JsonAutoDetect(fieldVisibility = Visibility.ANY, getterVisibility = Visibility.NONE, isGetterVisibility = Visibility.NONE, setterVisibility = Visibility.NONE)
+@Value
+final class JSONDocumentFilterParam
 {
 	/**
 	 * Creates {@link JSONDocumentFilterParam} from {@link DocumentFilterParam} if the given filter is not internal.
@@ -41,7 +44,7 @@ final class JSONDocumentFilterParam implements Serializable
 	 * @param filterParam
 	 * @return JSON document filter parameter
 	 */
-	/* package */static final Optional<JSONDocumentFilterParam> of(final DocumentFilterParam filterParam)
+	/* package */static Optional<JSONDocumentFilterParam> of(final DocumentFilterParam filterParam, final JSONOptions jsonOpts)
 	{
 		// Don't convert internal filters
 		if (filterParam.isSqlFilter())
@@ -51,8 +54,8 @@ final class JSONDocumentFilterParam implements Serializable
 		}
 
 		final String fieldName = filterParam.getFieldName();
-		final Object jsonValue = Values.valueToJsonObject(filterParam.getValue());
-		final Object jsonValueTo = Values.valueToJsonObject(filterParam.getValueTo());
+		final Object jsonValue = Values.valueToJsonObject(filterParam.getValue(), jsonOpts);
+		final Object jsonValueTo = Values.valueToJsonObject(filterParam.getValueTo(), jsonOpts);
 		final JSONDocumentFilterParam jsonFilterParam = new JSONDocumentFilterParam(fieldName, jsonValue, jsonValueTo);
 		return Optional.of(jsonFilterParam);
 	}
@@ -73,7 +76,6 @@ final class JSONDocumentFilterParam implements Serializable
 			, @JsonProperty("valueTo") final Object valueTo //
 	)
 	{
-		super();
 		this.parameterName = parameterName;
 		this.value = value;
 		this.valueTo = valueTo;

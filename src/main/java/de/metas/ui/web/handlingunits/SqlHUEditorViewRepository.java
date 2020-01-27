@@ -5,8 +5,8 @@ import static org.adempiere.model.InterfaceWrapperHelper.loadOutOfTrx;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.LocalDate;
 import java.util.Collection;
-import java.util.Date;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
@@ -30,8 +30,10 @@ import org.slf4j.Logger;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
+import de.metas.bpartner.BPartnerId;
 import de.metas.handlingunits.HuId;
 import de.metas.handlingunits.IHUQueryBuilder;
+import de.metas.handlingunits.IHUStatusBL;
 import de.metas.handlingunits.IHandlingUnitsBL;
 import de.metas.handlingunits.IHandlingUnitsDAO;
 import de.metas.handlingunits.exceptions.HUException;
@@ -77,7 +79,6 @@ import de.metas.util.Check;
 import de.metas.util.GuavaCollectors;
 import de.metas.util.Services;
 import de.metas.util.collections.PagedIterator.Page;
-
 import lombok.Builder;
 import lombok.NonNull;
 
@@ -226,7 +227,7 @@ public class SqlHUEditorViewRepository implements HUEditorViewRepository
 		{
 			huRecordType = HUEditorRowType.ofHU_UnitType(huUnitTypeCode);
 		}
-		final Optional<OrderLineId> orderLineIdWithReservation = huReservationService.getReservedForOrderLineId(HuId.ofRepoId(hu.getM_HU_ID()));
+		final Optional<OrderLineId> orderLineIdWithReservation = huReservationService.getOrderLineIdByReservedVhuId(HuId.ofRepoId(hu.getM_HU_ID()));
 
 		final String huUnitTypeDisplayName = huRecordType.getName();
 		final JSONLookupValue huUnitTypeLookupValue = JSONLookupValue.of(huUnitTypeCode, huUnitTypeDisplayName);
@@ -241,7 +242,7 @@ public class SqlHUEditorViewRepository implements HUEditorViewRepository
 				.setType(huRecordType)
 				.setTopLevel(topLevelHUId == null)
 				.setProcessed(processed)
-				.setBPartnerId(hu.getC_BPartner_ID())
+				.setBPartnerId(BPartnerId.ofRepoIdOrNull(hu.getC_BPartner_ID()))
 				.setAttributesProvider(attributesProvider)
 				//
 				.setCode(hu.getValue())
@@ -272,7 +273,7 @@ public class SqlHUEditorViewRepository implements HUEditorViewRepository
 			huEditorRow
 					.setProduct(createProductLookupValue(singleProductStorage.getProductId()))
 					.setUOM(createUOMLookupValue(singleProductStorage.getC_UOM()))
-					.setQtyCU(singleProductStorage.getQty().getAsBigDecimal());
+					.setQtyCU(singleProductStorage.getQty().toBigDecimal());
 		}
 
 		//
@@ -377,7 +378,7 @@ public class SqlHUEditorViewRepository implements HUEditorViewRepository
 		final ProductId productId = huStorage.getProductId();
 		final HUEditorRowAttributesProvider attributesProviderEffective = !huId.equals(parentHUId) ? attributesProvider : null;
 
-		final Optional<OrderLineId> reservedForOrderLineId = huReservationService.getReservedForOrderLineId(huId);
+		final Optional<OrderLineId> reservedForOrderLineId = huReservationService.getOrderLineIdByReservedVhuId(huId);
 
 		final HUEditorRow huEditorRow = HUEditorRow.builder(windowId)
 				.setRowId(HUEditorRowId.ofHUStorage(huId, topLevelHUId, productId))
@@ -395,7 +396,7 @@ public class SqlHUEditorViewRepository implements HUEditorViewRepository
 				//
 				.setProduct(createProductLookupValue(productId))
 				.setUOM(createUOMLookupValue(huStorage.getC_UOM()))
-				.setQtyCU(huStorage.getQty().getAsBigDecimal())
+				.setQtyCU(huStorage.getQty().toBigDecimal())
 				//
 				.build();
 
@@ -449,9 +450,12 @@ public class SqlHUEditorViewRepository implements HUEditorViewRepository
 
 	private static JSONLookupValue createHUStatusDisplayLookupValue(@NonNull final I_M_HU hu)
 	{
+		final IHUStatusBL huStatusBL = Services.get(IHUStatusBL.class);
+
 		final String huStatusKey;
 		final String huStatusDisplayName;
-		if (hu.isReserved())
+
+		if (hu.isReserved() && huStatusBL.isPhysicalHU(hu)) // if e.g. a reserved HU was shipped, it shall be shown as "shipped" not "reserved"
 		{
 			huStatusKey = MSG_HU_RESERVED;
 			huStatusDisplayName = Services.get(IMsgBL.class).getMsg(Env.getCtx(), huStatusKey);
@@ -466,7 +470,7 @@ public class SqlHUEditorViewRepository implements HUEditorViewRepository
 		return JSONLookupValue.of(huStatusKey, huStatusDisplayName);
 	}
 
-	private static Date extractBestBeforeDate(final HUEditorRowAttributesProvider attributesProvider, final HUEditorRowId rowId)
+	private static LocalDate extractBestBeforeDate(final HUEditorRowAttributesProvider attributesProvider, final HUEditorRowId rowId)
 	{
 		if (attributesProvider == null)
 		{

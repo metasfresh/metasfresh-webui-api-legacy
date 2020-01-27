@@ -2,10 +2,13 @@ package de.metas.ui.web.dashboard;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.time.ZonedDateTime;
 import java.util.Date;
 import java.util.List;
 
 import org.compiere.util.DisplayType;
+import org.compiere.util.TimeUtil;
 import org.elasticsearch.search.aggregations.bucket.MultiBucketsAggregation;
 import org.slf4j.Logger;
 
@@ -15,11 +18,13 @@ import com.google.common.base.MoreObjects;
 import com.google.common.base.Splitter;
 
 import de.metas.i18n.ITranslatableString;
-import de.metas.i18n.ImmutableTranslatableString;
+import de.metas.i18n.Language;
+import de.metas.i18n.TranslatableStrings;
 import de.metas.logging.LogManager;
-import de.metas.ui.web.window.datatypes.json.JSONDate;
-import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
+import de.metas.ui.web.window.datatypes.json.DateTimeConverters;
+import de.metas.ui.web.window.datatypes.json.JSONOptions;
 import de.metas.util.Check;
+import lombok.NonNull;
 
 /*
  * #%L
@@ -52,7 +57,7 @@ public class KPIField
 	}
 
 	@FunctionalInterface
-	public static interface BucketValueExtractor
+	public interface BucketValueExtractor
 	{
 		Object extractValue(final String containingAggName, final MultiBucketsAggregation.Bucket bucket);
 	}
@@ -118,7 +123,7 @@ public class KPIField
 		return (containingAggName, bucket) -> bucket.getProperty(containingAggName, path);
 	}
 
-	public final Object convertValueToJson(final Object value)
+	public final Object convertValueToJson(final Object value, @NonNull final JSONOptions jsonOpts)
 	{
 		if (value == null)
 		{
@@ -131,45 +136,13 @@ public class KPIField
 			{
 				case Date:
 				{
-					if (value instanceof String)
-					{
-						final Date date = JSONDate.fromJson(value.toString(), DocumentFieldWidgetType.Date);
-						return JSONDate.toJson(date);
-					}
-					else if (value instanceof Date)
-					{
-						return JSONDate.toJson((Date)value);
-					}
-					else if (value instanceof Number)
-					{
-						final long millis = ((Number)value).longValue();
-						return JSONDate.toJson(millis);
-					}
-					else
-					{
-						return value;
-					}
+					final LocalDate date = DateTimeConverters.fromObjectToLocalDate(value);
+					return DateTimeConverters.toJson(date);
 				}
 				case DateTime:
 				{
-					if (value instanceof String)
-					{
-						final Date date = JSONDate.fromJson(value.toString(), DocumentFieldWidgetType.DateTime);
-						return JSONDate.toJson(date);
-					}
-					else if (value instanceof Date)
-					{
-						return JSONDate.toJson((Date)value);
-					}
-					else if (value instanceof Number)
-					{
-						final long millis = ((Number)value).longValue();
-						return JSONDate.toJson(millis);
-					}
-					else
-					{
-						return value;
-					}
+					final ZonedDateTime date = DateTimeConverters.fromObjectToZonedDateTime(value);
+					return DateTimeConverters.toJson(date, jsonOpts.getZoneId());
 				}
 				case Number:
 				{
@@ -226,7 +199,7 @@ public class KPIField
 		}
 	}
 
-	public final Object convertValueToJsonUserFriendly(final Object value)
+	public final Object convertValueToJsonUserFriendly(final Object value, @NonNull final JSONOptions jsonOpts)
 	{
 		if (value == null)
 		{
@@ -239,21 +212,24 @@ public class KPIField
 			{
 				if (value instanceof String)
 				{
-					final Date date = JSONDate.fromJson(value.toString(), DocumentFieldWidgetType.Date);
-					return DisplayType.getDateFormat(DisplayType.Date)
+					final Date date = TimeUtil.asDate(DateTimeConverters.fromObjectToZonedDateTime(value));
+					final Language language = Language.getLanguage(jsonOpts.getAdLanguage());
+					return DisplayType.getDateFormat(DisplayType.Date, language)
 							.format(date);
 				}
 				else if (value instanceof Date)
 				{
 					final Date date = (Date)value;
-					return DisplayType.getDateFormat(DisplayType.Date)
+					final Language language = Language.getLanguage(jsonOpts.getAdLanguage());
+					return DisplayType.getDateFormat(DisplayType.Date, language)
 							.format(date);
 				}
 				else if (value instanceof Number)
 				{
 					final long millis = ((Number)value).longValue();
 					final Date date = new Date(millis);
-					return DisplayType.getDateFormat(DisplayType.Date)
+					final Language language = Language.getLanguage(jsonOpts.getAdLanguage());
+					return DisplayType.getDateFormat(DisplayType.Date, language)
 							.format(date);
 				}
 				else
@@ -265,21 +241,24 @@ public class KPIField
 			{
 				if (value instanceof String)
 				{
-					final Date date = JSONDate.fromJson(value.toString(), DocumentFieldWidgetType.DateTime);
-					return DisplayType.getDateFormat(DisplayType.DateTime)
+					final Date date = TimeUtil.asDate(DateTimeConverters.fromObjectToZonedDateTime(value));
+					final Language language = Language.getLanguage(jsonOpts.getAdLanguage());
+					return DisplayType.getDateFormat(DisplayType.DateTime, language)
 							.format(date);
 				}
 				else if (value instanceof Date)
 				{
 					final Date date = (Date)value;
-					return DisplayType.getDateFormat(DisplayType.DateTime)
+					final Language language = Language.getLanguage(jsonOpts.getAdLanguage());
+					return DisplayType.getDateFormat(DisplayType.DateTime, language)
 							.format(date);
 				}
 				else if (value instanceof Number)
 				{
 					final long millis = ((Number)value).longValue();
 					final Date date = new Date(millis);
-					return DisplayType.getDateFormat(DisplayType.DateTime)
+					final Language language = Language.getLanguage(jsonOpts.getAdLanguage());
+					return DisplayType.getDateFormat(DisplayType.DateTime, language)
 							.format(date);
 				}
 				else
@@ -289,7 +268,7 @@ public class KPIField
 			}
 			else
 			{
-				return convertValueToJson(value);
+				return convertValueToJson(value, jsonOpts);
 			}
 		}
 		catch (Exception ex)
@@ -375,9 +354,9 @@ public class KPIField
 	{
 		private String fieldName;
 		private boolean groupBy = false;
-		private ITranslatableString caption = ImmutableTranslatableString.empty();
-		private ITranslatableString offsetCaption = ImmutableTranslatableString.empty();
-		private ITranslatableString description = ImmutableTranslatableString.empty();
+		private ITranslatableString caption = TranslatableStrings.empty();
+		private ITranslatableString offsetCaption = TranslatableStrings.empty();
+		private ITranslatableString description = TranslatableStrings.empty();
 		private String unit;
 		private KPIFieldValueType valueType;
 		private Integer numberPrecision;

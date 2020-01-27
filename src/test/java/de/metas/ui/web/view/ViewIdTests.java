@@ -1,14 +1,21 @@
 package de.metas.ui.web.view;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.io.IOException;
 import java.util.Random;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.adempiere.exceptions.AdempiereException;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableList;
 
+import de.metas.JsonObjectMapperHolder;
 import de.metas.ui.web.window.datatypes.WindowId;
 
 /*
@@ -37,22 +44,34 @@ public class ViewIdTests
 {
 	private final Random random = new Random(System.currentTimeMillis());
 
-	@Test
-	public void test_deriveWithWindowId_StandardCase()
-	{
-		final ViewId viewId = ViewId.ofViewIdString("123-abcde");
-		assertViewIdMatching(viewId, "123", "abcde");
+	private ObjectMapper jsonObjectMapper;
 
-		final ViewId viewId2 = viewId.deriveWithWindowId(WindowId.of(456));
-		assertViewIdMatching(viewId2, "456", "abcde");
+	@BeforeEach
+	public void init()
+	{
+		jsonObjectMapper = JsonObjectMapperHolder.newJsonObjectMapper();
 	}
 
-	@Test
-	public void test_deriveWithWindowId_SameWindowId()
+	@Nested
+	public class withWindowId
 	{
-		final ViewId viewId = ViewId.ofViewIdString("123-abcde");
-		final ViewId viewId2 = viewId.deriveWithWindowId(WindowId.of(123));
-		assertThat(viewId).isSameAs(viewId2);
+		@Test
+		public void standardCase()
+		{
+			final ViewId viewId = ViewId.ofViewIdString("123-abcde");
+			assertViewIdMatching(viewId, "123", "abcde");
+
+			final ViewId viewId2 = viewId.withWindowId(WindowId.of(456));
+			assertViewIdMatching(viewId2, "456", "abcde");
+		}
+
+		@Test
+		public void sameWindowId()
+		{
+			final ViewId viewId = ViewId.ofViewIdString("123-abcde");
+			final ViewId viewId2 = viewId.withWindowId(WindowId.of(123));
+			assertThat(viewId).isSameAs(viewId2);
+		}
 	}
 
 	private static final void assertViewIdMatching(final ViewId viewId, final String windowIdStr, final String viewIdPart)
@@ -75,7 +94,7 @@ public class ViewIdTests
 		final WindowId expectedWindowId = viewId.getWindowId();
 		final ViewId viewId2 = ViewId.ofViewIdString(viewId.getViewId(), expectedWindowId);
 
-		Assert.assertEquals(viewId, viewId2);
+		assertThat(viewId2).isEqualTo(viewId);
 	}
 
 	@Test
@@ -86,7 +105,7 @@ public class ViewIdTests
 		final String expectedWindowIdStr = viewId.getWindowId().toJson();
 		final ViewId viewId2 = ViewId.of(expectedWindowIdStr, viewId.toJson());
 
-		Assert.assertEquals(viewId, viewId2);
+		assertThat(viewId2).isEqualTo(viewId);
 	}
 
 	@Test
@@ -97,7 +116,7 @@ public class ViewIdTests
 		final WindowId expectedWindowId = null;
 		final ViewId viewId2 = ViewId.ofViewIdString(viewId.getViewId(), expectedWindowId);
 
-		Assert.assertEquals(viewId, viewId2);
+		assertThat(viewId2).isEqualTo(viewId);
 	}
 
 	@Test
@@ -108,7 +127,7 @@ public class ViewIdTests
 		final String expectedWindowIdStr = null;
 		final ViewId viewId2 = ViewId.of(expectedWindowIdStr, viewId.toJson());
 
-		Assert.assertEquals(viewId, viewId2);
+		assertThat(viewId2).isEqualTo(viewId);
 	}
 
 	@Test
@@ -118,15 +137,9 @@ public class ViewIdTests
 
 		final WindowId expectedWindowId = randomWindowIdButNot(viewId.getWindowId());
 
-		try
-		{
-			final ViewId viewId2 = ViewId.ofViewIdString(viewId.getViewId(), expectedWindowId);
-			Assert.fail("Exception was expected because windowId are not matching: viewId2=" + viewId2 + ", expectedWindowId=" + expectedWindowId);
-		}
-		catch (final IllegalArgumentException ex)
-		{
-			// OK
-		}
+		assertThatThrownBy(() -> ViewId.ofViewIdString(viewId.getViewId(), expectedWindowId))
+				.as("Exception is expected because windowId are not matching")
+				.isInstanceOf(IllegalArgumentException.class);
 	}
 
 	@Test
@@ -136,15 +149,9 @@ public class ViewIdTests
 
 		final String expectedWindowIdStr = randomWindowIdButNot(viewId.getWindowId()).toJson();
 
-		try
-		{
-			final ViewId viewId2 = ViewId.of(expectedWindowIdStr, viewId.toJson());
-			Assert.fail("Exception was expected because windowId are not matching: viewId2=" + viewId2 + ", expectedWindowId=" + expectedWindowIdStr);
-		}
-		catch (final IllegalArgumentException ex)
-		{
-			// OK
-		}
+		assertThatThrownBy(() -> ViewId.of(expectedWindowIdStr, viewId.toJson()))
+				.as("Exception is expected because windowId are not matching")
+				.isInstanceOf(IllegalArgumentException.class);
 	}
 
 	private final ViewId randomViewId()
@@ -191,14 +198,39 @@ public class ViewIdTests
 	}
 
 	@Test
-	public void test_encodeUsingDigits()
+	public void testSerializeDeserialize()
 	{
-		final char[] BASE10 = new char[] { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' };
-		for (int i = 0; i < 1000; i++)
+		testSerializeDeserialize(ViewId.ofParts(WindowId.fromJson("windowId"), "viewIdPart"));
+		testSerializeDeserialize(ViewId.ofParts(WindowId.fromJson("windowId"), "viewIdPart", "otherPart1", "otherPart2"));
+	}
+
+	private void testSerializeDeserialize(final ViewId viewId)
+	{
+		final ViewId viewIdDeserialized = fromJson(toJson(viewId));
+		assertThat(viewIdDeserialized).isEqualTo(viewId);
+	}
+
+	private String toJson(final ViewId viewId)
+	{
+		try
 		{
-			final String expected = String.valueOf(i);
-			final String actual = ViewId.encodeUsingDigits(i, BASE10);
-			assertThat(actual).isEqualTo(expected);
+			return jsonObjectMapper.writeValueAsString(viewId);
+		}
+		catch (final JsonProcessingException e)
+		{
+			throw new AdempiereException("Failed serializing " + viewId, e);
+		}
+	}
+
+	private ViewId fromJson(final String json)
+	{
+		try
+		{
+			return jsonObjectMapper.readValue(json, ViewId.class);
+		}
+		catch (final IOException e)
+		{
+			throw new AdempiereException("Failed deserializing:\n" + json, e);
 		}
 	}
 }

@@ -1,6 +1,7 @@
 package de.metas.ui.web.view.json;
 
 import java.util.List;
+import java.util.Set;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
@@ -10,12 +11,13 @@ import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableList;
 
 import de.metas.ui.web.document.filter.json.JSONDocumentFilterDescriptor;
+import de.metas.ui.web.view.ViewCloseAction;
 import de.metas.ui.web.view.ViewProfileId;
 import de.metas.ui.web.view.descriptor.IncludedViewLayout;
 import de.metas.ui.web.view.descriptor.ViewLayout;
 import de.metas.ui.web.window.datatypes.WindowId;
 import de.metas.ui.web.window.datatypes.json.JSONDocumentLayoutElement;
-import de.metas.ui.web.window.datatypes.json.JSONOptions;
+import de.metas.ui.web.window.datatypes.json.JSONDocumentLayoutOptions;
 import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
 import lombok.Builder;
 import lombok.Value;
@@ -45,9 +47,9 @@ import lombok.Value;
 @JsonAutoDetect(fieldVisibility = Visibility.ANY, getterVisibility = Visibility.NONE, isGetterVisibility = Visibility.NONE, setterVisibility = Visibility.NONE)
 public final class JSONViewLayout
 {
-	public static JSONViewLayout of(final ViewLayout gridLayout, final JSONOptions jsonOpts)
+	public static JSONViewLayout of(final ViewLayout gridLayout, final JSONDocumentLayoutOptions options)
 	{
-		return new JSONViewLayout(gridLayout, jsonOpts);
+		return new JSONViewLayout(gridLayout, options);
 	}
 
 	@JsonProperty("viewId")
@@ -104,6 +106,9 @@ public final class JSONViewLayout
 	@JsonInclude(JsonInclude.Include.NON_NULL)
 	private final Integer expandedDepth;
 
+	@JsonProperty("allowedCloseActions")
+	private final Set<ViewCloseAction> allowedCloseActions;
+
 	//
 	@JsonProperty("includedView")
 	private final JSONIncludedViewSupport includedView;
@@ -122,21 +127,29 @@ public final class JSONViewLayout
 	@JsonProperty("newRecordCaption")
 	@JsonInclude(JsonInclude.Include.NON_NULL)
 	private String newRecordCaption = null;
-	
+
 	//
 	//
 	@JsonProperty("supportOpenRecord")
 	@JsonInclude(JsonInclude.Include.NON_NULL)
 	private final Boolean supportOpenRecord;
 
-	private JSONViewLayout(final ViewLayout layout, final JSONOptions jsonOpts)
+	@JsonProperty("supportGeoLocations")
+	@JsonInclude(JsonInclude.Include.NON_NULL)
+	private final Boolean supportGeoLocations;
+
+	@JsonProperty("focusOnFieldName")
+	@JsonInclude(JsonInclude.Include.NON_NULL)
+	private final String focusOnFieldName;
+
+	private JSONViewLayout(final ViewLayout layout, final JSONDocumentLayoutOptions options)
 	{
 		windowId = layout.getWindowId();
 		type = windowId;
 
 		profileId = layout.getProfileId();
 
-		final String adLanguage = jsonOpts.getAD_Language();
+		final String adLanguage = options.getAdLanguage();
 		caption = layout.getCaption(adLanguage);
 		description = layout.getDescription(adLanguage);
 		emptyResultText = layout.getEmptyResultText(adLanguage);
@@ -144,9 +157,11 @@ public final class JSONViewLayout
 
 		//
 		// Elements
-		List<JSONDocumentLayoutElement> elements = JSONDocumentLayoutElement.ofList(layout.getElements(), jsonOpts);
+		List<JSONDocumentLayoutElement> elements = JSONDocumentLayoutElement.ofList(layout.getElements(), options);
 		final String idFieldName = layout.getIdFieldName();
-		if (jsonOpts.isDebugShowColumnNamesForCaption() && idFieldName != null)
+		if (options.isDebugShowColumnNamesForCaption()
+				&& idFieldName != null
+				&& !JSONDocumentLayoutElement.hasField(elements, idFieldName))
 		{
 			elements = ImmutableList.<JSONDocumentLayoutElement> builder()
 					.add(JSONDocumentLayoutElement.debuggingField(idFieldName, DocumentFieldWidgetType.Text))
@@ -155,9 +170,11 @@ public final class JSONViewLayout
 		}
 		this.elements = elements;
 
-		filters = JSONDocumentFilterDescriptor.ofCollection(layout.getFilters(), jsonOpts);
+		filters = JSONDocumentFilterDescriptor.ofCollection(layout.getFilters(), options);
 
 		supportAttributes = layout.isAttributesSupport();
+
+		allowedCloseActions = layout.getAllowedViewCloseActions();
 
 		//
 		// Included view
@@ -193,8 +210,12 @@ public final class JSONViewLayout
 			collapsible = null;
 			expandedDepth = null;
 		}
-		
+
 		supportOpenRecord = layout.isAllowOpeningRowDetails();
+
+		supportGeoLocations = layout.isGeoLocationSupport();
+
+		focusOnFieldName = layout.getFocusOnFieldName();
 	}
 
 	@Override
@@ -202,7 +223,7 @@ public final class JSONViewLayout
 	{
 		return MoreObjects.toStringHelper(this)
 				.omitNullValues()
-				.add("AD_Window_ID", type)
+				.add("AD_Window_ID", windowId)
 				.add("caption", caption)
 				.add("elements", elements.isEmpty() ? null : elements)
 				.add("filters", filters.isEmpty() ? null : filters)

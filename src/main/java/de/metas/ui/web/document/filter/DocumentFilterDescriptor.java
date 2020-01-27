@@ -14,15 +14,17 @@ import java.util.function.Supplier;
 import java.util.stream.Collector;
 
 import com.google.common.base.MoreObjects;
+import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 
 import de.metas.i18n.ITranslatableString;
-import de.metas.i18n.ImmutableTranslatableString;
+import de.metas.i18n.TranslatableStrings;
+import de.metas.process.BarcodeScannerType;
 import de.metas.ui.web.window.datatypes.PanelLayoutType;
 import de.metas.util.Check;
 import de.metas.util.GuavaCollectors;
-
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
@@ -51,7 +53,7 @@ import lombok.Getter;
 @EqualsAndHashCode // required for (ETag) caching
 public final class DocumentFilterDescriptor
 {
-	public static final Builder builder()
+	public static Builder builder()
 	{
 		return new Builder();
 	}
@@ -79,6 +81,9 @@ public final class DocumentFilterDescriptor
 	private final boolean autoFilter;
 
 	@Getter
+	private BarcodeScannerType barcodeScannerType;
+
+	@Getter
 	private final Map<String, Object> debugProperties;
 
 	private DocumentFilterDescriptor(final Builder builder)
@@ -98,6 +103,14 @@ public final class DocumentFilterDescriptor
 		autoFilter = parametersByName.values().stream().anyMatch(DocumentFilterParamDescriptor::isAutoFilter);
 
 		debugProperties = builder.debugProperties == null ? ImmutableMap.of() : ImmutableMap.copyOf(builder.debugProperties);
+
+		final ImmutableSet<BarcodeScannerType> barcodeScannerTypes = parametersByName.values().stream()
+				.map(DocumentFilterParamDescriptor::getBarcodeScannerType)
+				.filter(Predicates.notNull())
+				.collect(ImmutableSet.toImmutableSet());
+		barcodeScannerType = barcodeScannerTypes.size() == 1
+				? barcodeScannerTypes.iterator().next()
+				: null;
 	}
 
 	@Override
@@ -189,7 +202,7 @@ public final class DocumentFilterDescriptor
 
 		public Builder setDisplayName(final Map<String, String> displayNameTrls)
 		{
-			this.displayNameTrls = ImmutableTranslatableString.ofMap(displayNameTrls);
+			this.displayNameTrls = TranslatableStrings.ofMap(displayNameTrls);
 			return this;
 		}
 
@@ -201,7 +214,7 @@ public final class DocumentFilterDescriptor
 
 		public Builder setDisplayName(final String displayName)
 		{
-			displayNameTrls = ImmutableTranslatableString.constant(displayName);
+			displayNameTrls = TranslatableStrings.constant(displayName);
 			return this;
 		}
 
@@ -276,6 +289,11 @@ public final class DocumentFilterDescriptor
 			final Function<List<DocumentFilterParamDescriptor.Builder>, Builder> finisher = (params) -> addParameters(params);
 
 			return Collector.of(supplier, accumulator, combiner, finisher);
+		}
+
+		public Builder addInternalParameter(final String parameterName, final Object constantValue)
+		{
+			return addInternalParameter(DocumentFilterParam.ofNameEqualsValue(parameterName, constantValue));
 		}
 
 		public Builder addInternalParameter(final DocumentFilterParam parameter)

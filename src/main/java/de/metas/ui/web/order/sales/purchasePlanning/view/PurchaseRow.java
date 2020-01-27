@@ -2,7 +2,7 @@ package de.metas.ui.web.order.sales.purchasePlanning.view;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -16,6 +16,7 @@ import org.compiere.model.I_C_UOM;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 
 import de.metas.bpartner.BPartnerId;
@@ -35,6 +36,8 @@ import de.metas.purchasecandidate.model.I_C_PurchaseCandidate;
 import de.metas.quantity.Quantity;
 import de.metas.ui.web.exceptions.EntityNotFoundException;
 import de.metas.ui.web.view.IViewRow;
+import de.metas.ui.web.view.ViewRowFieldNameAndJsonValues;
+import de.metas.ui.web.view.ViewRowFieldNameAndJsonValuesHolder;
 import de.metas.ui.web.view.descriptor.annotation.ViewColumn;
 import de.metas.ui.web.view.descriptor.annotation.ViewColumnHelper;
 import de.metas.ui.web.window.datatypes.DocumentId;
@@ -120,9 +123,9 @@ public final class PurchaseRow implements IViewRow
 	@ViewColumn(captionKey = "C_UOM_ID", widgetType = DocumentFieldWidgetType.Text, seqNo = 60)
 	private String uomOrAvailablility;
 
-	@ViewColumn(fieldName = FIELDNAME_DatePromised, captionKey = "DatePromised", widgetType = DocumentFieldWidgetType.DateTime, seqNo = 70)
+	@ViewColumn(fieldName = FIELDNAME_DatePromised, captionKey = "DatePromised", widgetType = DocumentFieldWidgetType.ZonedDateTime, seqNo = 70)
 	@Getter
-	private LocalDateTime datePromised;
+	private ZonedDateTime datePromised;
 
 	//
 	private final PurchaseRowId rowId;
@@ -134,7 +137,7 @@ public final class PurchaseRow implements IViewRow
 	@Getter(AccessLevel.PRIVATE)
 	private PurchaseCandidatesGroup purchaseCandidatesGroup;
 
-	private transient ImmutableMap<String, Object> _fieldNameAndJsonValues; // lazy
+	private final ViewRowFieldNameAndJsonValuesHolder<PurchaseRow> values;
 
 	private static final ImmutableMap<String, ViewEditorRenderMode> ViewEditorRenderModeByFieldName_ReadOnly = //
 			ImmutableMap.<String, ViewEditorRenderMode> builder()
@@ -181,8 +184,18 @@ public final class PurchaseRow implements IViewRow
 
 		readonly = true;
 
+		values = createViewRowFieldNameAndJsonValuesHolder(readonly);
+
 		setIncludedRows(ImmutableList.copyOf(includedRows));
 		updateQtysFromIncludedRows();
+	}
+
+	private static ViewRowFieldNameAndJsonValuesHolder<PurchaseRow> createViewRowFieldNameAndJsonValuesHolder(final boolean readonly)
+	{
+		return ViewRowFieldNameAndJsonValuesHolder.builder(PurchaseRow.class)
+				.widgetTypesByFieldName(ViewColumnHelper.getWidgetTypesByFieldName(PurchaseRow.class))
+				.viewEditorRenderModeByFieldName(readonly ? ViewEditorRenderModeByFieldName_ReadOnly : ViewEditorRenderModeByFieldName_Editable)
+				.build();
 	}
 
 	@Builder(builderMethodName = "lineRowBuilder", builderClassName = "LineRowBuilder")
@@ -208,6 +221,8 @@ public final class PurchaseRow implements IViewRow
 
 		qtyAvailableToPromise = null;
 		qtyToDeliver = null;
+
+		values = createViewRowFieldNameAndJsonValuesHolder(readonly);
 
 		// Keep it last (like all setters called from ctor)
 		setPurchaseCandidatesGroup(purchaseCandidatesGroup);
@@ -245,6 +260,8 @@ public final class PurchaseRow implements IViewRow
 		datePromised = availabilityResult.getDatePromised();
 
 		readonly = true;
+
+		values = createViewRowFieldNameAndJsonValuesHolder(readonly);
 	}
 
 	@Builder(builderMethodName = "availabilityDetailErrorBuilder", builderClassName = "availabilityDetailErrorBuilder")
@@ -276,6 +293,8 @@ public final class PurchaseRow implements IViewRow
 		datePromised = null;
 
 		readonly = true;
+
+		values = createViewRowFieldNameAndJsonValuesHolder(readonly);
 	}
 
 	private PurchaseRow(@NonNull final PurchaseRow from)
@@ -306,7 +325,7 @@ public final class PurchaseRow implements IViewRow
 
 		readonly = from.readonly;
 
-		_fieldNameAndJsonValues = from._fieldNameAndJsonValues;
+		values = from.values.copy();
 	}
 
 	public PurchaseRow copy()
@@ -322,7 +341,7 @@ public final class PurchaseRow implements IViewRow
 	@Override
 	public DocumentId getId()
 	{
-		return rowId.toDocumentId();
+		return getRowId().toDocumentId();
 	}
 
 	public List<DemandGroupReference> getDemandGroupReferences()
@@ -334,7 +353,7 @@ public final class PurchaseRow implements IViewRow
 	@Override
 	public PurchaseRowType getType()
 	{
-		return rowId.getType();
+		return getRowId().getType();
 	}
 
 	@Override
@@ -351,30 +370,32 @@ public final class PurchaseRow implements IViewRow
 	}
 
 	@Override
-	public Map<String, Object> getFieldNameAndJsonValues()
+	public ImmutableSet<String> getFieldNames()
 	{
-		if (_fieldNameAndJsonValues == null)
-		{
-			_fieldNameAndJsonValues = ViewColumnHelper.extractJsonMap(this);
-		}
-		return _fieldNameAndJsonValues;
+		return values.getFieldNames();
+	}
+
+	@Override
+	public ViewRowFieldNameAndJsonValues getFieldNameAndJsonValues()
+	{
+		return values.get(this);
 	}
 
 	@Override
 	public Map<String, DocumentFieldWidgetType> getWidgetTypesByFieldName()
 	{
-		return ViewColumnHelper.getWidgetTypesByFieldName(PurchaseRow.class);
+		return values.getWidgetTypesByFieldName();
 	}
 
 	@Override
 	public Map<String, ViewEditorRenderMode> getViewEditorRenderModeByFieldName()
 	{
-		return readonly ? ViewEditorRenderModeByFieldName_ReadOnly : ViewEditorRenderModeByFieldName_Editable;
+		return values.getViewEditorRenderModeByFieldName();
 	}
 
-	private void resetFieldNameAndJsonValues()
+	private void resetFieldNamesAndValues()
 	{
-		_fieldNameAndJsonValues = null;
+		values.clearValues();
 	}
 
 	@Override
@@ -432,7 +453,7 @@ public final class PurchaseRow implements IViewRow
 		this.qtyToPurchase = qtyToPurchase;
 		uomOrAvailablility = qtyToPurchase != null ? lookups.createUOMLookupValue(qtyToPurchase.getUOM()) : null;
 
-		resetFieldNameAndJsonValues();
+		resetFieldNamesAndValues();
 	}
 
 	private void setPurchasedQty(final Quantity purchasedQty)
@@ -443,10 +464,10 @@ public final class PurchaseRow implements IViewRow
 		}
 
 		this.purchasedQty = purchasedQty;
-		resetFieldNameAndJsonValues();
+		resetFieldNamesAndValues();
 	}
 
-	private void setDatePromised(final LocalDateTime datePromised)
+	private void setDatePromised(final ZonedDateTime datePromised)
 	{
 		if (Objects.equals(this.datePromised, datePromised))
 		{
@@ -454,7 +475,7 @@ public final class PurchaseRow implements IViewRow
 		}
 
 		this.datePromised = datePromised;
-		resetFieldNameAndJsonValues();
+		resetFieldNamesAndValues();
 	}
 
 	private void setProfitInfo(@Nullable final PurchaseProfitInfo profitInfo)
@@ -464,7 +485,7 @@ public final class PurchaseRow implements IViewRow
 			profitSalesPriceActual = profitInfo.getProfitSalesPriceActual().orElse(null);
 			profitPurchasePriceActual = profitInfo.getProfitPurchasePriceActual().orElse(null);
 			profitPercent = profitInfo.getProfitPercent()
-					.map(percent -> percent.roundToHalf(RoundingMode.HALF_UP).getValue())
+					.map(percent -> percent.roundToHalf(RoundingMode.HALF_UP).toBigDecimal())
 					.orElse(null);
 		}
 		else
@@ -474,7 +495,7 @@ public final class PurchaseRow implements IViewRow
 			profitPercent = null;
 		}
 
-		resetFieldNameAndJsonValues();
+		resetFieldNamesAndValues();
 	}
 
 	private void updateQtysFromIncludedRows()
@@ -495,18 +516,18 @@ public final class PurchaseRow implements IViewRow
 	{
 		if (readonly)
 		{
-			throw new AdempiereException("readonly").setParameter("rowId", rowId);
+			throw new AdempiereException("readonly").setParameter("rowId", getRowId());
 		}
 	}
 
 	public void assertRowType(@NonNull final PurchaseRowType expectedRowType)
 	{
+		getRowId().assertRowType(expectedRowType);
 		final PurchaseRowType rowType = getType();
 		if (rowType != expectedRowType)
 		{
 			throw new AdempiereException("Expected " + expectedRowType + " but it was " + rowType + ": " + this);
 		}
-
 	}
 
 	void changeIncludedRow(@NonNull final PurchaseRowId includedRowId, @NonNull final PurchaseRowChangeRequest request)
@@ -543,7 +564,7 @@ public final class PurchaseRow implements IViewRow
 
 		//
 		// PurchaseDatePromised
-		final LocalDateTime purchaseDatePromised = request.getPurchaseDatePromised();
+		final ZonedDateTime purchaseDatePromised = request.getPurchaseDatePromised();
 		if (purchaseDatePromised != null)
 		{
 			newCandidatesGroup.purchaseDatePromised(purchaseDatePromised);
@@ -584,7 +605,14 @@ public final class PurchaseRow implements IViewRow
 		assertRowType(PurchaseRowType.LINE);
 		availabilityResultRows.forEach(availabilityResultRow -> availabilityResultRow.assertRowType(PurchaseRowType.AVAILABILITY_DETAIL));
 
+		// If there is at least one "available on vendor" row,
+		// we shall order directly and not aggregate later on a Purchase Order.
+		final boolean allowPOAggregation = availabilityResultRows
+				.stream()
+				.noneMatch(row -> row.getRowId().isAvailableOnVendor());
+
 		setIncludedRows(ImmutableList.copyOf(availabilityResultRows));
+		setPurchaseCandidatesGroup(getPurchaseCandidatesGroup().allowingPOAggregation(allowPOAggregation));
 	}
 
 	public Stream<PurchaseCandidatesGroup> streamPurchaseCandidatesGroup()

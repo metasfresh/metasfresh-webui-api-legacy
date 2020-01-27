@@ -19,6 +19,7 @@ import de.metas.ui.web.view.ViewId;
 import de.metas.ui.web.view.ViewProfileId;
 import de.metas.ui.web.view.ViewResult;
 import de.metas.ui.web.window.datatypes.WindowId;
+import de.metas.ui.web.window.datatypes.json.JSONOptions;
 import de.metas.util.GuavaCollectors;
 
 /*
@@ -46,24 +47,24 @@ import de.metas.util.GuavaCollectors;
 @JsonAutoDetect(fieldVisibility = Visibility.ANY, getterVisibility = Visibility.NONE, isGetterVisibility = Visibility.NONE, setterVisibility = Visibility.NONE)
 public final class JSONViewResult
 {
-	public static final JSONViewResult of(final ViewResult viewResult, IViewRowOverrides rowOverrides, final String adLanguage)
+	public static JSONViewResult of(final ViewResult viewResult, IViewRowOverrides rowOverrides, final JSONOptions jsonOpts)
 	{
 		List<? extends JSONViewRowBase> jsonRows;
 		if (viewResult.isPageLoaded())
 		{
 			final List<IViewRow> rows = viewResult.getPage();
-			jsonRows = JSONViewRow.ofViewRows(rows, rowOverrides, adLanguage);
+			jsonRows = JSONViewRow.ofViewRows(rows, rowOverrides, jsonOpts);
 		}
 		else
 		{
 			jsonRows = null;
 		}
-		return new JSONViewResult(viewResult, jsonRows, adLanguage);
+		return new JSONViewResult(viewResult, jsonRows, jsonOpts);
 	}
 
-	public static final JSONViewResult of(final ViewResult viewResult, final List<? extends JSONViewRowBase> rows, final String adLanguage)
+	public static JSONViewResult of(final ViewResult viewResult, final List<? extends JSONViewRowBase> rows, final JSONOptions jsonOpts)
 	{
-		return new JSONViewResult(viewResult, rows, adLanguage);
+		return new JSONViewResult(viewResult, rows, jsonOpts);
 	}
 
 	//
@@ -93,6 +94,10 @@ public final class JSONViewResult
 	@JsonProperty("description")
 	@JsonInclude(JsonInclude.Include.NON_EMPTY)
 	private final String description;
+
+	@JsonProperty("headerProperties")
+	@JsonInclude(JsonInclude.Include.NON_NULL)
+	private final JSONViewHeaderProperties headerProperties;
 
 	@JsonProperty("size")
 	@JsonInclude(JsonInclude.Include.NON_NULL)
@@ -142,7 +147,7 @@ public final class JSONViewResult
 	@JsonInclude(JsonInclude.Include.NON_NULL)
 	private final Integer queryLimit;
 
-	private JSONViewResult(final ViewResult viewResult, final List<? extends JSONViewRowBase> rows, final String adLanguage)
+	private JSONViewResult(final ViewResult viewResult, final List<? extends JSONViewRowBase> rows, final JSONOptions jsonOpts)
 	{
 		//
 		// View informations
@@ -156,13 +161,15 @@ public final class JSONViewResult
 		parentWindowId = parentViewId == null ? null : parentViewId.getWindowId();
 		this.parentViewId = parentViewId == null ? null : parentViewId.getViewId();
 
+		final String adLanguage = jsonOpts.getAdLanguage();
 		description = viewResult.getViewDescription(adLanguage);
+		headerProperties = JSONViewHeaderProperties.of(viewResult.getHeaderProperties(), adLanguage);
 
 		final long size = viewResult.getSize();
 		this.size = size >= 0 ? size : null;
 
 		staticFilters = JSONStickyDocumentFilter.ofStickyFiltersList(viewResult.getStickyFilters(), adLanguage);
-		filters = JSONDocumentFilter.ofList(viewResult.getFilters(), adLanguage);
+		filters = JSONDocumentFilter.ofList(viewResult.getFilters(), jsonOpts);
 
 		orderBy = JSONViewOrderBy.ofList(viewResult.getOrderBys());
 
@@ -203,6 +210,7 @@ public final class JSONViewResult
 			@JsonProperty("parentViewId") final String parentViewId,
 			//
 			@JsonProperty("description") final String description,
+			@JsonProperty("headerProperties") final JSONViewHeaderProperties headerProperties,
 			//
 			@JsonProperty("size") final Long size,
 			@JsonProperty("staticFilters") final List<JSONStickyDocumentFilter> staticFilters,
@@ -230,6 +238,7 @@ public final class JSONViewResult
 		this.parentViewId = parentViewId;
 		//
 		this.description = description;
+		this.headerProperties = headerProperties;
 		//
 		this.size = size;
 		this.filters = filters == null ? ImmutableList.of() : filters;

@@ -1,35 +1,43 @@
 package de.metas.ui.web.order.pricingconditions.view;
 
+import static de.metas.util.Check.assumeNotNull;
+
+import java.math.BigDecimal;
 import java.util.List;
+
+import javax.annotation.Nullable;
 
 import org.adempiere.model.InterfaceWrapperHelper;
 
 import com.google.common.collect.ImmutableList;
 
-import de.metas.i18n.ITranslatableString;
+import de.metas.currency.CurrencyPrecision;
+import de.metas.i18n.TranslatableStrings;
 import de.metas.interfaces.I_C_OrderLine;
+import de.metas.money.CurrencyId;
 import de.metas.money.Money;
 import de.metas.order.IOrderDAO;
 import de.metas.order.IOrderLineBL;
 import de.metas.order.OrderLineId;
 import de.metas.order.OrderLinePriceUpdateRequest;
+import de.metas.order.PriceAndDiscount;
 import de.metas.payment.paymentterm.PaymentTermId;
-import de.metas.pricing.conditions.PriceOverride;
-import de.metas.pricing.conditions.PriceOverrideType;
+import de.metas.pricing.conditions.PriceSpecification;
+import de.metas.pricing.conditions.PriceSpecificationType;
 import de.metas.pricing.conditions.PricingConditionsBreak;
 import de.metas.pricing.conditions.PricingConditionsBreakId;
 import de.metas.process.RelatedProcessDescriptor;
 import de.metas.ui.web.document.filter.DocumentFilter;
-import de.metas.ui.web.document.filter.DocumentFilterDescriptorsProvider;
 import de.metas.ui.web.document.filter.DocumentFiltersList;
-import de.metas.ui.web.view.AbstractCustomView;
+import de.metas.ui.web.document.filter.provider.DocumentFilterDescriptorsProvider;
 import de.metas.ui.web.view.IEditableView;
 import de.metas.ui.web.view.ViewId;
+import de.metas.ui.web.view.template.AbstractCustomView;
 import de.metas.ui.web.window.datatypes.DocumentId;
 import de.metas.ui.web.window.datatypes.LookupValuesList;
+import de.metas.util.Check;
 import de.metas.util.Services;
 import de.metas.util.lang.Percent;
-
 import lombok.Builder;
 import lombok.NonNull;
 import lombok.Singular;
@@ -73,7 +81,7 @@ public class PricingConditionsView extends AbstractCustomView<PricingConditionsR
 			@Singular final List<RelatedProcessDescriptor> relatedProcessDescriptors,
 			@NonNull final DocumentFilterDescriptorsProvider filterDescriptors)
 	{
-		super(viewId, ITranslatableString.empty(), rowsData, filterDescriptors);
+		super(viewId, TranslatableStrings.empty(), rowsData, filterDescriptors);
 		this.rowsData = rowsData;
 		this.relatedProcessDescriptors = ImmutableList.copyOf(relatedProcessDescriptors);
 	}
@@ -148,11 +156,23 @@ public class PricingConditionsView extends AbstractCustomView<PricingConditionsR
 			return;
 		}
 
+		final PricingConditionsRow editableRow = getEditableRow();
+
+		final BigDecimal basePriceAmt = editableRow.getBasePriceAmt();
+		final CurrencyId currencyId = editableRow.getCurrencyId();
+		final Money basePriceFromRow = Money.ofOrNull(basePriceAmt, currencyId);
+
+		final PricingConditionsBreak pricingConditionsBreak = editableRow.getPricingConditionsBreak();
+
+		updateOrderLineRecord(pricingConditionsBreak, basePriceFromRow);
+	}
+
+	private void updateOrderLineRecord(
+			@NonNull final PricingConditionsBreak pricingConditionsBreak,
+			@Nullable final Money basePrice)
+	{
 		final IOrderDAO ordersRepo = Services.get(IOrderDAO.class);
 		final IOrderLineBL orderLineBL = Services.get(IOrderLineBL.class);
-
-		final PricingConditionsRow editableRow = getEditableRow();
-		final PricingConditionsBreak pricingConditionsBreak = editableRow.getPricingConditionsBreak();
 
 		final I_C_OrderLine orderLineRecord = ordersRepo.getOrderLineById(getOrderLineId());
 		orderLineRecord.setIsTempPricingConditions(pricingConditionsBreak.isTemporaryPricingConditionsBreak());
@@ -162,35 +182,63 @@ public class PricingConditionsView extends AbstractCustomView<PricingConditionsR
 			orderLineRecord.setM_DiscountSchema_ID(-1);
 			orderLineRecord.setM_DiscountSchemaBreak_ID(-1);
 
-			final PriceOverride price = pricingConditionsBreak.getPriceOverride();
-			final PriceOverrideType type = price.getType();
-			if (type == PriceOverrideType.NONE)
+			final PriceSpecification price = pricingConditionsBreak.getPriceSpecification();
+
+			final PriceSpecificationType type = price.getType();
+			if (type == PriceSpecificationType.NONE)
 			{
 				//
 			}
-			else if (type == PriceOverrideType.BASE_PRICING_SYSTEM)
+			else if (type == PriceSpecificationType.BASE_PRICING_SYSTEM)
 			{
+				assumeNotNull(basePrice, "If type={}, then the given basePrice may not be null; pricingConditionsBreak={}", type, pricingConditionsBreak);
+
+				final BigDecimal priceEntered = limitPrice(basePrice.toBigDecimal(), orderLineRecord);
+
 				orderLineRecord.setIsManualPrice(true);
-				orderLineRecord.setPriceEntered(editableRow.getBasePrice());
+				orderLineRecord.setPriceEntered(priceEntered);
+				orderLineRecord.setC_Currency_ID(basePrice.getCurrencyId().getRepoId());
+
 				orderLineRecord.setBase_PricingSystem_ID(price.getBasePricingSystemId().getRepoId());
-
 			}
-			else if (type == PriceOverrideType.FIXED_PRICE)
+			else if (type == PriceSpecificationType.FIXED_PRICE)
 			{
-				orderLineRecord.setIsManualPrice(true);
-
 				final Money fixedPrice = price.getFixedPrice();
-				orderLineRecord.setPriceEntered(fixedPrice.getValue());
+				Check.assumeNotNull(fixedPrice, "fixedPrice shall not be null for {}", price);
+
+				final BigDecimal priceEntered = limitPrice(fixedPrice.toBigDecimal(), orderLineRecord);
+
+				orderLineRecord.setIsManualPrice(true);
+				orderLineRecord.setPriceEntered(priceEntered);
 				orderLineRecord.setC_Currency_ID(fixedPrice.getCurrencyId().getRepoId());
+
+				orderLineRecord.setBase_PricingSystem_ID(-1);
 			}
 
 			orderLineRecord.setIsManualDiscount(true);
-			orderLineRecord.setDiscount(pricingConditionsBreak.getDiscount().getValue());
+			orderLineRecord.setDiscount(pricingConditionsBreak.getDiscount().toBigDecimal());
 
 			orderLineRecord.setIsManualPaymentTerm(true); // make sure it's not overwritten by whatever the system comes up with when we save the orderLine.
-			final int paymentTermRepoId = PaymentTermId.getRepoId(pricingConditionsBreak.getDerivedPaymentTermIdOrNull());
-			orderLineRecord.setC_PaymentTerm_Override_ID(paymentTermRepoId);
-			orderLineRecord.setPaymentDiscount(Percent.getValueOrNull(pricingConditionsBreak.getPaymentDiscountOverrideOrNull()));
+			orderLineRecord.setC_PaymentTerm_Override_ID(PaymentTermId.toRepoId(pricingConditionsBreak.getDerivedPaymentTermIdOrNull()));
+			orderLineRecord.setPaymentDiscount(Percent.toBigDecimalOrNull(pricingConditionsBreak.getPaymentDiscountOverrideOrNull()));
+
+			//
+			// PriceActual & Discount
+			Percent discountEffective = pricingConditionsBreak.getDiscount();
+			final BigDecimal priceActual = discountEffective.subtractFromBase(orderLineRecord.getPriceEntered(), CurrencyPrecision.TWO.toInt());
+			final BigDecimal priceActualEffective = limitPrice(priceActual, orderLineRecord);
+			if (priceActualEffective.compareTo(priceActual) != 0)
+			{
+				discountEffective = PriceAndDiscount.calculateDiscountFromPrices(
+						orderLineRecord.getPriceEntered(),
+						priceActualEffective,
+						CurrencyPrecision.TWO);
+			}
+			//
+			orderLineRecord.setIsManualDiscount(true);
+			orderLineRecord.setDiscount(discountEffective.toBigDecimal());
+			orderLineRecord.setPriceActual(priceActualEffective);
+
 		}
 		else
 		{
@@ -201,14 +249,33 @@ public class PricingConditionsView extends AbstractCustomView<PricingConditionsR
 			orderLineRecord.setIsManualDiscount(false);
 			orderLineRecord.setIsManualPrice(false);
 			orderLineRecord.setIsManualPaymentTerm(false);
-			orderLineBL.updatePrices(OrderLinePriceUpdateRequest.prepare(orderLineRecord)
+
+			final OrderLinePriceUpdateRequest orderLinePriceUpdateRequest = OrderLinePriceUpdateRequest
+					.prepare(orderLineRecord)
 					.pricingConditionsBreakOverride(pricingConditionsBreak)
-					.build());
+					.build();
+			orderLineBL.updatePrices(orderLinePriceUpdateRequest);
 		}
 
-		orderLineBL.updateLineNetAmt(orderLineRecord);
+		orderLineBL.updateLineNetAmtFromQtyEntered(orderLineRecord);
 		orderLineBL.setTaxAmtInfo(orderLineRecord);
 
 		InterfaceWrapperHelper.save(orderLineRecord);
+	}
+
+	private static BigDecimal limitPrice(final BigDecimal price, final I_C_OrderLine orderLineRecord)
+	{
+		if (!orderLineRecord.isEnforcePriceLimit())
+		{
+			return price;
+		}
+
+		final BigDecimal priceLimit = orderLineRecord.getPriceLimit();
+		if (priceLimit.signum() == 0)
+		{
+			return price;
+		}
+
+		return price.max(priceLimit);
 	}
 }

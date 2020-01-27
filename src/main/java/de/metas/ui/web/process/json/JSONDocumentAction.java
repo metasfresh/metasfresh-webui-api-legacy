@@ -4,6 +4,7 @@ import java.io.Serializable;
 import java.time.Duration;
 import java.util.Comparator;
 import java.util.Map;
+import java.util.Set;
 
 import org.compiere.util.TimeUtil;
 
@@ -14,7 +15,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableMap;
 
+import de.metas.process.RelatedProcessDescriptor.DisplayPlace;
 import de.metas.ui.web.process.descriptor.WebuiRelatedProcessDescriptor;
+import de.metas.ui.web.window.WindowConstants;
 import de.metas.ui.web.window.datatypes.json.JSONOptions;
 import lombok.NonNull;
 
@@ -45,6 +48,7 @@ public final class JSONDocumentAction implements Serializable
 {
 	public static final Comparator<JSONDocumentAction> ORDERBY_QuickActionFirst_Caption = Comparator
 			.<JSONDocumentAction> comparingInt(action -> action.isEnabled() ? 0 : 1) // enabled actions first
+			.thenComparingInt(action -> action.getSortNo()) // sort no
 			.thenComparingInt(action -> action.isDefaultQuickAction() ? 0 : 1) // Default QuickAction
 			.thenComparingInt(action -> action.isQuickAction() ? 0 : 1) // QuickAction
 			.thenComparing(JSONDocumentAction::getCaption) // Caption
@@ -59,11 +63,19 @@ public final class JSONDocumentAction implements Serializable
 	@JsonProperty("description")
 	private final String description;
 
+	@JsonProperty("displayPlaces")
+	private final Set<DisplayPlace> displayPlaces;
+	//
 	@JsonProperty("quickAction")
+	@Deprecated
 	private final boolean quickAction;
 
 	@JsonProperty("defaultQuickAction")
 	private final boolean defaultQuickAction;
+
+	@JsonProperty("shortcut")
+	@JsonInclude(JsonInclude.Include.NON_EMPTY)
+	private final String shortcut;
 
 	@JsonProperty("disabled")
 	@JsonInclude(JsonInclude.Include.NON_NULL)
@@ -85,20 +97,26 @@ public final class JSONDocumentAction implements Serializable
 	@JsonInclude(JsonInclude.Include.NON_EMPTY)
 	private final String internalName;
 
+	@JsonIgnore
+	private final int sortNo;
+
 	private final Map<String, Object> debugProperties;
 
 	JSONDocumentAction(
 			@NonNull final WebuiRelatedProcessDescriptor relatedProcessDescriptor,
 			@NonNull final JSONOptions jsonOpts)
 	{
-		final String adLanguage = jsonOpts.getAD_Language();
+		final String adLanguage = jsonOpts.getAdLanguage();
 
 		processId = relatedProcessDescriptor.getProcessId().toJson();
 		caption = relatedProcessDescriptor.getCaption(adLanguage);
 		description = relatedProcessDescriptor.getDescription(adLanguage);
 
-		quickAction = relatedProcessDescriptor.isQuickAction();
+		displayPlaces = relatedProcessDescriptor.getDisplayPlaces();
+		quickAction = relatedProcessDescriptor.isDisplayedOn(DisplayPlace.ViewQuickActions);
 		defaultQuickAction = relatedProcessDescriptor.isDefaultQuickAction();
+
+		shortcut = relatedProcessDescriptor.getShortcut();
 
 		disabled = relatedProcessDescriptor.isDisabled() ? Boolean.TRUE : null;
 		disabledReason = relatedProcessDescriptor.getDisabledReason(adLanguage);
@@ -107,11 +125,15 @@ public final class JSONDocumentAction implements Serializable
 		final Duration preconditionsResolutionCalcDuration = relatedProcessDescriptor.getPreconditionsResolutionCalcDuration();
 		evaluateDurationStr = preconditionsResolutionCalcDuration != null ? TimeUtil.formatElapsed(preconditionsResolutionCalcDuration) : null;
 
-		internalName = relatedProcessDescriptor.getInternalName();
+		internalName = relatedProcessDescriptor.getInternalName() != null
+				? relatedProcessDescriptor.getInternalName().getAsString()
+				: null;
+
+		sortNo = relatedProcessDescriptor.getSortNo();
 
 		//
 		// Debug properties
-		if (jsonOpts.isProtocolDebugging())
+		if (WindowConstants.isProtocolDebugging())
 		{
 			debugProperties = relatedProcessDescriptor.getDebugProperties();
 		}
@@ -145,7 +167,7 @@ public final class JSONDocumentAction implements Serializable
 	@JsonIgnore
 	public boolean isDisabled()
 	{
-		return disabled != null && disabled.booleanValue();
+		return disabled != null && disabled;
 	}
 
 	@JsonIgnore
@@ -162,6 +184,11 @@ public final class JSONDocumentAction implements Serializable
 	public boolean isDefaultQuickAction()
 	{
 		return defaultQuickAction;
+	}
+
+	private int getSortNo()
+	{
+		return sortNo;
 	}
 
 	@JsonAnyGetter

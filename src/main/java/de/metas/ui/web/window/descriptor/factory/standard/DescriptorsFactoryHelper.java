@@ -1,5 +1,6 @@
 package de.metas.ui.web.window.descriptor.factory.standard;
 
+import java.util.Optional;
 import java.util.Set;
 
 import org.adempiere.exceptions.AdempiereException;
@@ -16,6 +17,7 @@ import de.metas.ui.web.window.descriptor.DocumentLayoutElementFieldDescriptor.Lo
 import de.metas.ui.web.window.descriptor.LookupDescriptor;
 import de.metas.ui.web.window.exceptions.DocumentLayoutBuildException;
 import de.metas.util.Check;
+import lombok.NonNull;
 
 /*
  * #%L
@@ -57,15 +59,15 @@ public final class DescriptorsFactoryHelper
 		super();
 	}
 
-	public static Class<?> getValueClass(final DocumentFieldWidgetType widgetType, final LookupDescriptor lookupDescriptor)
+	public static Class<?> getValueClass(@NonNull final DocumentFieldWidgetType widgetType, @NonNull final Optional<LookupDescriptor> lookupDescriptor)
 	{
 		final Class<?> widgetValueClass = widgetType.getValueClassOrNull();
 
 		//
 		// Try fetching the valueClass from lookup
-		if (lookupDescriptor != null)
+		if (lookupDescriptor.isPresent())
 		{
-			final Class<?> lookupValueClass = lookupDescriptor.getValueClass();
+			final Class<?> lookupValueClass = lookupDescriptor.get().getValueClass();
 			Check.assumeNotNull(lookupValueClass, "Parameter lookupValueClass is not null for {}", lookupDescriptor); // shall not happen
 
 			if (widgetValueClass == null)
@@ -143,22 +145,22 @@ public final class DescriptorsFactoryHelper
 		//
 		else if (displayType == DisplayType.Date)
 		{
-			return DocumentFieldWidgetType.Date;
+			return DocumentFieldWidgetType.LocalDate;
 		}
 		else if (displayType == DisplayType.Time)
 		{
-			return DocumentFieldWidgetType.Time;
+			return DocumentFieldWidgetType.LocalTime;
 		}
 		else if (displayType == DisplayType.DateTime)
 		{
 			if (WindowConstants.FIELDNAME_Created.equals(columnName)
 					|| WindowConstants.FIELDNAME_Updated.equals(columnName))
 			{
-				return DocumentFieldWidgetType.ZonedDateTime;
+				return DocumentFieldWidgetType.Timestamp;
 			}
 			else
 			{
-				return DocumentFieldWidgetType.DateTime;
+				return DocumentFieldWidgetType.ZonedDateTime;
 			}
 		}
 		//
@@ -235,13 +237,16 @@ public final class DescriptorsFactoryHelper
 		}
 	}
 
-	public static DocumentFieldWidgetType extractWidgetType(final String columnName, final int displayType, final LookupDescriptor lookupDescriptor)
+	public static DocumentFieldWidgetType extractWidgetType(
+			final String columnName,
+			final int displayType,
+			@NonNull final Optional<LookupDescriptor> lookupDescriptor)
 	{
 		final DocumentFieldWidgetType widgetType = extractWidgetType(columnName, displayType);
-		if (lookupDescriptor != null
+		if (lookupDescriptor.isPresent()
 				&& (widgetType == DocumentFieldWidgetType.List || widgetType == DocumentFieldWidgetType.Lookup))
 		{
-			final LookupSource lookupSourceType = lookupDescriptor.getLookupSourceType();
+			final LookupSource lookupSourceType = lookupDescriptor.get().getLookupSourceType();
 			final DocumentFieldWidgetType lookupWidgetType = extractWidgetType(lookupSourceType);
 			if (lookupWidgetType != widgetType)
 			{
@@ -256,7 +261,7 @@ public final class DescriptorsFactoryHelper
 		return widgetType;
 	}
 
-	private static final DocumentFieldWidgetType extractWidgetType(final DocumentLayoutElementFieldDescriptor.LookupSource lookupSource)
+	private static DocumentFieldWidgetType extractWidgetType(final DocumentLayoutElementFieldDescriptor.LookupSource lookupSource)
 	{
 		Check.assumeNotNull(lookupSource, "Parameter lookupSource is not null");
 		switch (lookupSource)

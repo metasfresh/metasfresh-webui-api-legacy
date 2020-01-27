@@ -1,7 +1,8 @@
 package de.metas.ui.web.window.descriptor.sql;
 
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZonedDateTime;
 import java.util.Optional;
 
@@ -122,7 +123,6 @@ public class SqlDocumentFieldDataBindingDescriptor implements DocumentFieldDataB
 		sqlSelectValue = builder.buildSqlSelectValue();
 		sqlSelectDisplayValue = builder.buildSqlSelectDisplayValue();
 
-		//
 		// ORDER BY
 		{
 			defaultOrderByPriority = builder.orderByPriority;
@@ -289,13 +289,14 @@ public class SqlDocumentFieldDataBindingDescriptor implements DocumentFieldDataB
 		// Built values
 		private boolean _usingDisplayColumn;
 		private String _displayColumnName;
+		// private String _descriptionColumnName;
+
 		private IStringExpression _displayColumnSqlExpression;
 		private Boolean _numericKey;
 		private DocumentFieldValueLoader _documentFieldValueLoader;
 
 		private Builder()
 		{
-			super();
 		}
 
 		public SqlDocumentFieldDataBindingDescriptor build()
@@ -304,7 +305,8 @@ public class SqlDocumentFieldDataBindingDescriptor implements DocumentFieldDataB
 			// Display column
 			final String sqlColumnName = getColumnName();
 			if (_lookupDescriptor != null
-					&& sqlColumnName != null) // in case of Labels, sqlColumnName is null
+					&& sqlColumnName != null // in case of Labels, sqlColumnName is null
+					&& _lookupDescriptor instanceof ISqlLookupDescriptor)
 			{
 				_usingDisplayColumn = true;
 
@@ -342,7 +344,7 @@ public class SqlDocumentFieldDataBindingDescriptor implements DocumentFieldDataB
 			}
 
 			final String sqlColumnNameFQ = sqlTableAlias + "." + sqlColumnName;
-			final IStringExpression displayColumnSqlExpression = sqlLookupDescriptor.getSqlForFetchingDisplayNameByIdExpression(sqlColumnNameFQ);
+			final IStringExpression displayColumnSqlExpression = sqlLookupDescriptor.getSqlForFetchingLookupByIdExpression(sqlColumnNameFQ);
 			if (displayColumnSqlExpression == null || displayColumnSqlExpression.isNullExpression())
 			{
 				return ConstantStringExpression.of(sqlColumnName);
@@ -351,7 +353,7 @@ public class SqlDocumentFieldDataBindingDescriptor implements DocumentFieldDataB
 			return displayColumnSqlExpression;
 		}
 
-		private final String buildSqlSelectValue()
+		private String buildSqlSelectValue()
 		{
 			final String columnSql = getColumnSql();
 			final String columnName = getColumnName();
@@ -378,7 +380,7 @@ public class SqlDocumentFieldDataBindingDescriptor implements DocumentFieldDataB
 			}
 		}
 
-		private final IStringExpression buildSqlSelectDisplayValue()
+		private IStringExpression buildSqlSelectDisplayValue()
 		{
 			if (!isUsingDisplayColumn())
 			{
@@ -398,7 +400,8 @@ public class SqlDocumentFieldDataBindingDescriptor implements DocumentFieldDataB
 			{
 				_documentFieldValueLoader = createDocumentFieldValueLoader(
 						getColumnName(),
-						isUsingDisplayColumn() ? getDisplayColumnName() : null, // displayColumnName
+						isUsingDisplayColumn() ? getDisplayColumnName() : null/* displayColumnName */,
+						// isUsingDisplayColumn() ? getDescriptionColumnName() : null/* descriptionColumnName */,
 						getValueClass(),
 						getWidgetType(),
 						encrypted,
@@ -408,30 +411,25 @@ public class SqlDocumentFieldDataBindingDescriptor implements DocumentFieldDataB
 		}
 
 		/**
-		 *
 		 * NOTE to developer: make sure there is NO reference to fieldDescriptor or dataBinding or anything else in returned lambdas.
 		 * They shall be independent from descriptors.
 		 * That's the reason why it's a static method (to make sure we are no doing any mistakes).
 		 *
-		 * @param sqlColumnName
-		 * @param displayColumnName
-		 * @param valueClass
-		 * @param encrypted
-		 * @param numericKey
+		 * @param descriptionColumnName currently only used in lookup value
+		 *
 		 * @return document field value loader
 		 */
-		private static final DocumentFieldValueLoader createDocumentFieldValueLoader(
-				final String sqlColumnName //
-				, final String displayColumnName //
-				, final Class<?> valueClass //
-				, final DocumentFieldWidgetType widgetType //
-				, final boolean encrypted //
-				, final Boolean numericKey //
-		)
+		private static DocumentFieldValueLoader createDocumentFieldValueLoader(
+				final String sqlColumnName,
+				final String displayColumnName,
+				final Class<?> valueClass,
+				final DocumentFieldWidgetType widgetType,
+				final boolean encrypted,
+				final Boolean numericKey)
 		{
 			if (!Check.isEmpty(displayColumnName))
 			{
-				return DocumentFieldValueLoaders.toLookupValue(sqlColumnName, displayColumnName, numericKey);
+				return DocumentFieldValueLoaders.toLookupValue(sqlColumnName, displayColumnName, /* descriptionColumnName, */ numericKey);
 			}
 			else if (java.lang.String.class == valueClass)
 			{
@@ -450,6 +448,8 @@ public class SqlDocumentFieldDataBindingDescriptor implements DocumentFieldDataB
 				final Integer precision = widgetType.getStandardNumberPrecision();
 				return DocumentFieldValueLoaders.toBigDecimal(sqlColumnName, encrypted, precision);
 			}
+			//
+			// Date & times
 			else if (java.util.Date.class.isAssignableFrom(valueClass))
 			{
 				return DocumentFieldValueLoaders.toJULDate(sqlColumnName, encrypted);
@@ -458,13 +458,17 @@ public class SqlDocumentFieldDataBindingDescriptor implements DocumentFieldDataB
 			{
 				return DocumentFieldValueLoaders.toZonedDateTime(sqlColumnName, encrypted);
 			}
-			else if (LocalDateTime.class == valueClass)
+			else if (Instant.class == valueClass)
 			{
-				return DocumentFieldValueLoaders.toLocalDateTime(sqlColumnName, encrypted);
+				return DocumentFieldValueLoaders.toInstant(sqlColumnName, encrypted);
 			}
 			else if (LocalDate.class == valueClass)
 			{
 				return DocumentFieldValueLoaders.toLocalDate(sqlColumnName, encrypted);
+			}
+			else if (LocalTime.class == valueClass)
+			{
+				return DocumentFieldValueLoaders.toLocalTime(sqlColumnName, encrypted);
 			}
 			// YesNo
 			else if (Boolean.class == valueClass)
@@ -621,6 +625,11 @@ public class SqlDocumentFieldDataBindingDescriptor implements DocumentFieldDataB
 		{
 			return _displayColumnName;
 		}
+
+		// private String getDescriptionColumnName()
+		// {
+		// return _descriptionColumnName;
+		// }
 
 		public IStringExpression getDisplayColumnSqlExpression()
 		{

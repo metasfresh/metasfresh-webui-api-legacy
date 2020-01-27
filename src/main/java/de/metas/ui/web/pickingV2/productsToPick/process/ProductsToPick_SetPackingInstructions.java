@@ -3,6 +3,7 @@ package de.metas.ui.web.pickingV2.productsToPick.process;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -15,7 +16,7 @@ import de.metas.handlingunits.picking.PickingCandidateService;
 import de.metas.process.Param;
 import de.metas.process.ProcessPreconditionsResolution;
 import de.metas.process.RunOutOfTrx;
-import de.metas.ui.web.pickingV2.productsToPick.ProductsToPickRow;
+import de.metas.ui.web.pickingV2.productsToPick.rows.ProductsToPickRow;
 import de.metas.ui.web.window.datatypes.DocumentId;
 
 /*
@@ -51,15 +52,14 @@ public class ProductsToPick_SetPackingInstructions extends ProductsToPickViewBas
 	@Override
 	protected ProcessPreconditionsResolution checkPreconditionsApplicable()
 	{
-		final List<ProductsToPickRow> selectedRows = getSelectedRows();
-		if (selectedRows.isEmpty())
+		if (!isPickerProfile())
 		{
-			return ProcessPreconditionsResolution.rejectBecauseNoSelection().toInternal();
+			return ProcessPreconditionsResolution.rejectWithInternalReason("only picker shall pack");
 		}
-
-		if (!selectedRows.stream().allMatch(ProductsToPickRow::isEligibleForPacking))
+		
+		if (!streamRowsEligibleForPacking().findAny().isPresent())
 		{
-			return ProcessPreconditionsResolution.rejectWithInternalReason("not all rows are eligible");
+			return ProcessPreconditionsResolution.rejectWithInternalReason("no eligible rows were selected");
 		}
 
 		return ProcessPreconditionsResolution.accept();
@@ -69,9 +69,7 @@ public class ProductsToPick_SetPackingInstructions extends ProductsToPickViewBas
 	@RunOutOfTrx
 	protected String doIt()
 	{
-		final Map<PickingCandidateId, DocumentId> rowIdsByPickingCandidateId = getSelectedRows()
-				.stream()
-				.filter(ProductsToPickRow::isEligibleForPacking)
+		final Map<PickingCandidateId, DocumentId> rowIdsByPickingCandidateId = streamRowsEligibleForPacking()
 				.collect(ImmutableMap.toImmutableMap(ProductsToPickRow::getPickingCandidateId, ProductsToPickRow::getId));
 
 		final Set<PickingCandidateId> pickingCandidateIds = rowIdsByPickingCandidateId.keySet();
@@ -86,6 +84,13 @@ public class ProductsToPick_SetPackingInstructions extends ProductsToPickViewBas
 		invalidateView();
 
 		return MSG_OK;
+	}
+
+	private Stream<ProductsToPickRow> streamRowsEligibleForPacking()
+	{
+		return getSelectedRows()
+				.stream()
+				.filter(ProductsToPickRow::isEligibleForPacking);
 	}
 
 	private HuPackingInstructionsId getHuPackingInstructionsId()

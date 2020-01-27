@@ -4,13 +4,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Set;
 
-import org.adempiere.exceptions.AdempiereException;
-
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
 import de.metas.ui.web.window.datatypes.DocumentId;
-import de.metas.ui.web.window.datatypes.DocumentPath;
+import de.metas.ui.web.window.datatypes.DocumentIdsSelection;
 import de.metas.ui.web.window.datatypes.WindowId;
 import de.metas.ui.web.window.datatypes.json.JSONIncludedTabInfo;
 import de.metas.ui.web.window.descriptor.DetailId;
@@ -41,7 +39,7 @@ import lombok.Value;
  */
 
 @ToString
-class JSONDocumentChangedWebSocketEventCollector
+final class JSONDocumentChangedWebSocketEventCollector
 {
 	public static JSONDocumentChangedWebSocketEventCollector newInstance()
 	{
@@ -59,18 +57,13 @@ class JSONDocumentChangedWebSocketEventCollector
 	{
 	}
 
-	public List<JSONDocumentChangedWebSocketEvent> getEvents()
-	{
-		return ImmutableList.copyOf(events.values());
-	}
-
 	public List<JSONDocumentChangedWebSocketEvent> getEventsAndClear()
 	{
 		final List<JSONDocumentChangedWebSocketEvent> eventsList = ImmutableList.copyOf(events.values());
 		events.clear();
 		return eventsList;
 	}
-	
+
 	public boolean isEmpty()
 	{
 		return events.isEmpty();
@@ -85,26 +78,6 @@ class JSONDocumentChangedWebSocketEventCollector
 	private JSONDocumentChangedWebSocketEvent createEvent(final EventKey key)
 	{
 		return JSONDocumentChangedWebSocketEvent.rootDocument(key.getWindowId(), key.getDocumentId());
-	}
-
-	public void staleByDocumentPath(final DocumentPath documentPath)
-	{
-		if (documentPath.isRootDocument())
-		{
-			staleRootDocument(documentPath.getWindowId(), documentPath.getDocumentId());
-		}
-		else if (documentPath.isAnyIncludedDocument())
-		{
-			staleTab(documentPath.getWindowId(), documentPath.getDocumentId(), documentPath.getDetailId());
-		}
-		else if (documentPath.isSingleIncludedDocument())
-		{
-			staleIncludedDocument(documentPath.getWindowId(), documentPath.getDocumentId(), documentPath.getDetailId(), documentPath.getSingleRowId());
-		}
-		else
-		{
-			throw new AdempiereException("Cannot convert " + documentPath + " to websocket staled event");
-		}
 	}
 
 	public void staleRootDocument(final WindowId windowId, final DocumentId documentId)
@@ -124,10 +97,10 @@ class JSONDocumentChangedWebSocketEventCollector
 		event.staleTabs(tabIds);
 	}
 
-	public void staleIncludedDocument(final WindowId windowId, final DocumentId documentId, final DetailId tabId, final DocumentId rowId)
+	public void staleIncludedDocuments(final WindowId windowId, final DocumentId documentId, final DetailId tabId, final DocumentIdsSelection rowIds)
 	{
 		final JSONDocumentChangedWebSocketEvent event = getCreateEvent(windowId, documentId);
-		event.staleIncludedRow(tabId, rowId);
+		event.staleIncludedRows(tabId, rowIds);
 	}
 
 	public void mergeFrom(final WindowId windowId, final DocumentId documentId, final JSONIncludedTabInfo tabInfo)

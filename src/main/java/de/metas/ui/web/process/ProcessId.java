@@ -1,11 +1,15 @@
 package de.metas.ui.web.process;
 
+import org.adempiere.exceptions.AdempiereException;
+
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 import com.google.common.base.Preconditions;
 
+import de.metas.process.AdProcessId;
 import de.metas.ui.web.window.datatypes.DocumentId;
 import lombok.EqualsAndHashCode;
+import lombok.NonNull;
 
 /*
  * #%L
@@ -41,16 +45,20 @@ public final class ProcessId
 	{
 		return new ProcessId(processHandlerType, processId);
 	}
-	
+
 	public static ProcessId of(final String processHandlerType, final String processId)
 	{
 		return new ProcessId(processHandlerType, processId);
 	}
 
-
 	public static final ProcessId ofAD_Process_ID(final int adProcessId)
 	{
 		return new ProcessId(PROCESSHANDLERTYPE_AD_Process, adProcessId);
+	}
+
+	public static final ProcessId ofAD_Process_ID(@NonNull final AdProcessId adProcessId)
+	{
+		return new ProcessId(PROCESSHANDLERTYPE_AD_Process, adProcessId.getRepoId());
 	}
 
 	private final String json;
@@ -135,6 +143,15 @@ public final class ProcessId
 			this.processIdAsInt = processIdAsInt;
 		}
 		return processIdAsInt;
+	}
+
+	public AdProcessId toAdProcessId()
+	{
+		if (!PROCESSHANDLERTYPE_AD_Process.contentEquals(getProcessHandlerType()))
+		{
+			throw new AdempiereException("Cannot convert " + this + " to " + AdProcessId.class.getSimpleName() + " because the processHanderType is not " + PROCESSHANDLERTYPE_AD_Process);
+		}
+		return AdProcessId.ofRepoId(getProcessIdAsInt());
 	}
 
 	public DocumentId toDocumentId()

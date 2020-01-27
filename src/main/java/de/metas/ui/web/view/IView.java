@@ -13,6 +13,7 @@ import org.compiere.util.Evaluatee;
 import com.google.common.collect.ImmutableList;
 
 import de.metas.i18n.ITranslatableString;
+import de.metas.i18n.TranslatableStrings;
 import de.metas.process.RelatedProcessDescriptor;
 import de.metas.ui.web.document.filter.DocumentFilter;
 import de.metas.ui.web.exceptions.EntityNotFoundException;
@@ -61,7 +62,12 @@ public interface IView
 
 	default ITranslatableString getDescription()
 	{
-		return ITranslatableString.empty();
+		return TranslatableStrings.empty();
+	}
+
+	default ViewHeaderProperties getHeaderProperties()
+	{
+		return ViewHeaderProperties.EMPTY;
 	}
 
 	Set<DocumentPath> getReferencingDocumentPaths();
@@ -86,20 +92,19 @@ public interface IView
 
 	DocumentId getParentRowId();
 
-	/** @return true if this is an included view */
-	default boolean isIncludedView()
-	{
-		return getParentViewId() != null;
-	}
-
 	long size();
-	
+
 	default boolean isAllowClosingPerUserRequest()
 	{
 		return true;
 	}
 
-	default void close(final ViewCloseReason reason)
+	default void close(final ViewCloseAction closeAction)
+	{
+		// nothing
+	}
+	
+	default void afterDestroy()
 	{
 		// nothing
 	}
@@ -132,11 +137,14 @@ public interface IView
 		invalidateAll();
 	}
 
-	ViewResult getPage(int firstRow, int pageLength, List<DocumentQueryOrderBy> orderBys);
+	ViewResult getPage(int firstRow, int pageLength, ViewRowsOrderBy orderBy);
 
-	default ViewResult getPageWithRowIdsOnly(final int firstRow, final int pageLength, final List<DocumentQueryOrderBy> orderBys)
+	default ViewResult getPageWithRowIdsOnly(
+			final int firstRow,
+			final int pageLength,
+			final ViewRowsOrderBy orderBy)
 	{
-		return getPage(firstRow, pageLength, orderBys);
+		return getPage(firstRow, pageLength, orderBy);
 	}
 
 	IViewRow getById(DocumentId rowId) throws EntityNotFoundException;

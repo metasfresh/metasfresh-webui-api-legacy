@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.Objects;
 
 import org.adempiere.exceptions.AdempiereException;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.compiere.util.MimeType;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -26,12 +26,14 @@ import org.springframework.web.context.request.WebRequest;
 
 import com.google.common.collect.ImmutableList;
 
+import de.metas.impexp.excel.ExcelFormat;
+import de.metas.impexp.excel.ExcelFormats;
+import de.metas.process.RelatedProcessDescriptor.DisplayPlace;
 import de.metas.ui.web.cache.ETagResponseEntityBuilder;
 import de.metas.ui.web.config.WebConfig;
 import de.metas.ui.web.process.ProcessRestController;
 import de.metas.ui.web.process.ViewAsPreconditionsContext;
 import de.metas.ui.web.process.WebuiPreconditionsContext;
-import de.metas.ui.web.process.descriptor.WebuiRelatedProcessDescriptor;
 import de.metas.ui.web.process.json.JSONDocumentActionsList;
 import de.metas.ui.web.session.UserSession;
 import de.metas.ui.web.view.descriptor.ViewLayout;
@@ -44,11 +46,12 @@ import de.metas.ui.web.view.json.JSONViewResult;
 import de.metas.ui.web.view.json.JSONViewRow;
 import de.metas.ui.web.window.controller.WindowRestController;
 import de.metas.ui.web.window.datatypes.DocumentIdsSelection;
+import de.metas.ui.web.window.datatypes.LookupValuesList;
 import de.metas.ui.web.window.datatypes.WindowId;
+import de.metas.ui.web.window.datatypes.json.JSONDocumentLayoutOptions;
 import de.metas.ui.web.window.datatypes.json.JSONLookupValuesList;
 import de.metas.ui.web.window.datatypes.json.JSONOptions;
 import de.metas.ui.web.window.datatypes.json.JSONZoomInto;
-import de.metas.ui.web.window.model.DocumentQueryOrderBy;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiParam;
 import lombok.Builder;
@@ -81,11 +84,12 @@ import lombok.NonNull;
 @RequestMapping(value = ViewRestController.ENDPOINT)
 public class ViewRestController
 {
-	static final String PARAM_WindowId = "windowId";
+	public static final String PARAM_WindowId = "windowId";
 
 	// FIXME: change "documentView" to "view"
-	/* package */static final String ENDPOINT = WebConfig.ENDPOINT_ROOT + "/documentView/{" + PARAM_WindowId + "}";
+	public static final String ENDPOINT = WebConfig.ENDPOINT_ROOT + "/documentView/{" + PARAM_WindowId + "}";
 
+	private static final String PARAM_ViewId = "viewId";
 	private static final String PARAM_ViewDataType = "viewType";
 	private static final String PARAM_OrderBy = "orderBy";
 	private static final String PARAM_OrderBy_Description = "Command separated field names. Use +/- prefix for ascending/descending. e.g. +C_BPartner_ID,-DateOrdered";
@@ -93,26 +97,34 @@ public class ViewRestController
 	private static final String PARAM_FirstRow = "firstRow";
 	private static final String PARAM_FirstRow_Description = "first row to fetch (starting from 0)";
 	private static final String PARAM_PageLength = "pageLength";
+	//
+	private static final String PARAM_FilterId = "filterId";
 
-	@Autowired
-	private UserSession userSession;
+	private final UserSession userSession;
+	private final IViewsRepository viewsRepo;
+	private final ProcessRestController processRestController;
+	private final WindowRestController windowRestController;
 
-	@Autowired
-	private IViewsRepository viewsRepo;
-
-	@Autowired
-	private ProcessRestController processRestController;
-
-	@Autowired
-	private WindowRestController windowRestController;
-
-	public ViewRestController()
+	public ViewRestController(
+			@NonNull final UserSession userSession,
+			@NonNull final IViewsRepository viewsRepo,
+			@NonNull final ProcessRestController processRestController,
+			@NonNull final WindowRestController windowRestController)
 	{
+		this.userSession = userSession;
+		this.viewsRepo = viewsRepo;
+		this.processRestController = processRestController;
+		this.windowRestController = windowRestController;
 	}
 
 	private JSONOptions newJSONOptions()
 	{
-		return JSONOptions.builder(userSession).build();
+		return JSONOptions.of(userSession);
+	}
+
+	private JSONDocumentLayoutOptions newJSONLayoutOptions()
+	{
+		return JSONDocumentLayoutOptions.of(userSession);
 	}
 
 	@PostMapping
@@ -140,8 +152,11 @@ public class ViewRestController
 		final ViewResult result;
 		if (jsonRequest.getQueryPageLength() > 0)
 		{
-			final List<DocumentQueryOrderBy> orderBys = ImmutableList.of();
-			result = view.getPage(jsonRequest.getQueryFirstRow(), jsonRequest.getQueryPageLength(), orderBys);
+			final JSONOptions jsonOpts = newJSONOptions();
+			result = view.getPage(
+					jsonRequest.getQueryFirstRow(),
+					jsonRequest.getQueryPageLength(),
+					ViewRowsOrderBy.empty(jsonOpts));
 		}
 		else
 		{
@@ -149,7 +164,8 @@ public class ViewRestController
 		}
 
 		final IViewRowOverrides rowOverrides = ViewRowOverridesHelper.getViewRowOverrides(view);
-		return JSONViewResult.of(result, rowOverrides, userSession.getAD_Language());
+		final JSONOptions jsonOpts = newJSONOptions();
+		return JSONViewResult.of(result, rowOverrides, jsonOpts);
 	}
 
 	private static final WindowId extractWindowId(final String pathWindowIdStr, final WindowId requestWindowId)
@@ -174,38 +190,47 @@ public class ViewRestController
 	@PostMapping("/{viewId}/filter")
 	public JSONViewResult filterView( //
 			@PathVariable(PARAM_WindowId) final String windowIdStr //
-			, @PathVariable("viewId") final String viewIdStr //
+			, @PathVariable(PARAM_ViewId) final String viewIdStr //
 			, @RequestBody final JSONFilterViewRequest jsonRequest //
 	)
 	{
 		final ViewId viewId = ViewId.of(windowIdStr, viewIdStr);
 
 		final IView newView = viewsRepo.filterView(viewId, jsonRequest);
-		return JSONViewResult.of(ViewResult.ofView(newView), ViewRowOverridesHelper.getViewRowOverrides(newView), userSession.getAD_Language());
+		final JSONOptions jsonOpts = newJSONOptions();
+		return JSONViewResult.of(ViewResult.ofView(newView), ViewRowOverridesHelper.getViewRowOverrides(newView), jsonOpts);
 	}
 
 	@DeleteMapping("/{viewId}/staticFilter/{filterId}")
-	public JSONViewResult deleteStickyFilter(@PathVariable(PARAM_WindowId) final String windowIdStr, @PathVariable("viewId") final String viewIdStr, @PathVariable("filterId") final String filterId)
+	public JSONViewResult deleteStickyFilter(
+			@PathVariable(PARAM_WindowId) final String windowIdStr,
+			@PathVariable(PARAM_ViewId) final String viewIdStr,
+			@PathVariable(PARAM_FilterId) final String filterId)
 	{
 		final ViewId viewId = ViewId.of(windowIdStr, viewIdStr);
 
 		final IView newView = viewsRepo.deleteStickyFilter(viewId, filterId);
-		return JSONViewResult.of(ViewResult.ofView(newView), ViewRowOverridesHelper.getViewRowOverrides(newView), userSession.getAD_Language());
+		final JSONOptions jsonOpts = newJSONOptions();
+		return JSONViewResult.of(ViewResult.ofView(newView), ViewRowOverridesHelper.getViewRowOverrides(newView), jsonOpts);
 	}
 
 	@DeleteMapping("/{viewId}")
-	public void deleteView(@PathVariable(PARAM_WindowId) final String windowId, @PathVariable("viewId") final String viewIdStr)
+	public void closeView(
+			@PathVariable(PARAM_WindowId) final String windowId,
+			@PathVariable(PARAM_ViewId) final String viewIdStr,
+			@RequestParam(name = "action", required = false) final String closeActionStr)
 	{
 		userSession.assertLoggedIn();
 
 		final ViewId viewId = ViewId.of(windowId, viewIdStr);
-		viewsRepo.deleteView(viewId);
+		final ViewCloseAction closeAction = ViewCloseAction.fromJsonOr(closeActionStr, ViewCloseAction.DONE);
+		viewsRepo.closeView(viewId, closeAction);
 	}
 
 	@GetMapping("/{viewId}")
 	public JSONViewResult getViewData(
 			@PathVariable(PARAM_WindowId) final String windowId //
-			, @PathVariable("viewId") final String viewIdStr//
+			, @PathVariable(PARAM_ViewId) final String viewIdStr//
 			, @RequestParam(name = PARAM_FirstRow, required = true) @ApiParam(PARAM_FirstRow_Description) final int firstRow //
 			, @RequestParam(name = PARAM_PageLength, required = true) final int pageLength //
 			, @RequestParam(name = PARAM_OrderBy, required = false) @ApiParam(PARAM_OrderBy_Description) final String orderBysListStr //
@@ -215,9 +240,13 @@ public class ViewRestController
 
 		final ViewId viewId = ViewId.of(windowId, viewIdStr);
 		final IView view = viewsRepo.getView(viewId);
-		final ViewResult result = view.getPage(firstRow, pageLength, DocumentQueryOrderBy.parseOrderBysList(orderBysListStr));
+		final JSONOptions jsonOpts = newJSONOptions();
+		final ViewResult result = view.getPage(
+				firstRow,
+				pageLength,
+				ViewRowsOrderBy.parseString(orderBysListStr, jsonOpts));
 		final IViewRowOverrides rowOverrides = ViewRowOverridesHelper.getViewRowOverrides(view);
-		return JSONViewResult.of(result, rowOverrides, userSession.getAD_Language());
+		return JSONViewResult.of(result, rowOverrides, jsonOpts);
 	}
 
 	@GetMapping("/layout")
@@ -235,8 +264,8 @@ public class ViewRestController
 		return ETagResponseEntityBuilder.ofETagAware(request, viewLayout)
 				.includeLanguageInETag()
 				.cacheMaxAge(userSession.getHttpCacheMaxAge())
-				.jsonOptions(() -> newJSONOptions())
-				.toJson(JSONViewLayout::of);
+				.jsonLayoutOptions(() -> newJSONLayoutOptions())
+				.toLayoutJson(JSONViewLayout::of);
 	}
 
 	@GetMapping("/availableProfiles")
@@ -252,7 +281,7 @@ public class ViewRestController
 	@GetMapping("/{viewId}/byIds")
 	public List<JSONViewRow> getByIds(
 			@PathVariable(PARAM_WindowId) final String windowId //
-			, @PathVariable("viewId") final String viewIdStr //
+			, @PathVariable(PARAM_ViewId) final String viewIdStr //
 			, @RequestParam("ids") @ApiParam("comma separated IDs") final String idsListStr //
 	)
 	{
@@ -268,14 +297,15 @@ public class ViewRestController
 		final IView view = viewsRepo.getView(viewId);
 		final List<? extends IViewRow> result = view.streamByIds(rowIds).collect(ImmutableList.toImmutableList());
 		final IViewRowOverrides rowOverrides = ViewRowOverridesHelper.getViewRowOverrides(view);
-		return JSONViewRow.ofViewRows(result, rowOverrides, userSession.getAD_Language());
+		final JSONOptions jsonOpts = newJSONOptions();
+		return JSONViewRow.ofViewRows(result, rowOverrides, jsonOpts);
 	}
 
 	@GetMapping("/{viewId}/filter/{filterId}/field/{parameterName}/typeahead")
 	public JSONLookupValuesList getFilterParameterTypeahead(
 			@PathVariable(PARAM_WindowId) final String windowId //
-			, @PathVariable("viewId") final String viewIdStr //
-			, @PathVariable("filterId") final String filterId //
+			, @PathVariable(PARAM_ViewId) final String viewIdStr //
+			, @PathVariable(PARAM_FilterId) final String filterId //
 			, @PathVariable("parameterName") final String parameterName //
 			, @RequestParam(name = "query", required = true) final String query //
 	)
@@ -285,14 +315,19 @@ public class ViewRestController
 		final ViewId viewId = ViewId.of(windowId, viewIdStr);
 		return viewsRepo.getView(viewId)
 				.getFilterParameterTypeahead(filterId, parameterName, query, userSession.toEvaluatee())
-				.transform(JSONLookupValuesList::ofLookupValuesList);
+				.transform(this::toJSONLookupValuesList);
+	}
+
+	private JSONLookupValuesList toJSONLookupValuesList(final LookupValuesList lookupValuesList)
+	{
+		return JSONLookupValuesList.ofLookupValuesList(lookupValuesList, userSession.getAD_Language());
 	}
 
 	@GetMapping("/{viewId}/filter/{filterId}/field/{parameterName}/dropdown")
 	public JSONLookupValuesList getFilterParameterDropdown(
 			@PathVariable(PARAM_WindowId) final String windowId //
-			, @PathVariable("viewId") final String viewIdStr //
-			, @PathVariable("filterId") final String filterId //
+			, @PathVariable(PARAM_ViewId) final String viewIdStr //
+			, @PathVariable(PARAM_FilterId) final String filterId //
 			, @PathVariable("parameterName") final String parameterName //
 	)
 	{
@@ -301,18 +336,20 @@ public class ViewRestController
 		final ViewId viewId = ViewId.of(windowId, viewIdStr);
 		return viewsRepo.getView(viewId)
 				.getFilterParameterDropdown(filterId, parameterName, userSession.toEvaluatee())
-				.transform(JSONLookupValuesList::ofLookupValuesList);
+				.transform(this::toJSONLookupValuesList);
 	}
 
 	@Builder(builderMethodName = "newPreconditionsContextBuilder")
 	private ViewAsPreconditionsContext createPreconditionsContext(
 			@NonNull final String windowId,
 			@NonNull final String viewIdString,
+			final String viewProfileIdStr,
 			final String selectedIdsList,
 			final String parentViewId,
 			final String parentViewSelectedIdsList,
 			final String childViewId,
-			final String childViewSelectedIdsList)
+			final String childViewSelectedIdsList,
+			final DisplayPlace displayPlace)
 	{
 		final ViewId viewId = ViewId.of(windowId, viewIdString);
 		final IView view = viewsRepo.getView(viewId);
@@ -323,16 +360,18 @@ public class ViewRestController
 
 		return ViewAsPreconditionsContext.builder()
 				.view(view)
+				.viewProfileId(ViewProfileId.fromJson(viewProfileIdStr))
 				.viewRowIdsSelection(viewRowIdsSelection)
 				.parentViewRowIdsSelection(parentViewRowIdsSelection)
 				.childViewRowIdsSelection(childViewRowIdsSelection)
+				.displayPlace(displayPlace)
 				.build();
 	}
 
 	@GetMapping("/{viewId}/actions")
 	public JSONDocumentActionsList getDocumentActions(
 			@PathVariable(PARAM_WindowId) final String windowId,
-			@PathVariable("viewId") final String viewIdStr,
+			@PathVariable(PARAM_ViewId) final String viewIdStr,
 			@RequestParam(name = "selectedIds", required = false) @ApiParam("comma separated IDs") final String selectedIdsListStr,
 			@RequestParam(name = "parentViewId", required = false) final String parentViewIdStr,
 			@RequestParam(name = "parentViewSelectedIds", required = false) @ApiParam("comma separated IDs") final String parentViewSelectedIdsListStr,
@@ -350,9 +389,11 @@ public class ViewRestController
 				.parentViewSelectedIdsList(parentViewSelectedIdsListStr)
 				.childViewId(childViewIdStr)
 				.childViewSelectedIdsList(childViewSelectedIdsListStr)
+				.displayPlace(DisplayPlace.ViewActionsMenu)
 				.build();
 
 		return processRestController.streamDocumentRelatedProcesses(preconditionsContext)
+				.filter(descriptor -> descriptor.isDisplayedOn(preconditionsContext.getDisplayPlace())) // shall be already filtered out, but just to make sure
 				.filter(descriptor -> all || descriptor.isEnabled()) // only those which are enabled and not internally rejected
 				.collect(JSONDocumentActionsList.collect(newJSONOptions()));
 	}
@@ -360,12 +401,13 @@ public class ViewRestController
 	@GetMapping("/{viewId}/quickActions")
 	public JSONDocumentActionsList getDocumentQuickActions(
 			@PathVariable(PARAM_WindowId) final String windowId,
-			@PathVariable("viewId") final String viewIdStr,
+			@PathVariable(PARAM_ViewId) final String viewIdStr,
 			@RequestParam(name = "selectedIds", required = false) @ApiParam("comma separated IDs") final String selectedIdsListStr,
 			@RequestParam(name = "parentViewId", required = false) final String parentViewIdStr,
 			@RequestParam(name = "parentViewSelectedIds", required = false) @ApiParam("comma separated IDs") final String parentViewSelectedIdsListStr,
 			@RequestParam(name = "childViewId", required = false) final String childViewIdStr,
 			@RequestParam(name = "childViewSelectedIds", required = false) @ApiParam("comma separated IDs") final String childViewSelectedIdsListStr,
+			@RequestParam(name = "viewProfileId", required = false) final String viewProfileIdStr,
 			@RequestParam(name = "all", required = false) final boolean all)
 	{
 		userSession.assertLoggedIn();
@@ -373,15 +415,17 @@ public class ViewRestController
 		final WebuiPreconditionsContext preconditionsContext = newPreconditionsContextBuilder()
 				.windowId(windowId)
 				.viewIdString(viewIdStr)
+				.viewProfileIdStr(viewProfileIdStr)
 				.selectedIdsList(selectedIdsListStr)
 				.parentViewId(parentViewIdStr)
 				.parentViewSelectedIdsList(parentViewSelectedIdsListStr)
 				.childViewId(childViewIdStr)
 				.childViewSelectedIdsList(childViewSelectedIdsListStr)
+				.displayPlace(DisplayPlace.ViewQuickActions)
 				.build();
 
 		return processRestController.streamDocumentRelatedProcesses(preconditionsContext)
-				.filter(WebuiRelatedProcessDescriptor::isQuickAction)
+				.filter(descriptor -> descriptor.isDisplayedOn(preconditionsContext.getDisplayPlace())) // shall be already filtered out, but just to make sure
 				.filter(descriptor -> all || descriptor.isEnabledOrNotSilent()) // only those which are enabled or not silent
 				.collect(JSONDocumentActionsList.collect(newJSONOptions()));
 	}
@@ -389,7 +433,7 @@ public class ViewRestController
 	@GetMapping("/{viewId}/{rowId}/field/{fieldName}/zoomInto")
 	public JSONZoomInto getRowFieldZoomInto(
 			@PathVariable("windowId") final String windowIdStr,
-			@PathVariable("viewId") final String viewIdStr,
+			@PathVariable(PARAM_ViewId) final String viewIdStr,
 			@PathVariable("rowId") final String rowId,
 			@PathVariable("fieldName") final String fieldName)
 	{
@@ -405,7 +449,7 @@ public class ViewRestController
 	@GetMapping("/{viewId}/export/excel")
 	public ResponseEntity<Resource> exportToExcel(
 			@PathVariable("windowId") final String windowIdStr,
-			@PathVariable("viewId") final String viewIdStr,
+			@PathVariable(PARAM_ViewId) final String viewIdStr,
 			@RequestParam(name = "selectedIds", required = false) @ApiParam("comma separated IDs") final String selectedIdsListStr)
 			throws Exception
 	{
@@ -413,22 +457,26 @@ public class ViewRestController
 
 		final ViewId viewId = ViewId.ofViewIdString(viewIdStr, WindowId.fromJson(windowIdStr));
 
-		final File tmpFile = File.createTempFile("exportToExcel", ".xls");
+		final ExcelFormat excelFormat = ExcelFormats.getDefaultFormat();
+		final File tmpFile = File.createTempFile("exportToExcel", "." + excelFormat.getFileExtension());
 
 		try (final FileOutputStream out = new FileOutputStream(tmpFile))
 		{
 			ViewExcelExporter.builder()
+					.excelFormat(excelFormat)
 					.view(viewsRepo.getView(viewId))
 					.rowIds(DocumentIdsSelection.ofCommaSeparatedString(selectedIdsListStr))
 					.layout(viewsRepo.getViewLayout(viewId.getWindowId(), JSONViewDataType.grid, ViewProfileId.NULL))
-					.adLanguage(userSession.getAD_Language())
+					.language(userSession.getLanguage())
+					.zoneId(userSession.getTimeZone())
 					.build()
 					.export(out);
 		}
 
-		final String filename = "report.xls"; // TODO: use a better name
+		final String filename = "report." + excelFormat.getFileExtension(); // TODO: use a better name
+		final String contentType = MimeType.getMimeType(filename);
 		final HttpHeaders headers = new HttpHeaders();
-		headers.setContentType(MediaType.parseMediaType("application/vnd.ms-excel"));
+		headers.setContentType(MediaType.parseMediaType(contentType));
 		headers.set(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filename + "\"");
 		headers.setCacheControl("must-revalidate, post-check=0, pre-check=0");
 

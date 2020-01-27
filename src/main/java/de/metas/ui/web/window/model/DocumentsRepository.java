@@ -2,6 +2,7 @@ package de.metas.ui.web.window.model;
 
 import de.metas.ui.web.window.datatypes.DocumentId;
 import de.metas.ui.web.window.descriptor.DocumentEntityDescriptor;
+import lombok.NonNull;
 
 /*
  * #%L
@@ -32,7 +33,7 @@ public interface DocumentsRepository
 		SAVED,
 		DELETED,
 	};
-	
+
 	OrderedDocumentsList retrieveDocuments(DocumentQuery query, IDocumentChangesCollector changesCollector);
 
 	/** @return document or null */
@@ -54,9 +55,6 @@ public interface DocumentsRepository
 	DocumentId retrieveParentDocumentId(DocumentEntityDescriptor parentEntityDescriptor, DocumentQuery childDocumentQuery);
 
 	/**
-	 *
-	 * @param entityDescriptor
-	 * @param parentDocument
 	 * @return newly created document (not saved); never returns null
 	 */
 	Document createNewDocument(DocumentEntityDescriptor entityDescriptor, final Document parentDocument, final IDocumentChangesCollector changesCollector);
@@ -70,4 +68,17 @@ public interface DocumentsRepository
 	String retrieveVersion(DocumentEntityDescriptor entityDescriptor, int documentIdAsInt);
 
 	int retrieveLastLineNo(DocumentQuery query);
+
+	/** Can be called to verify that this repository belongs with the given {@code entityDescriptor} */
+	default void assertThisRepository(@NonNull final DocumentEntityDescriptor entityDescriptor)
+	{
+		final DocumentsRepository documentsRepository = entityDescriptor.getDataBinding().getDocumentsRepository();
+		if (documentsRepository != this)
+		{
+			// shall not happen
+			throw new IllegalArgumentException("Entity descriptor's repository is invalid: " + entityDescriptor
+					+ "\n Expected: " + this
+					+ "\n But it was: " + documentsRepository);
+		}
+	}
 }

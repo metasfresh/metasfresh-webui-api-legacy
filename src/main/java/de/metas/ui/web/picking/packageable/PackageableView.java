@@ -13,14 +13,13 @@ import de.metas.handlingunits.picking.requests.CloseForShipmentSchedulesRequest;
 import de.metas.i18n.ITranslatableString;
 import de.metas.inoutcandidate.api.ShipmentScheduleId;
 import de.metas.inoutcandidate.model.I_M_Packageable_V;
-import de.metas.ui.web.document.filter.NullDocumentFilterDescriptorsProvider;
+import de.metas.ui.web.document.filter.provider.NullDocumentFilterDescriptorsProvider;
 import de.metas.ui.web.picking.pickingslot.PickingSlotView;
-import de.metas.ui.web.view.AbstractCustomView;
 import de.metas.ui.web.view.IView;
-import de.metas.ui.web.view.ViewCloseReason;
+import de.metas.ui.web.view.ViewCloseAction;
 import de.metas.ui.web.view.ViewId;
+import de.metas.ui.web.view.template.AbstractCustomView;
 import de.metas.ui.web.window.datatypes.DocumentId;
-
 import lombok.Builder;
 import lombok.NonNull;
 
@@ -93,9 +92,9 @@ public class PackageableView extends AbstractCustomView<PackageableRow>
 	}
 
 	@Override
-	public void close(final ViewCloseReason reason)
+	public void close(final ViewCloseAction action)
 	{
-		if (reason == ViewCloseReason.USER_REQUEST)
+		if (action.isDone())
 		{
 			closePickingCandidatesFromRackSystemPickingSlots();
 		}
@@ -121,12 +120,12 @@ public class PackageableView extends AbstractCustomView<PackageableRow>
 		pickingSlotsViewByRowId.put(rowId, pickingSlotView);
 	}
 
-	public void removePickingSlotView(@NonNull final DocumentId rowId, @NonNull final ViewCloseReason viewCloseReason)
+	public void removePickingSlotView(@NonNull final DocumentId rowId, @NonNull final ViewCloseAction viewCloseAction)
 	{
 		final PickingSlotView view = pickingSlotsViewByRowId.remove(rowId);
 		if (view != null)
 		{
-			view.close(viewCloseReason);
+			view.close(viewCloseAction);
 		}
 	}
 

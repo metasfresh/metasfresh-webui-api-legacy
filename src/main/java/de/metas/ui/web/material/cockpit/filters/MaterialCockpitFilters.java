@@ -1,7 +1,6 @@
 package de.metas.ui.web.material.cockpit.filters;
 
-import java.sql.Timestamp;
-import java.util.Date;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.function.Predicate;
 
@@ -11,15 +10,14 @@ import org.adempiere.ad.dao.IQueryBuilder;
 import org.adempiere.ad.dao.impl.CompareQueryFilter;
 import org.compiere.model.IQuery;
 import org.compiere.model.I_M_Product;
-import org.compiere.util.TimeUtil;
 import org.springframework.stereotype.Service;
 
 import com.google.common.collect.ImmutableList;
 
 import de.metas.material.cockpit.model.I_MD_Cockpit;
 import de.metas.ui.web.document.filter.DocumentFilter;
-import de.metas.ui.web.document.filter.DocumentFilterDescriptorsProvider;
-import de.metas.ui.web.document.filter.ImmutableDocumentFilterDescriptorsProvider;
+import de.metas.ui.web.document.filter.provider.DocumentFilterDescriptorsProvider;
+import de.metas.ui.web.document.filter.provider.ImmutableDocumentFilterDescriptorsProvider;
 import de.metas.ui.web.view.CreateViewRequest;
 import de.metas.util.Services;
 import lombok.NonNull;
@@ -122,15 +120,14 @@ public class MaterialCockpitFilters
 			return false;
 		}
 
-		final Date date = dateFilterVO.getDate();
+		final LocalDate date = dateFilterVO.getDate();
 		if (date == null)
 		{
 			return false;
 		}
 
-		final Timestamp dayTimestamp = TimeUtil.getDay(date);
-		queryBuilder.addCompareFilter(I_MD_Cockpit.COLUMN_DateGeneral, CompareQueryFilter.Operator.GREATER_OR_EQUAL, dayTimestamp);
-		queryBuilder.addCompareFilter(I_MD_Cockpit.COLUMN_DateGeneral, CompareQueryFilter.Operator.LESS, TimeUtil.addDays(dayTimestamp, 1));
+		queryBuilder.addCompareFilter(I_MD_Cockpit.COLUMN_DateGeneral, CompareQueryFilter.Operator.GREATER_OR_EQUAL, date);
+		queryBuilder.addCompareFilter(I_MD_Cockpit.COLUMN_DateGeneral, CompareQueryFilter.Operator.LESS, date.plusDays(1));
 
 		return true;
 	}
@@ -157,7 +154,7 @@ public class MaterialCockpitFilters
 				.endOrderBy();
 	}
 
-	public Date getFilterByDate(@NonNull final List<DocumentFilter> filters)
+	public LocalDate getFilterByDate(@NonNull final List<DocumentFilter> filters)
 	{
 		final DateFilterVO dateFilterVO = DateFilterUtil.extractDateFilterVO(filters);
 		return dateFilterVO.getDate();
@@ -167,5 +164,6 @@ public class MaterialCockpitFilters
 	{
 		return ProductFilterUtil.toPredicate(filters);
 	}
+
 
 }

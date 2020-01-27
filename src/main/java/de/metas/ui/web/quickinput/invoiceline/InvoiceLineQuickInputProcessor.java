@@ -1,17 +1,24 @@
 package de.metas.ui.web.quickinput.invoiceline;
 
+import java.util.Set;
+
 import org.adempiere.invoice.service.IInvoiceBL;
 import org.adempiere.model.InterfaceWrapperHelper;
 import org.compiere.model.I_C_Invoice;
 
+import com.google.common.collect.ImmutableSet;
+
 import de.metas.adempiere.model.I_C_InvoiceLine;
 import de.metas.bpartner.BPartnerId;
+import de.metas.bpartner_product.IBPartnerProductBL;
 import de.metas.invoice.IInvoiceLineBL;
 import de.metas.product.ProductId;
-import de.metas.purchasing.api.IBPartnerProductBL;
+import de.metas.quantity.StockQtyAndUOMQty;
+import de.metas.quantity.StockQtyAndUOMQtys;
 import de.metas.ui.web.quickinput.IQuickInputProcessor;
 import de.metas.ui.web.quickinput.QuickInput;
 import de.metas.ui.web.window.datatypes.DocumentId;
+import de.metas.uom.UomId;
 import de.metas.util.Services;
 
 /*
@@ -40,7 +47,7 @@ public class InvoiceLineQuickInputProcessor implements IQuickInputProcessor
 {
 
 	@Override
-	public DocumentId process(final QuickInput quickInput)
+	public Set<DocumentId> process(final QuickInput quickInput)
 	{
 		final IInvoiceBL invoiceBL = Services.get(IInvoiceBL.class);
 		final IInvoiceLineBL invoiceLineBL = Services.get(IInvoiceLineBL.class);
@@ -57,7 +64,9 @@ public class InvoiceLineQuickInputProcessor implements IQuickInputProcessor
 		invoiceLine.setC_Invoice(invoice);
 
 		invoiceBL.setProductAndUOM(invoiceLine, invoiceLineQuickInput.getM_Product_ID());
-		invoiceBL.setQtys(invoiceLine, invoiceLineQuickInput.getQty());
+
+		final StockQtyAndUOMQty qtyInStockUom = StockQtyAndUOMQtys.createConvert(invoiceLineQuickInput.getQty(), productId, UomId.ofRepoId(invoiceLine.getC_UOM_ID()));
+		invoiceBL.setQtys(invoiceLine, qtyInStockUom);
 
 		invoiceLineBL.updatePrices(invoiceLine);
 		// invoiceBL.setLineNetAmt(invoiceLine); // not needed; will be called on save
@@ -65,7 +74,8 @@ public class InvoiceLineQuickInputProcessor implements IQuickInputProcessor
 
 		InterfaceWrapperHelper.save(invoiceLine);
 
-		return DocumentId.of(invoiceLine.getC_InvoiceLine_ID());
+		final DocumentId documentId = DocumentId.of(invoiceLine.getC_InvoiceLine_ID());
+		return ImmutableSet.of(documentId);
 	}
 
 }

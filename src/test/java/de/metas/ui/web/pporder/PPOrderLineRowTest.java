@@ -8,6 +8,7 @@ import java.math.BigDecimal;
 
 import org.adempiere.test.AdempiereTestHelper;
 import org.compiere.model.I_C_UOM;
+import org.compiere.model.I_M_Product;
 import org.eevolution.model.I_PP_Order;
 import org.eevolution.model.I_PP_Order_BOMLine;
 import org.eevolution.model.X_PP_Order_BOMLine;
@@ -16,8 +17,10 @@ import org.junit.Test;
 
 import com.google.common.collect.ImmutableList;
 
+import de.metas.handlingunits.HuId;
 import de.metas.handlingunits.model.I_PP_Order_Qty;
 import de.metas.handlingunits.model.X_M_HU;
+import de.metas.product.ProductId;
 import de.metas.quantity.Quantity;
 import de.metas.ui.web.view.IViewRowAttributesProvider;
 import de.metas.ui.web.window.datatypes.DocumentId;
@@ -50,17 +53,35 @@ public class PPOrderLineRowTest
 {
 	@Mocked
 	private IViewRowAttributesProvider viewRowAttributesProvider;
+	private I_C_UOM uom;
 
 	@Before
 	public void init()
 	{
 		AdempiereTestHelper.get().init();
+
+		uom = newInstance(I_C_UOM.class);
+		uom.setUOMSymbol("Ea");
+		save(uom);
+	}
+
+	private ProductId createProduct(final String name)
+	{
+		final I_M_Product product = newInstance(I_M_Product.class);
+		product.setValue(name);
+		product.setName(name);
+		product.setC_UOM_ID(uom.getC_UOM_ID());
+		save(product);
+
+		return ProductId.ofRepoId(product.getM_Product_ID());
 	}
 
 	@Test
 	public void canBuildForPPOrder()
 	{
 		final I_PP_Order ppOrder = newInstance(I_PP_Order.class);
+		ppOrder.setM_Product_ID(createProduct("main").getRepoId());
+		ppOrder.setC_UOM_ID(uom.getC_UOM_ID());
 		save(ppOrder);
 
 		final PPOrderLineRow result = PPOrderLineRow.builderForPPOrder()
@@ -107,11 +128,11 @@ public class PPOrderLineRowTest
 	{
 		final PPOrderLineRow result = PPOrderLineRow.builderForSourceHU()
 				.code("code")
-				.huId(30)
+				.huId(HuId.ofRepoId(30))
 				.packingInfo("packingInfo")
 				.product(JSONLookupValue.of(35, "product"))
 				.qty(BigDecimal.TEN)
-				.rowId(PPOrderLineRowId.ofSourceHU(DocumentId.of(40), 30))
+				.rowId(PPOrderLineRowId.ofSourceHU(DocumentId.of(40), HuId.ofRepoId(30)))
 				.type(PPOrderLineType.HU_TU)
 				.uom(JSONLookupValue.of(50, "uom"))
 				.attributesSupplier(() -> null)
@@ -126,9 +147,8 @@ public class PPOrderLineRowTest
 	@Test
 	public void canBuildForIssuedOrReceivedHU()
 	{
-		final I_C_UOM uom = newInstance(I_C_UOM.class);
-		uom.setUOMSymbol("UOMSymbol");
 		final I_PP_Order_Qty ppOrderQty = newInstance(I_PP_Order_Qty.class);
+		ppOrderQty.setPP_Order_ID(1); // dummy
 		ppOrderQty.setM_HU_ID(10);
 
 		final PPOrderLineRow result = PPOrderLineRow.builderForIssuedOrReceivedHU()
@@ -140,7 +160,7 @@ public class PPOrderLineRowTest
 				.processed(true)
 				.product(JSONLookupValue.of(35, "product"))
 				.quantity(new Quantity(BigDecimal.TEN, uom))
-				.rowId(PPOrderLineRowId.ofIssuedOrReceivedHU(DocumentId.of(40), 10))
+				.rowId(PPOrderLineRowId.ofIssuedOrReceivedHU(DocumentId.of(40), HuId.ofRepoId(10)))
 				.type(PPOrderLineType.HU_TU)
 				.topLevelHU(true)
 				.huStatus(JSONLookupValue.of(X_M_HU.HUSTATUS_Active, "Active"))

@@ -20,6 +20,7 @@ import javax.annotation.Nullable;
 
 import org.adempiere.ad.callout.api.ICalloutExecutor;
 import org.adempiere.ad.callout.api.ICalloutRecord;
+import org.adempiere.ad.element.api.AdWindowId;
 import org.adempiere.ad.expression.api.IExpression;
 import org.adempiere.ad.expression.api.IExpressionEvaluator.OnVariableNotFound;
 import org.adempiere.ad.expression.api.ILogicExpression;
@@ -27,6 +28,7 @@ import org.adempiere.ad.expression.api.LogicExpressionResult;
 import org.adempiere.ad.ui.spi.ExceptionHandledTabCallout;
 import org.adempiere.ad.ui.spi.ITabCallout;
 import org.adempiere.exceptions.AdempiereException;
+import org.adempiere.service.ClientId;
 import org.adempiere.util.lang.IAutoCloseable;
 import org.compiere.util.Env;
 import org.slf4j.Logger;
@@ -39,8 +41,10 @@ import com.google.common.collect.ImmutableSet;
 
 import de.metas.document.engine.IDocumentBL;
 import de.metas.document.exceptions.DocumentProcessingException;
+import de.metas.lang.SOTrx;
 import de.metas.letters.model.Letters;
 import de.metas.logging.LogManager;
+import de.metas.organization.OrgId;
 import de.metas.ui.web.window.WindowConstants;
 import de.metas.ui.web.window.datatypes.DataTypes;
 import de.metas.ui.web.window.datatypes.DocumentId;
@@ -91,7 +95,7 @@ import lombok.NonNull;
 
 public final class Document
 {
-	public static final Builder builder(final DocumentEntityDescriptor entityDescriptor)
+	public static Builder builder(final DocumentEntityDescriptor entityDescriptor)
 	{
 		return new Builder(entityDescriptor);
 	}
@@ -129,7 +133,7 @@ public final class Document
 
 	//
 	// Callouts
-	private ITabCallout documentCallout = ITabCallout.NULL; // will be set from builder, after document it's initialized
+	private ITabCallout documentCallout = ITabCallout.NULL; // will be set from builder, after document is initialized
 	private final ICalloutExecutor fieldCalloutExecutor;
 	private DocumentAsCalloutRecord _calloutRecord; // lazy
 
@@ -156,7 +160,7 @@ public final class Document
 	// Misc
 	private Map<String, Object> _dynAttributes = null; // lazy
 
-	public static interface DocumentValuesSupplier
+	public interface DocumentValuesSupplier
 	{
 		Object NO_VALUE = new String("NO_VALUE");
 
@@ -222,14 +226,7 @@ public final class Document
 		//
 		// Create included documents containers
 		{
-			final ImmutableMap.Builder<DetailId, IIncludedDocumentsCollection> includedDocuments = ImmutableMap.builder();
-			for (final DocumentEntityDescriptor includedEntityDescriptor : entityDescriptor.getIncludedEntities())
-			{
-				final DetailId detailId = includedEntityDescriptor.getDetailId();
-				final IIncludedDocumentsCollection includedDocumentsForDetailId = includedEntityDescriptor.createIncludedDocumentsCollection(this);
-				includedDocuments.put(detailId, includedDocumentsForDetailId);
-			}
-			this.includedDocuments = includedDocuments.build();
+			this.includedDocuments = extractIncludedDocuments(entityDescriptor.getIncludedEntities());
 		}
 
 		//
@@ -251,10 +248,10 @@ public final class Document
 			// NOTE: these dynamic attributes will be considered by Document.asEvaluatee.
 			if (_parentDocument == null)
 			{
-				final Optional<Boolean> isSOTrx = entityDescriptor.getIsSOTrx();
-				if (isSOTrx.isPresent())
+				final Optional<SOTrx> soTrx = entityDescriptor.getSOTrx();
+				if (soTrx.isPresent())
 				{
-					setDynAttributeNoCheck("IsSOTrx", isSOTrx.get()); // cover the case for FieldName=IsSOTrx, DefaultValue=@IsSOTrx@
+					setDynAttributeNoCheck("IsSOTrx", soTrx.get().isSales()); // cover the case for FieldName=IsSOTrx, DefaultValue=@IsSOTrx@
 				}
 				setDynAttributeNoCheck("IsApproved", false); // cover the case for FieldName=IsApproved, DefaultValue=@IsApproved@
 			}
@@ -265,10 +262,28 @@ public final class Document
 		logger.trace("Created new document instance: {}", this); // keep it last
 	}
 
+	private ImmutableMap<DetailId, IIncludedDocumentsCollection> extractIncludedDocuments(@NonNull final Collection<DocumentEntityDescriptor> includedEntities)
+	{
+		final ImmutableMap.Builder<DetailId, IIncludedDocumentsCollection> includedDocuments = ImmutableMap.builder();
+
+		for (final DocumentEntityDescriptor includedEntityDescriptor : includedEntities)
+		{
+			// if (!includedEntityDescriptor.getFields().isEmpty())
+			// {
+			final DetailId detailId = includedEntityDescriptor.getDetailId();
+			final IIncludedDocumentsCollection includedDocumentsForDetailId = includedEntityDescriptor.createIncludedDocumentsCollection(this);
+			includedDocuments.put(detailId, includedDocumentsForDetailId);
+			// }
+
+			// recurse
+			includedDocuments.putAll(extractIncludedDocuments(includedEntityDescriptor.getIncludedEntities()));
+		}
+		return includedDocuments.build();
+	}
+
 	/** copy constructor */
 	private Document(final Document from, @Nullable final Document parentDocumentCopy, final CopyMode copyMode, final IDocumentChangesCollector changesCollector)
 	{
-		super();
 		documentPath = from.documentPath;
 		entityDescriptor = from.entityDescriptor;
 		windowNo = from.windowNo;
@@ -390,7 +405,7 @@ public final class Document
 		return _writable;
 	}
 
-	private final void initializeFields(final FieldInitializationMode mode, final DocumentValuesSupplier documentValuesSupplier)
+	private void initializeFields(final FieldInitializationMode mode, final DocumentValuesSupplier documentValuesSupplier)
 	{
 		logger.trace("Initializing fields: mode={}", mode);
 
@@ -508,7 +523,11 @@ public final class Document
 			}
 			else
 			{
-				throw AdempiereException.wrapIfNeeded(e);
+				throw AdempiereException.wrapIfNeeded(e)
+						.appendParametersToMessage()
+						.setParameter("mode", mode)
+						.setParameter("documentField", documentField)
+						.setParameter("fieldValueSupplier", fieldValueSupplier);
 			}
 		}
 
@@ -639,7 +658,7 @@ public final class Document
 			return parentSupplier.getVersion();
 		}
 
-		private final IDocumentEvaluatee getEvaluatee(final DocumentFieldDescriptor fieldInScope)
+		private IDocumentEvaluatee getEvaluatee(final DocumentFieldDescriptor fieldInScope)
 		{
 			if (fieldInScope == null)
 			{
@@ -666,7 +685,18 @@ public final class Document
 			if (fieldDescriptor.isKey())
 			{
 				final DocumentId id = parentSupplier.getDocumentId();
-				return id == null ? null : id.toInt();
+				if (id == null)
+				{
+					return null;
+				}
+				else if (id.isInt())
+				{
+					return id.toInt();
+				}
+				else
+				{
+					return id.toJson();
+				}
 			}
 
 			//
@@ -704,7 +734,7 @@ public final class Document
 			if (documentType == DocumentType.Window && !fieldDescriptor.isVirtualField())
 			{
 				final Properties ctx = Env.getCtx();
-				final int adWindowId = documentTypeId.toInt();
+				final AdWindowId adWindowId = documentTypeId.toId(AdWindowId::ofRepoId);
 				final String fieldName = fieldDescriptor.getFieldName();
 
 				//
@@ -736,7 +766,7 @@ public final class Document
 		}
 	}
 
-	public static enum CopyMode
+	public enum CopyMode
 	{
 		CheckOutWritable(true), CheckInReadonly(false);
 
@@ -764,7 +794,7 @@ public final class Document
 		return new Document(this, parentDocumentCopy, copyMode, parentDocumentCopy.changesCollector);
 	}
 
-	/* package */final void assertWritable()
+	/* package */void assertWritable()
 	{
 		if (isInitializing())
 		{
@@ -793,7 +823,7 @@ public final class Document
 	}
 
 	@Override
-	public final String toString()
+	public String toString()
 	{
 		// NOTE: keep it short
 
@@ -1043,7 +1073,7 @@ public final class Document
 		return _valid;
 	}
 
-	private final DocumentValidStatus setValidStatusAndReturn(final DocumentValidStatus valid, final OnValidStatusChanged onValidStatusChanged)
+	private DocumentValidStatus setValidStatusAndReturn(final DocumentValidStatus valid, final OnValidStatusChanged onValidStatusChanged)
 	{
 		Preconditions.checkNotNull(valid, "valid"); // shall not happen
 
@@ -1078,7 +1108,7 @@ public final class Document
 		return _saveStatus;
 	}
 
-	private final DocumentSaveStatus setSaveStatusAndReturn(@NonNull final DocumentSaveStatus saveStatus)
+	private DocumentSaveStatus setSaveStatusAndReturn(@NonNull final DocumentSaveStatus saveStatus)
 	{
 		_saveStatus = saveStatus;
 		final DocumentSaveStatus saveStatusOnCheckoutOld = _saveStatusOnCheckout;
@@ -1123,7 +1153,8 @@ public final class Document
 		setValue(documentField, value, reason);
 
 		// FIXME: hardcoded DocAction processing
-		if (WindowConstants.FIELDNAME_DocAction.equals(fieldName))
+		if (WindowConstants.FIELDNAME_DocAction.equals(fieldName)
+				&& DocumentType.Window.equals(getDocumentPath().getDocumentType()))
 		{
 			processDocAction();
 		}
@@ -1182,7 +1213,7 @@ public final class Document
 		setValue(documentField, value, reason);
 	}
 
-	private final void setValue(final IDocumentField documentField, final Object value, final ReasonSupplier reason)
+	private void setValue(final IDocumentField documentField, final Object value, final ReasonSupplier reason)
 	{
 		assertWritable();
 
@@ -1279,7 +1310,7 @@ public final class Document
 		getFields().forEach(documentField -> updateFieldReadOnlyAndCollect(documentField, reason));
 	}
 
-	private final DocumentReadonly computeReadonly()
+	private DocumentReadonly computeReadonly()
 	{
 		final ILogicExpression allFieldsReadonlyLogic = getEntityDescriptor().getReadonlyLogic();
 		LogicExpressionResult allFieldsReadonly;
@@ -1302,7 +1333,7 @@ public final class Document
 		return readonlyComputed;
 	}
 
-	private final void updateFieldReadOnlyAndCollect(final IDocumentField documentField, final ReasonSupplier reason)
+	private void updateFieldReadOnlyAndCollect(final IDocumentField documentField, final ReasonSupplier reason)
 	{
 		final LogicExpressionResult readonlyOld = documentField.getReadonly();
 		final LogicExpressionResult readonlyNew = computeFieldReadOnly(documentField);
@@ -1313,7 +1344,7 @@ public final class Document
 		}
 	}
 
-	private final LogicExpressionResult computeFieldReadOnly(final IDocumentField documentField)
+	private LogicExpressionResult computeFieldReadOnly(final IDocumentField documentField)
 	{
 		// Check document's readonly logic
 		final DocumentReadonly documentReadonlyLogic = getReadonly();
@@ -1337,7 +1368,7 @@ public final class Document
 
 	}
 
-	private final void updateFieldDisplayed(final IDocumentField documentField)
+	private void updateFieldDisplayed(final IDocumentField documentField)
 	{
 		LogicExpressionResult displayed = LogicExpressionResult.FALSE; // default false, i.e. not displayed
 		final ILogicExpression displayLogic = documentField.getDescriptor().getDisplayLogic();
@@ -1354,7 +1385,7 @@ public final class Document
 		documentField.setDisplayed(displayed);
 	}
 
-	private final void updateFieldsWhichDependsOn(final String triggeringFieldName)
+	private void updateFieldsWhichDependsOn(final String triggeringFieldName)
 	{
 		final DocumentFieldDependencyMap dependencies = getEntityDescriptor().getDependencies();
 		dependencies.consumeForChangedFieldName(triggeringFieldName, (dependentFieldName, dependencyType) -> {
@@ -1496,6 +1527,17 @@ public final class Document
 		return includedDocuments.getDocuments(orderBys);
 	}
 
+	public OrderedDocumentsList getIncludedDocuments(final DetailId detailId, final DocumentIdsSelection documentIds)
+	{
+		if (documentIds.isEmpty())
+		{
+			return OrderedDocumentsList.newEmpty();
+		}
+
+		final IIncludedDocumentsCollection includedDocuments = getIncludedDocumentsCollection(detailId);
+		return includedDocuments.getDocumentsByIds(documentIds);
+	}
+
 	public void assertNewDocumentAllowed(final DetailId detailId)
 	{
 		getIncludedDocumentsCollection(detailId).assertNewDocumentAllowed();
@@ -1571,13 +1613,13 @@ public final class Document
 	 * @param name
 	 * @param value
 	 */
-	public final Object setDynAttribute(final String name, final Object value)
+	public Object setDynAttribute(final String name, final Object value)
 	{
 		assertWritable();
 		return setDynAttributeNoCheck(name, value);
 	}
 
-	private final Object setDynAttributeNoCheck(final String name, final Object value)
+	private Object setDynAttributeNoCheck(final String name, final Object value)
 	{
 		Check.assumeNotEmpty(name, "name not empty");
 
@@ -1597,7 +1639,7 @@ public final class Document
 	 * @param name
 	 * @return attribute value or null if not found
 	 */
-	public final <T> T getDynAttribute(final String name)
+	public <T> T getDynAttribute(final String name)
 	{
 		final T defaultValue = null;
 		return getDynAttribute(name, defaultValue);
@@ -1610,7 +1652,7 @@ public final class Document
 	 * @param defaultValue
 	 * @return attribute value or <code>defaultValue</code> if not found
 	 */
-	public final <T> T getDynAttribute(final String name, final T defaultValue)
+	public <T> T getDynAttribute(final String name, final T defaultValue)
 	{
 		if (_dynAttributes == null)
 		{
@@ -1628,7 +1670,7 @@ public final class Document
 		return value;
 	}
 
-	public final boolean hasDynAttribute(final String name)
+	public boolean hasDynAttribute(final String name)
 	{
 		final Map<String, Object> dynAttributes = _dynAttributes;
 		return dynAttributes != null && dynAttributes.get(name) != null;
@@ -1644,14 +1686,14 @@ public final class Document
 		return ImmutableSet.copyOf(dynAttributes.keySet());
 	}
 
-	/* package */ static interface OnValidStatusChanged
+	/* package */ interface OnValidStatusChanged
 	{
 		void onInvalidStatus(Document document, DocumentValidStatus invalidStatus);
 
-		public static final OnValidStatusChanged DO_NOTHING = (document, invalidStatus) -> {
+		OnValidStatusChanged DO_NOTHING = (document, invalidStatus) -> {
 		};
 
-		public static final OnValidStatusChanged MARK_NOT_SAVED = (document, invalidStatus) -> {
+		OnValidStatusChanged MARK_NOT_SAVED = (document, invalidStatus) -> {
 			document.setSaveStatusAndReturn(DocumentSaveStatus.notSaved(invalidStatus));
 		};
 
@@ -1670,7 +1712,7 @@ public final class Document
 	 *
 	 * @param onValidStatusChanged callback to be called when the valid state of this document or of any of it's included documents was changed
 	 */
-	/* package */ final DocumentValidStatus checkAndGetValidStatus(final OnValidStatusChanged onValidStatusChanged)
+	/* package */ DocumentValidStatus checkAndGetValidStatus(final OnValidStatusChanged onValidStatusChanged)
 	{
 		//
 		// Check document fields
@@ -1938,16 +1980,16 @@ public final class Document
 		};
 	}
 
-	public int getAD_Client_ID()
+	public ClientId getClientId()
 	{
 		final IDocumentField field = getFieldOrNull(WindowConstants.FIELDNAME_AD_Client_ID);
-		return field != null ? field.getValueAsInt(-1) : -1;
+		return ClientId.ofRepoIdOrNull(field != null ? field.getValueAsInt(-1) : -1);
 	}
 
-	public int getAD_Org_ID()
+	public OrgId getOrgId()
 	{
 		final IDocumentField field = getFieldOrNull(WindowConstants.FIELDNAME_AD_Org_ID);
-		return field != null ? field.getValueAsInt(-1) : -1;
+		return OrgId.ofRepoIdOrNull(field != null ? field.getValueAsInt(-1) : -1);
 	}
 
 	public void onChildSaved(final Document document)
@@ -2146,20 +2188,17 @@ public final class Document
 
 		public Document initializeAsNewDocument(final DocumentId newDocumentId, final String version)
 		{
-			initializeAsNewDocument(new SimpleDocumentValuesSupplier(newDocumentId, version));
-			return build();
+			return initializeAsNewDocument(new SimpleDocumentValuesSupplier(newDocumentId, version));
 		}
 
-		public Builder initializeAsNewDocument(final Supplier<DocumentId> newDocumentIdSupplier, final String version)
+		public Document initializeAsNewDocument(final Supplier<DocumentId> newDocumentIdSupplier, final String version)
 		{
-			initializeAsNewDocument(new SimpleDocumentValuesSupplier(newDocumentIdSupplier, version));
-			return this;
+			return initializeAsNewDocument(new SimpleDocumentValuesSupplier(newDocumentIdSupplier, version));
 		}
 
-		public Builder initializeAsNewDocument(final IntSupplier newDocumentIdSupplier, final String version)
+		public Document initializeAsNewDocument(final IntSupplier newDocumentIdSupplier, final String version)
 		{
-			initializeAsNewDocument(new SimpleDocumentValuesSupplier(DocumentId.supplier(newDocumentIdSupplier), version));
-			return this;
+			return initializeAsNewDocument(new SimpleDocumentValuesSupplier(DocumentId.supplier(newDocumentIdSupplier), version));
 		}
 
 		public Document initializeAsExistingRecord(@NonNull final DocumentValuesSupplier documentValuesSupplier)
@@ -2170,7 +2209,7 @@ public final class Document
 			return build();
 		}
 
-		private final DocumentId getDocumentId()
+		private DocumentId getDocumentId()
 		{
 			return _documentValuesSupplier.getDocumentId();
 		}

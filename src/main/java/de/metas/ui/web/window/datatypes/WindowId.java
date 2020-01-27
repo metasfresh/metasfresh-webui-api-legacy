@@ -1,13 +1,18 @@
 package de.metas.ui.web.window.datatypes;
 
+import java.util.OptionalInt;
+
+import javax.annotation.Nullable;
+
+import org.adempiere.ad.element.api.AdWindowId;
 import org.adempiere.exceptions.AdempiereException;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
-import com.google.common.base.Preconditions;
 
 import de.metas.util.Check;
 import lombok.EqualsAndHashCode;
+import lombok.NonNull;
 
 /*
  * #%L
@@ -34,23 +39,25 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode
 public final class WindowId
 {
-	public static final WindowId fromJson(final String json)
+	@JsonCreator
+	public static WindowId fromJson(@NonNull final String json)
 	{
 		return new WindowId(json);
 	}
 
-	public static final WindowId fromNullableJson(final String json)
+	public static WindowId fromNullableJson(@Nullable final String json)
 	{
-		if (json == null)
-		{
-			return null;
-		}
-		return new WindowId(json);
+		return json != null ? fromJson(json) : null;
 	}
 
-	public static final WindowId of(final int windowIdInt)
+	public static WindowId of(final int windowIdInt)
 	{
 		return new WindowId(windowIdInt);
+	}
+
+	public static WindowId of(@NonNull final AdWindowId adWindowId)
+	{
+		return new WindowId(adWindowId.getRepoId());
 	}
 
 	public static WindowId of(final DocumentId documentTypeId)
@@ -65,19 +72,14 @@ public final class WindowId
 		}
 	}
 
-	public static final WindowId ofIntOrNull(final int windowIdInt)
+	public static WindowId ofNullable(@Nullable final AdWindowId adWindowId)
 	{
-		if (windowIdInt <= 0)
-		{
-			return null;
-		}
-		return new WindowId(windowIdInt);
+		return adWindowId != null ? new WindowId(adWindowId.getRepoId()) : null;
 	}
 
 	private final String value;
-	private transient int valueInt = -1; // lazy
+	private transient OptionalInt valueInt = null; // lazy
 
-	@JsonCreator
 	private WindowId(final String value)
 	{
 		Check.assumeNotEmpty(value, "value is not empty");
@@ -86,8 +88,8 @@ public final class WindowId
 
 	private WindowId(final int valueInt)
 	{
-		Preconditions.checkArgument(valueInt > 0, "invalid valueInt: %s", valueInt);
-		this.valueInt = valueInt;
+		Check.assumeGreaterThanZero(valueInt, "valueInt");
+		this.valueInt = OptionalInt.of(valueInt);
 		value = String.valueOf(valueInt);
 	}
 
@@ -106,32 +108,46 @@ public final class WindowId
 
 	public int toInt()
 	{
-		int valueInt = this.valueInt;
-		if (valueInt < 0)
-		{
-			try
-			{
-				valueInt = Integer.parseInt(value);
-				this.valueInt = valueInt;
-			}
-			catch (final NumberFormatException ex)
-			{
-				throw new AdempiereException("WindowId cannot be converted to int: " + this, ex);
-			}
-		}
-		return valueInt;
+		return toOptionalInt()
+				.orElseThrow(() -> new AdempiereException("WindowId cannot be converted to int: " + this));
 	}
 
 	public int toIntOr(final int fallbackValue)
 	{
+		return toOptionalInt()
+				.orElse(fallbackValue);
+	}
+
+	private OptionalInt toOptionalInt()
+	{
+		OptionalInt valueInt = this.valueInt;
+		if (valueInt == null)
+		{
+			valueInt = this.valueInt = parseOptionalInt();
+		}
+		return valueInt;
+	}
+
+	private OptionalInt parseOptionalInt()
+	{
 		try
 		{
-			return toInt();
+			return OptionalInt.of(Integer.parseInt(value));
 		}
-		catch (Exception ex)
+		catch (final Exception ex)
 		{
-			return fallbackValue;
+			return OptionalInt.empty();
 		}
+	}
+
+	public AdWindowId toAdWindowIdOrNull()
+	{
+		return AdWindowId.ofRepoIdOrNull(toIntOr(-1));
+	}
+
+	public AdWindowId toAdWindowId()
+	{
+		return AdWindowId.ofRepoId(toInt());
 	}
 
 	public boolean isInt()

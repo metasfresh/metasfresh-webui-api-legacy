@@ -8,10 +8,8 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.function.UnaryOperator;
 
-import org.adempiere.ad.trx.api.ITrx;
 import org.adempiere.ad.trx.api.ITrxManager;
 import org.adempiere.exceptions.AdempiereException;
-import org.adempiere.user.UserId;
 import org.adempiere.util.lang.impl.TableRecordReference;
 import org.apache.commons.io.FileUtils;
 import org.compiere.util.Env;
@@ -53,6 +51,7 @@ import de.metas.ui.web.window.datatypes.json.JSONDocumentPath;
 import de.metas.ui.web.window.datatypes.json.JSONLookupValue;
 import de.metas.ui.web.window.datatypes.json.JSONLookupValuesList;
 import de.metas.ui.web.window.model.DocumentCollection;
+import de.metas.user.UserId;
 import de.metas.util.Services;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiOperation;
@@ -102,8 +101,8 @@ public class LetterRestController
 	private final void assertReadable(final WebuiLetter letter)
 	{
 		// Make sure current logged in user is the owner
-		final int loggedUserId = userSession.getAD_User_ID();
-		if (letter.getOwnerUserId() != loggedUserId)
+		final UserId loggedUserId = userSession.getLoggedUserId();
+		if (!UserId.equals(loggedUserId, letter.getOwnerUserId()))
 		{
 			throw new AdempiereException("No credentials to read the letter")
 					.setParameter("letterId", letter.getLetterId())
@@ -135,24 +134,28 @@ public class LetterRestController
 		//
 		// Extract context BPartner, Location and Contact
 		final BoilerPlateContext context = documentCollection.createBoilerPlateContext(contextDocumentPath);
-		final int bpartnerId = context.getC_BPartner_ID(-1);
-		final int bpartnerLocationId = context.getC_BPartner_Location_ID(-1);
-		final int contactId = context.getAD_User_ID(-1);
+		final BPartnerId bpartnerId = BPartnerId.ofRepoIdOrNull(context.getC_BPartner_ID(-1));
+		final BPartnerLocationId bpartnerLocationId = BPartnerLocationId.ofRepoIdOrNull(bpartnerId, context.getC_BPartner_Location_ID(-1));
+		final UserId contactId = UserId.ofRepoIdOrNull(context.getAD_User_ID(-1));
 
 		//
 		// Build BPartnerAddress
-		final PlainDocumentLocation documentLocation = new PlainDocumentLocation(Env.getCtx(), bpartnerId, bpartnerLocationId, contactId, ITrx.TRXNAME_None);
+		final PlainDocumentLocation documentLocation = PlainDocumentLocation.builder()
+				.bpartnerId(bpartnerId)
+				.bpartnerLocationId(bpartnerLocationId)
+				.contactId(contactId)
+				.build();
 		Services.get(IDocumentLocationBL.class).setBPartnerAddress(documentLocation);
 		final String bpartnerAddress = documentLocation.getBPartnerAddress();
 
 		final WebuiLetter letter = lettersRepo.createNewLetter(WebuiLetter.builder()
 				.contextDocumentPath(contextDocumentPath)
-				.ownerUserId(userSession.getAD_User_ID())
-				.adOrgId(context.getAD_Org_ID(userSession.getAD_Org_ID()))
-				.bpartnerId(bpartnerId)
-				.bpartnerLocationId(bpartnerLocationId)
-				.bpartnerAddress(bpartnerAddress)
-				.bpartnerContactId(contactId));
+				.ownerUserId(userSession.getLoggedUserId())
+				.adOrgId(context.getAD_Org_ID(userSession.getOrgId().getRepoId()))
+				.bpartnerId(BPartnerId.toRepoId(bpartnerId))
+				.bpartnerLocationId(BPartnerLocationId.toRepoId(bpartnerLocationId))
+				.bpartnerContactId(UserId.toRepoId(contactId))
+				.bpartnerAddress(bpartnerAddress));
 
 		return JSONLetter.of(letter);
 	}
@@ -202,7 +205,7 @@ public class LetterRestController
 		userSession.assertLoggedIn();
 
 		final ITrxManager trxManager = Services.get(ITrxManager.class);
-		final WebuiLetterChangeResult result = changeLetter(letterId, letter -> trxManager.call(() -> complete0(letter)));
+		final WebuiLetterChangeResult result = changeLetter(letterId, letter -> trxManager.callInNewTrx(() -> complete0(letter)));
 
 		//
 		// Remove the letter
@@ -245,9 +248,9 @@ public class LetterRestController
 				.body(letter.getContent())
 				.adOrgId(letter.getAdOrgId())
 				.bpartnerId(BPartnerId.ofRepoId(letter.getBpartnerId()))
-				.bpartnerLocationId(BPartnerLocationId.ofRepoId(BPartnerId.ofRepoId(letter.getBpartnerId()),letter.getBpartnerLocationId()))
+				.bpartnerLocationId(BPartnerLocationId.ofRepoId(BPartnerId.ofRepoId(letter.getBpartnerId()), letter.getBpartnerLocationId()))
 				.address(letter.getBpartnerAddress())
-				.userId(UserId.ofRepoId(letter.getBpartnerContactId()))
+				.userId(UserId.ofRepoIdOrNull(letter.getBpartnerContactId()))
 				.build();
 		return Services.get(ITextTemplateBL.class).createPDF(request);
 	}

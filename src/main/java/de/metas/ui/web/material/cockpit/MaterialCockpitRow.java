@@ -2,48 +2,44 @@ package de.metas.ui.web.material.cockpit;
 
 import static org.adempiere.model.InterfaceWrapperHelper.loadOutOfTrx;
 
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.NonNull;
-import lombok.Singular;
-import lombok.ToString;
-
-import javax.annotation.Nullable;
-
 import java.math.BigDecimal;
-import java.sql.Timestamp;
+import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
 
+import javax.annotation.Nullable;
+
 import org.compiere.model.I_C_BPartner;
 import org.compiere.model.I_C_UOM;
+import org.compiere.model.I_M_Product;
+import org.compiere.model.I_M_Product_Category;
 import org.compiere.model.I_S_Resource;
 import org.compiere.util.Env;
-import org.compiere.util.Util;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 
-import de.metas.adempiere.model.I_M_Product;
 import de.metas.dimension.DimensionSpecGroup;
 import de.metas.i18n.IMsgBL;
 import de.metas.material.cockpit.model.I_MD_Cockpit;
 import de.metas.material.cockpit.model.I_MD_Stock;
+import de.metas.product.IProductDAO;
+import de.metas.product.ProductCategoryId;
+import de.metas.product.ProductId;
 import de.metas.quantity.Quantity;
 import de.metas.ui.web.view.IViewRow;
 import de.metas.ui.web.view.IViewRowType;
 import de.metas.ui.web.view.ViewRow.DefaultRowType;
+import de.metas.ui.web.view.ViewRowFieldNameAndJsonValues;
+import de.metas.ui.web.view.ViewRowFieldNameAndJsonValuesHolder;
 import de.metas.ui.web.view.descriptor.annotation.ViewColumn;
 import de.metas.ui.web.view.descriptor.annotation.ViewColumn.ViewColumnLayout;
 import de.metas.ui.web.view.descriptor.annotation.ViewColumn.ViewColumnLayout.Displayed;
-import de.metas.ui.web.view.descriptor.annotation.ViewColumnHelper;
 import de.metas.ui.web.view.json.JSONViewDataType;
 import de.metas.ui.web.window.datatypes.DocumentId;
 import de.metas.ui.web.window.datatypes.DocumentPath;
@@ -54,6 +50,12 @@ import de.metas.util.Check;
 import de.metas.util.Services;
 import de.metas.util.collections.CollectionUtils;
 import de.metas.util.collections.ListUtils;
+import de.metas.util.lang.CoalesceUtil;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NonNull;
+import lombok.Singular;
+import lombok.ToString;
 
 /*
  * #%L
@@ -92,7 +94,7 @@ public class MaterialCockpitRow implements IViewRow
 	private static final String SEPARATOR = "-";
 	private static final Joiner DOCUMENT_ID_JOINER = Joiner.on(SEPARATOR).skipNulls();
 
-	private final Timestamp date;
+	private final LocalDate date;
 	@Getter
 	private final int productId;
 
@@ -108,8 +110,7 @@ public class MaterialCockpitRow implements IViewRow
 
 	@ViewColumn(widgetType = DocumentFieldWidgetType.Text, //
 			captionKey = I_M_Product.COLUMNNAME_M_Product_Category_ID, //
-			layouts = { @ViewColumnLayout(when = JSONViewDataType.grid, seqNo = 30,
-			displayed = Displayed.SYSCONFIG, displayedSysConfigPrefix = SYSCFG_PREFIX) })
+			layouts = { @ViewColumnLayout(when = JSONViewDataType.grid, seqNo = 30, displayed = Displayed.SYSCONFIG, displayedSysConfigPrefix = SYSCFG_PREFIX) })
 	@Getter
 	@VisibleForTesting
 	private final String productCategoryOrSubRowName;
@@ -221,7 +222,7 @@ public class MaterialCockpitRow implements IViewRow
 	@Getter
 	private final Set<Integer> allIncludedStockRecordIds;
 
-	private transient ImmutableMap<String, Object> _fieldNameAndJsonValues;
+	private final ViewRowFieldNameAndJsonValuesHolder<MaterialCockpitRow> values = ViewRowFieldNameAndJsonValuesHolder.newInstance(MaterialCockpitRow.class);
 
 	@lombok.Builder(builderClassName = "MainRowBuilder", builderMethodName = "mainRowBuilder")
 	private MaterialCockpitRow(
@@ -257,14 +258,18 @@ public class MaterialCockpitRow implements IViewRow
 				MaterialCockpitUtil.WINDOWID_MaterialCockpitView,
 				documentId);
 
-		final I_M_Product productRecord = loadOutOfTrx(productId, I_M_Product.class);
+		final IProductDAO productDAO = Services.get(IProductDAO.class);
+
+		final I_M_Product productRecord = productDAO.getById(ProductId.ofRepoId(productId));
+		final I_M_Product_Category productCategoryRecord = productDAO.getProductCategoryById(ProductCategoryId.ofRepoId(productRecord.getM_Product_Category_ID()));
+
 		this.productValue = productRecord.getValue();
 		this.productName = productRecord.getName();
-		this.productCategoryOrSubRowName = productRecord.getM_Product_Category().getName();
+		this.productCategoryOrSubRowName = productCategoryRecord.getName();
 
 		final LookupDataSourceFactory lookupFactory = LookupDataSourceFactory.instance;
 
-		final int uomRepoId = Util.firstGreaterThanZero(productRecord.getPackage_UOM_ID(), productRecord.getC_UOM_ID());
+		final int uomRepoId = CoalesceUtil.firstGreaterThanZero(productRecord.getPackage_UOM_ID(), productRecord.getC_UOM_ID());
 
 		this.uom = () -> lookupFactory
 				.searchInTableLookup(I_C_UOM.Table_Name)
@@ -277,14 +282,14 @@ public class MaterialCockpitRow implements IViewRow
 
 		this.includedRows = includedRows;
 
-		this.pmmQtyPromised = Quantity.asBigDecimal(pmmQtyPromised);
-		this.qtyReservedSale = Quantity.asBigDecimal(qtyReservedSale);
-		this.qtyReservedPurchase = Quantity.asBigDecimal(qtyReservedPurchase);
-		this.qtyMaterialentnahme = Quantity.asBigDecimal(qtyMaterialentnahme);
-		this.qtyRequiredForProduction = Quantity.asBigDecimal(qtyRequiredForProduction);
-		this.qtyOnHandEstimate = Quantity.asBigDecimal(qtyOnHandEstimate);
-		this.qtyAvailableToPromiseEstimate = Quantity.asBigDecimal(qtyAvailableToPromiseEstimate);
-		this.qtyOnHandStock = Quantity.asBigDecimal(qtyOnHandStock);
+		this.pmmQtyPromised = Quantity.toBigDecimal(pmmQtyPromised);
+		this.qtyReservedSale = Quantity.toBigDecimal(qtyReservedSale);
+		this.qtyReservedPurchase = Quantity.toBigDecimal(qtyReservedPurchase);
+		this.qtyMaterialentnahme = Quantity.toBigDecimal(qtyMaterialentnahme);
+		this.qtyRequiredForProduction = Quantity.toBigDecimal(qtyRequiredForProduction);
+		this.qtyOnHandEstimate = Quantity.toBigDecimal(qtyOnHandEstimate);
+		this.qtyAvailableToPromiseEstimate = Quantity.toBigDecimal(qtyAvailableToPromiseEstimate);
+		this.qtyOnHandStock = Quantity.toBigDecimal(qtyOnHandStock);
 
 		final List<Quantity> quantitiesToVerify = Arrays.asList(
 				pmmQtyPromised,
@@ -306,11 +311,11 @@ public class MaterialCockpitRow implements IViewRow
 	{
 		final boolean notOK = CollectionUtils.hasDifferentValues(
 				ListUtils.copyAndFilter(quantitiesToVerify, Predicates.notNull()),
-				Quantity::getUOMId);
+				Quantity::getUomId);
 		Check.errorIf(notOK, "Some of the given quantities have different UOMs; quantities={}", quantitiesToVerify);
 	}
 
-	private static Timestamp extractDate(final List<MaterialCockpitRow> includedRows)
+	private static LocalDate extractDate(final List<MaterialCockpitRow> includedRows)
 	{
 		return CollectionUtils.extractSingleElement(includedRows, row -> row.date);
 	}
@@ -323,7 +328,7 @@ public class MaterialCockpitRow implements IViewRow
 	@lombok.Builder(builderClassName = "AttributeSubRowBuilder", builderMethodName = "attributeSubRowBuilder")
 	private MaterialCockpitRow(
 			final int productId,
-			final Timestamp date,
+			final LocalDate date,
 			@NonNull final DimensionSpecGroup dimensionGroup,
 			final Quantity pmmQtyPromised,
 			final Quantity qtyReservedSale,
@@ -359,7 +364,7 @@ public class MaterialCockpitRow implements IViewRow
 
 		final LookupDataSourceFactory lookupFactory = LookupDataSourceFactory.instance;
 
-		final int uomRepoId = Util.firstGreaterThanZero(productRecord.getPackage_UOM_ID(), productRecord.getC_UOM_ID());
+		final int uomRepoId = CoalesceUtil.firstGreaterThanZero(productRecord.getPackage_UOM_ID(), productRecord.getC_UOM_ID());
 		this.uom = () -> lookupFactory
 				.searchInTableLookup(I_C_UOM.Table_Name)
 				.findById(uomRepoId);
@@ -374,14 +379,14 @@ public class MaterialCockpitRow implements IViewRow
 
 		this.includedRows = ImmutableList.of();
 
-		this.pmmQtyPromised = Quantity.asBigDecimal(pmmQtyPromised);
-		this.qtyReservedSale = Quantity.asBigDecimal(qtyReservedSale);
-		this.qtyReservedPurchase = Quantity.asBigDecimal(qtyReservedPurchase);
-		this.qtyMaterialentnahme = Quantity.asBigDecimal(qtyMaterialentnahme);
-		this.qtyRequiredForProduction = Quantity.asBigDecimal(qtyRequiredForProduction);
+		this.pmmQtyPromised = Quantity.toBigDecimal(pmmQtyPromised);
+		this.qtyReservedSale = Quantity.toBigDecimal(qtyReservedSale);
+		this.qtyReservedPurchase = Quantity.toBigDecimal(qtyReservedPurchase);
+		this.qtyMaterialentnahme = Quantity.toBigDecimal(qtyMaterialentnahme);
+		this.qtyRequiredForProduction = Quantity.toBigDecimal(qtyRequiredForProduction);
 		this.qtyOnHandEstimate = null;
-		this.qtyOnHandStock = Quantity.asBigDecimal(qtyOnHandStock);
-		this.qtyAvailableToPromiseEstimate = Quantity.asBigDecimal(qtyAvailableToPromiseEstimate);
+		this.qtyOnHandStock = Quantity.toBigDecimal(qtyOnHandStock);
+		this.qtyAvailableToPromiseEstimate = Quantity.toBigDecimal(qtyAvailableToPromiseEstimate);
 
 		this.allIncludedCockpitRecordIds = ImmutableSet.copyOf(allIncludedCockpitRecordIds);
 		this.allIncludedStockRecordIds = ImmutableSet.copyOf(allIncludedStockRecordIds);
@@ -390,7 +395,7 @@ public class MaterialCockpitRow implements IViewRow
 	@lombok.Builder(builderClassName = "CountingSubRowBuilder", builderMethodName = "countingSubRowBuilder")
 	private MaterialCockpitRow(
 			final int productId,
-			final Timestamp date,
+			final LocalDate date,
 			final int plantId,
 			@Nullable final Quantity qtyOnHandEstimate,
 			@Nullable final Quantity qtyOnHandStock,
@@ -431,7 +436,7 @@ public class MaterialCockpitRow implements IViewRow
 
 		final LookupDataSourceFactory lookupFactory = LookupDataSourceFactory.instance;
 
-		final int uomRepoId = Util.firstGreaterThanZero(productRecord.getPackage_UOM_ID(), productRecord.getC_UOM_ID());
+		final int uomRepoId = CoalesceUtil.firstGreaterThanZero(productRecord.getPackage_UOM_ID(), productRecord.getC_UOM_ID());
 		this.uom = () -> lookupFactory
 				.searchInTableLookup(I_C_UOM.Table_Name)
 				.findById(uomRepoId);
@@ -450,8 +455,8 @@ public class MaterialCockpitRow implements IViewRow
 		this.qtyReservedPurchase = null;
 		this.qtyMaterialentnahme = null;
 		this.qtyRequiredForProduction = null;
-		this.qtyOnHandEstimate = Quantity.asBigDecimal(qtyOnHandEstimate);
-		this.qtyOnHandStock = Quantity.asBigDecimal(qtyOnHandStock);
+		this.qtyOnHandEstimate = Quantity.toBigDecimal(qtyOnHandEstimate);
+		this.qtyOnHandStock = Quantity.toBigDecimal(qtyOnHandStock);
 		this.qtyAvailableToPromiseEstimate = null;
 
 		this.allIncludedCockpitRecordIds = ImmutableSet.copyOf(allIncludedCockpitRecordIds);
@@ -492,13 +497,15 @@ public class MaterialCockpitRow implements IViewRow
 	}
 
 	@Override
-	public Map<String, Object> getFieldNameAndJsonValues()
+	public ImmutableSet<String> getFieldNames()
 	{
-		if (_fieldNameAndJsonValues == null)
-		{
-			_fieldNameAndJsonValues = ViewColumnHelper.extractJsonMap(this);
-		}
-		return _fieldNameAndJsonValues;
+		return values.getFieldNames();
+	}
+
+	@Override
+	public ViewRowFieldNameAndJsonValues getFieldNameAndJsonValues()
+	{
+		return values.get(this);
 	}
 
 }

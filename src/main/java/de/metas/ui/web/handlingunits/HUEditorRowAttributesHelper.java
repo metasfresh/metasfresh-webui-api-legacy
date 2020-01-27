@@ -19,11 +19,13 @@ import de.metas.ui.web.devices.JSONDeviceDescriptor;
 import de.metas.ui.web.view.descriptor.ViewRowAttributesLayout;
 import de.metas.ui.web.window.datatypes.LookupValue;
 import de.metas.ui.web.window.datatypes.Values;
+import de.metas.ui.web.window.datatypes.json.JSONOptions;
 import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
 import de.metas.ui.web.window.descriptor.DocumentLayoutElementDescriptor;
 import de.metas.ui.web.window.descriptor.DocumentLayoutElementFieldDescriptor;
 import de.metas.util.GuavaCollectors;
 import de.metas.util.Services;
+import lombok.NonNull;
 
 /*
  * #%L
@@ -59,7 +61,7 @@ import de.metas.util.Services;
 	{
 	}
 
-	public static final ViewRowAttributesLayout createLayout(final IAttributeStorage attributeStorage)
+	public static ViewRowAttributesLayout createLayout(final IAttributeStorage attributeStorage)
 	{
 		final int warehouseId = attributeStorage.getM_Warehouse_ID();
 		final List<DocumentLayoutElementDescriptor> elements = attributeStorage.getAttributeValues()
@@ -70,7 +72,7 @@ import de.metas.util.Services;
 		return ViewRowAttributesLayout.of(elements);
 	}
 
-	private static final DocumentLayoutElementDescriptor createLayoutElement(final IAttributeValue attributeValue, final int warehouseId)
+	private static DocumentLayoutElementDescriptor createLayoutElement(final IAttributeValue attributeValue, final int warehouseId)
 	{
 		final I_M_Attribute attribute = attributeValue.getM_Attribute();
 		final IModelTranslationMap attributeTrlMap = InterfaceWrapperHelper.getModelTranslationMap(attribute);
@@ -90,7 +92,7 @@ import de.metas.util.Services;
 				.build();
 	}
 
-	private static final List<JSONDeviceDescriptor> createDevices(final String attributeCode, final int warehouseId)
+	private static List<JSONDeviceDescriptor> createDevices(final String attributeCode, final int warehouseId)
 	{
 		return Services.get(IDevicesHubFactory.class)
 				.getDefaultAttributesDevicesHub()
@@ -121,15 +123,20 @@ import de.metas.util.Services;
 		return attribute.getValue();
 	}
 
-	public static Object extractJSONValue(final IAttributeStorage attributesStorage, final IAttributeValue attributeValue)
+	public static Object extractJSONValue(
+			@NonNull final IAttributeStorage attributesStorage,
+			@NonNull final IAttributeValue attributeValue,
+			@NonNull final JSONOptions jsonOpts)
 	{
 		final Object value = extractValueAndResolve(attributesStorage, attributeValue);
 
-		final Object jsonValue = Values.valueToJsonObject(value);
+		final Object jsonValue = Values.valueToJsonObject(value, jsonOpts);
 		return jsonValue;
 	}
 
-	private static final Object extractValueAndResolve(final IAttributeStorage attributesStorage, final IAttributeValue attributeValue)
+	private static Object extractValueAndResolve(
+			@NonNull final IAttributeStorage attributesStorage,
+			@NonNull final IAttributeValue attributeValue)
 	{
 		final Object value = attributeValue.getValue();
 		if (!attributeValue.isList())
@@ -143,7 +150,7 @@ import de.metas.util.Services;
 		return LookupValue.fromNamePair(valueNP);
 	}
 
-	public static final DocumentFieldWidgetType extractWidgetType(final IAttributeValue attributeValue)
+	public static DocumentFieldWidgetType extractWidgetType(final IAttributeValue attributeValue)
 	{
 		if (attributeValue.isList())
 		{
@@ -167,7 +174,7 @@ import de.metas.util.Services;
 		}
 		else if (attributeValue.isDateValue())
 		{
-			return DocumentFieldWidgetType.Date;
+			return DocumentFieldWidgetType.LocalDate;
 		}
 		else
 		{

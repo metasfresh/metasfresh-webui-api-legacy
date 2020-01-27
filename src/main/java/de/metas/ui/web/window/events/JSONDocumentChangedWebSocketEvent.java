@@ -18,8 +18,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import de.metas.ui.web.websocket.WebSocketConfig;
 import de.metas.ui.web.websocket.WebsocketEndpointAware;
 import de.metas.ui.web.window.datatypes.DocumentId;
+import de.metas.ui.web.window.datatypes.DocumentIdsSelection;
 import de.metas.ui.web.window.datatypes.WindowId;
-import de.metas.ui.web.window.datatypes.json.JSONDate;
+import de.metas.ui.web.window.datatypes.json.DateTimeConverters;
 import de.metas.ui.web.window.datatypes.json.JSONIncludedTabInfo;
 import de.metas.ui.web.window.descriptor.DetailId;
 import de.metas.util.time.SystemTime;
@@ -66,8 +67,7 @@ final class JSONDocumentChangedWebSocketEvent implements WebsocketEndpointAware
 	{
 		final String tabId = null;
 		final DocumentId rowId = null;
-		final JSONDocumentChangedWebSocketEvent event = new JSONDocumentChangedWebSocketEvent(windowId, documentId, tabId, rowId);
-		return event;
+		return new JSONDocumentChangedWebSocketEvent(windowId, documentId, tabId, rowId);
 	}
 
 	@JsonProperty("windowId")
@@ -116,7 +116,7 @@ final class JSONDocumentChangedWebSocketEvent implements WebsocketEndpointAware
 		tabid = tabId;
 		this.rowId = rowId;
 
-		timestamp = JSONDate.toJson(SystemTime.millis());
+		timestamp = DateTimeConverters.toJson(SystemTime.asInstant(), SystemTime.zoneId());
 	}
 
 	private JSONDocumentChangedWebSocketEvent(JSONDocumentChangedWebSocketEvent from)
@@ -193,9 +193,9 @@ final class JSONDocumentChangedWebSocketEvent implements WebsocketEndpointAware
 		tabIds.stream().map(this::getIncludedTabInfo).forEach(JSONIncludedTabInfo::setStale);
 	}
 
-	public void staleIncludedRow(@NonNull final DetailId tabId, @NonNull final DocumentId rowId)
+	public void staleIncludedRows(@NonNull final DetailId tabId, @NonNull final DocumentIdsSelection rowIds)
 	{
-		getIncludedTabInfo(tabId).staleRow(rowId);
+		getIncludedTabInfo(tabId).staleRows(rowIds);
 	}
 
 	void mergeFrom(@NonNull final JSONDocumentChangedWebSocketEvent from)

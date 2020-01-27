@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 import java.util.Objects;
 import java.util.Optional;
 
+import javax.annotation.Nullable;
+
 import org.adempiere.ad.callout.api.ICalloutField;
 import org.adempiere.ad.expression.api.LogicExpressionResult;
 import org.compiere.util.Evaluatee;
@@ -20,15 +22,14 @@ import de.metas.ui.web.window.datatypes.LookupValue.IntegerLookupValue;
 import de.metas.ui.web.window.datatypes.LookupValuesList;
 import de.metas.ui.web.window.datatypes.Values;
 import de.metas.ui.web.window.datatypes.WindowId;
+import de.metas.ui.web.window.datatypes.json.JSONOptions;
 import de.metas.ui.web.window.descriptor.DocumentFieldDescriptor;
 import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
-import de.metas.ui.web.window.descriptor.LookupDescriptorProvider;
 import de.metas.ui.web.window.exceptions.DocumentFieldNotLookupException;
 import de.metas.ui.web.window.model.Document.CopyMode;
 import de.metas.ui.web.window.model.lookup.DocumentZoomIntoInfo;
 import de.metas.ui.web.window.model.lookup.LookupDataSource;
 import de.metas.util.NumberUtils;
-
 import lombok.NonNull;
 
 /*
@@ -59,7 +60,7 @@ import lombok.NonNull;
 
 	private final DocumentFieldDescriptor descriptor;
 	private final Document _document;
-	private final LookupDataSource _lookupDataSource;
+	private final Optional<LookupDataSource> _lookupDataSource;
 	private boolean lookupValuesStaled = true;
 
 	private transient ICalloutField _calloutField; // lazy
@@ -84,7 +85,7 @@ import lombok.NonNull;
 		this.descriptor = descriptor;
 		_document = document;
 
-		_lookupDataSource = descriptor.createLookupDataSource(LookupDescriptorProvider.LookupScope.DocumentField);
+		_lookupDataSource = descriptor.createLookupDataSource();
 
 		_validStatus = DocumentValidStatus.fieldInitiallyInvalid();
 	}
@@ -150,16 +151,13 @@ import lombok.NonNull;
 
 	private LookupDataSource getLookupDataSourceOrNull()
 	{
-		return _lookupDataSource;
+		return _lookupDataSource.orElse(null);
 	}
 
 	private LookupDataSource getLookupDataSource()
 	{
-		if (_lookupDataSource == null)
-		{
-			throw new DocumentFieldNotLookupException(getFieldName());
-		}
-		return _lookupDataSource;
+		return _lookupDataSource
+				.orElseThrow(() -> new DocumentFieldNotLookupException(getFieldName()));
 	}
 
 	@Override
@@ -223,7 +221,7 @@ import lombok.NonNull;
 	}
 
 	@Override
-	public Object getValueAsJsonObject(final String adLanguage)
+	public Object getValueAsJsonObject(@NonNull final JSONOptions jsonOpts)
 	{
 		Object value = getValue();
 		if (value == null)
@@ -238,14 +236,14 @@ import lombok.NonNull;
 		{
 			final LookupValue lookupValue = (LookupValue)value;
 			final ITranslatableString displayNameTrl = lookupValue.getDisplayNameTrl();
-			if (!displayNameTrl.isTranslatedTo(adLanguage))
+			if (!displayNameTrl.isTranslatedTo(jsonOpts.getAdLanguage()))
 			{
 				final LookupValue lookupValueNew = lookupDataSource.findById(lookupValue.getId());
 				value = lookupValueNew;
 			}
 		}
 
-		return Values.valueToJsonObject(value);
+		return Values.valueToJsonObject(value, jsonOpts);
 	}
 
 	@Override
@@ -263,7 +261,7 @@ import lombok.NonNull;
 	}
 
 	@Override
-	public <T> T getValueAs(final Class<T> returnType)
+	public <T> T getValueAs(@NonNull final Class<T> returnType)
 	{
 		Preconditions.checkNotNull(returnType, "returnType shall not be null");
 		final DocumentFieldWidgetType widgetType = null; // N/A
@@ -333,7 +331,10 @@ import lombok.NonNull;
 		return valueConv;
 	}
 
-	private final <T> T convertToValueClass(final Object value, final DocumentFieldWidgetType widgetType, final Class<T> targetType)
+	private final <T> T convertToValueClass(
+			@Nullable final Object value,
+			@Nullable final DocumentFieldWidgetType widgetType,
+			final Class<T> targetType)
 	{
 		return descriptor.convertToValueClass(value, widgetType, targetType, getLookupDataSourceOrNull());
 	}
@@ -365,12 +366,8 @@ import lombok.NonNull;
 	}
 
 	@Override
-	public void setReadonly(final LogicExpressionResult readonly)
+	public void setReadonly(@NonNull final LogicExpressionResult readonly)
 	{
-		if (readonly == null)
-		{
-			throw new NullPointerException("readonly");
-		}
 		_readonly = readonly;
 	}
 
@@ -381,12 +378,8 @@ import lombok.NonNull;
 	}
 
 	@Override
-	public void setDisplayed(final LogicExpressionResult displayed)
+	public void setDisplayed(@NonNull final LogicExpressionResult displayed)
 	{
-		if (displayed == null)
-		{
-			throw new NullPointerException("displayed");
-		}
 		_displayed = displayed;
 	}
 
@@ -463,7 +456,7 @@ import lombok.NonNull;
 	/**
 	 * Computes field's validStatus.
 	 *
-	 * IMPORTANT: this method is not updating the status, it's not computing it.
+	 * IMPORTANT: this method is not updating the status, it's only computing it.
 	 */
 	private final DocumentValidStatus computeValidStatus()
 	{

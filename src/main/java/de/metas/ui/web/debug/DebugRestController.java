@@ -2,19 +2,22 @@ package de.metas.ui.web.debug;
 
 import java.nio.charset.Charset;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 
 import org.adempiere.ad.dao.IQueryStatisticsLogger;
-import org.adempiere.ad.security.IUserRolePermissionsDAO;
 import org.adempiere.ad.trx.api.ITrx;
 import org.adempiere.exceptions.AdempiereException;
 import org.adempiere.util.lang.impl.TableRecordReference;
 import org.compiere.util.DB;
 import org.compiere.util.DisplayType;
+import org.compiere.util.Env;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
@@ -31,6 +34,8 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 
@@ -44,8 +49,10 @@ import de.metas.notification.UserNotificationRequest;
 import de.metas.notification.UserNotificationRequest.TargetRecordAction;
 import de.metas.notification.UserNotificationRequest.UserNotificationRequestBuilder;
 import de.metas.notification.UserNotificationTargetType;
+import de.metas.security.IUserRolePermissionsDAO;
 import de.metas.ui.web.base.model.I_T_WEBUI_ViewSelection;
 import de.metas.ui.web.config.WebConfig;
+import de.metas.ui.web.debug.JSONCacheResetResult.JSONCacheResetResultBuilder;
 import de.metas.ui.web.exceptions.EntityNotFoundException;
 import de.metas.ui.web.menu.MenuTreeRepository;
 import de.metas.ui.web.process.ProcessRestController;
@@ -67,13 +74,16 @@ import de.metas.ui.web.websocket.WebsocketSender;
 import de.metas.ui.web.window.WindowConstants;
 import de.metas.ui.web.window.datatypes.DocumentIdsSelection;
 import de.metas.ui.web.window.datatypes.WindowId;
+import de.metas.ui.web.window.datatypes.json.JSONOptions;
 import de.metas.ui.web.window.model.DocumentCollection;
 import de.metas.ui.web.window.model.lookup.LookupDataSourceFactory;
-import de.metas.ui.web.window.model.sql.SqlDocumentsRepository;
+import de.metas.user.UserId;
 import de.metas.util.Check;
 import de.metas.util.GuavaCollectors;
 import de.metas.util.Services;
 import io.swagger.annotations.ApiParam;
+import io.swagger.annotations.ApiResponse;
+import io.swagger.annotations.ApiResponses;
 
 /*
  * #%L
@@ -97,6 +107,7 @@ import io.swagger.annotations.ApiParam;
  * #L%
  */
 
+@ApiResponses(value = { @ApiResponse(code = 401, message = "Unauthorized") })
 @RestController
 @RequestMapping(value = DebugRestController.ENDPOINT)
 public class DebugRestController
@@ -115,6 +126,7 @@ public class DebugRestController
 	@Autowired
 	@Lazy
 	private IViewsRepository viewsRepo;
+
 	@Autowired
 	@Lazy
 	private SqlViewFactory sqlViewFactory;
@@ -131,17 +143,67 @@ public class DebugRestController
 	@Lazy
 	private WebsocketSender websocketSender;
 
-	@RequestMapping(value = "/cacheReset", method = RequestMethod.GET)
-	public void cacheReset()
-	{
-		CacheMgt.get().reset();
-		documentCollection.cacheReset();
-		menuTreeRepo.cacheReset();
-		processesController.cacheReset();
-		ViewColumnHelper.cacheReset();
-		Services.get(IUserRolePermissionsDAO.class).resetLocalCache();
+	@Autowired
+	@Lazy
+	private ObjectMapper sharedJsonObjectMapper;
 
-		System.gc();
+	private JSONOptions newJSONOptions()
+	{
+		return JSONOptions.of(userSession);
+	}
+
+	@ApiResponses(value = { @ApiResponse(code = 200, message = "cache reset done") })
+	@RequestMapping(value = "/cacheReset", method = RequestMethod.GET)
+	public JSONCacheResetResult cacheReset(
+			@RequestParam(name = "forgetNotSavedDocuments", defaultValue = "false", required = false) final boolean forgetNotSavedDocuments)
+	{
+		userSession.assertLoggedIn();
+
+		final JSONCacheResetResultBuilder result = JSONCacheResetResult.builder();
+
+		//
+		{
+			final long count = CacheMgt.get().reset();
+			result.log("CacheMgt: invalidate " + count + " items");
+		}
+
+		//
+		{
+			final String documentsResult = documentCollection.cacheReset(forgetNotSavedDocuments);
+			result.log("documents: " + documentsResult);
+		}
+
+		//
+		{
+			menuTreeRepo.cacheReset();
+			result.log("menuTreeRepo: cache invalidated");
+		}
+
+		//
+		{
+			processesController.cacheReset();
+			result.log("processesController: cache invalidated");
+		}
+
+		//
+		{
+			ViewColumnHelper.cacheReset();
+			result.log("viewColumnHelper: cache invalidated");
+		}
+
+		//
+		{
+			Services.get(IUserRolePermissionsDAO.class).resetLocalCache();
+			result.log("user/role permissions: cache invalidated");
+		}
+
+		//
+		{
+			System.gc();
+			result.log("system: garbage collected");
+		}
+
+		return result.build();
 	}
 
 	// NOTE: using String parameter because when using boolean parameter, we get following error in swagger-ui:
@@ -149,18 +211,32 @@ public class DebugRestController
 	@RequestMapping(value = "/showColumnNamesForCaption", method = RequestMethod.PUT)
 	public void setShowColumnNamesForCaption(@RequestBody final String showColumnNamesForCaptionStr)
 	{
-		userSession.setShowColumnNamesForCaption(DisplayType.toBoolean(showColumnNamesForCaptionStr));
+		userSession.assertLoggedIn();
+
+		final Boolean showColumnNamesForCaption = DisplayType.toBoolean(showColumnNamesForCaptionStr, null);
+		if (showColumnNamesForCaption == null)
+		{
+			throw new AdempiereException("Invalid boolean value: `" + showColumnNamesForCaptionStr + "`");
+		}
+		userSession.setShowColumnNamesForCaption(showColumnNamesForCaption);
+
+		final boolean forgetNotSavedDocuments = true;
+		cacheReset(forgetNotSavedDocuments);
 	}
 
 	@RequestMapping(value = "/allowDeprecatedRestAPI", method = RequestMethod.PUT)
 	public void setAllowDeprecatedRestAPI(@RequestBody final String allowDeprecatedRestAPI)
 	{
+		userSession.assertLoggedIn();
+
 		userSession.setAllowDeprecatedRestAPI(DisplayType.toBoolean(allowDeprecatedRestAPI));
 	}
 
 	@RequestMapping(value = "/disableDeprecatedRestAPI", method = RequestMethod.GET)
 	public boolean isAllowDeprecatedRestAPI()
 	{
+		userSession.assertLoggedIn();
+
 		return userSession.isAllowDeprecatedRestAPI();
 	}
 
@@ -171,6 +247,8 @@ public class DebugRestController
 					required = true) //
 			@RequestParam("enabled") final boolean enabled)
 	{
+		userSession.assertLoggedIn();
+
 		if (enabled)
 		{
 			statisticsLogger.enableWithSqlTracing();
@@ -184,30 +262,38 @@ public class DebugRestController
 	@RequestMapping(value = "/debugProtocol", method = RequestMethod.GET)
 	public void setDebugProtocol(@RequestParam("enabled") final boolean enabled)
 	{
+		userSession.assertLoggedIn();
+
 		WindowConstants.setProtocolDebugging(enabled);
 	}
 
 	@RequestMapping(value = "/views/list", method = RequestMethod.GET)
 	public List<JSONViewResult> getViewsList()
 	{
-		final String adLanguage = userSession.getAD_Language();
+		userSession.assertLoggedIn();
+
+		final JSONOptions jsonOpts = newJSONOptions();
 
 		return viewsRepo.getViews()
 				.stream()
 				.map(ViewResult::ofView)
-				.map(viewResult -> JSONViewResult.of(viewResult, ViewRowOverridesHelper.NULL, adLanguage))
+				.map(viewResult -> JSONViewResult.of(viewResult, ViewRowOverridesHelper.NULL, jsonOpts))
 				.collect(GuavaCollectors.toImmutableList());
 	}
 
 	@PostMapping("/viewDefaultProfile/{windowId}")
 	public void setDefaultViewProfile(@PathVariable("windowId") final String windowIdStr, @RequestBody final String profileIdStr)
 	{
+		userSession.assertLoggedIn();
+
 		sqlViewFactory.setDefaultProfileId(WindowId.fromJson(windowIdStr), ViewProfileId.fromJson(profileIdStr));
 	}
 
 	@RequestMapping(value = "/lookups/cacheStats", method = RequestMethod.GET)
 	public List<String> getLookupCacheStats()
 	{
+		userSession.assertLoggedIn();
+
 		return LookupDataSourceFactory.instance.getCacheStats()
 				.stream()
 				.map(stats -> stats.toString())
@@ -226,6 +312,8 @@ public class DebugRestController
 			, @RequestParam(name = "targetDocumentId", required = false) final String targetDocumentId//
 	)
 	{
+		userSession.assertLoggedIn();
+
 		final Topic topic = Topic.builder()
 				.name(topicName)
 				.type(Type.LOCAL)
@@ -233,7 +321,7 @@ public class DebugRestController
 
 		final UserNotificationRequestBuilder request = UserNotificationRequest.builder()
 				.topic(topic)
-				.recipientUserId(toUserId)
+				.recipientUserId(UserId.ofRepoIdOrNull(toUserId))
 				.important(important);
 
 		final UserNotificationTargetType targetType = Check.isEmpty(targetTypeStr) ? null : UserNotificationTargetType.forJsonValue(targetTypeStr);
@@ -255,6 +343,8 @@ public class DebugRestController
 	public void postToWebsocket(
 			@RequestParam("endpoint") final String endpoint, @RequestBody final String messageStr)
 	{
+		userSession.assertLoggedIn();
+
 		final Charset charset = Charset.forName("UTF-8");
 		final Map<String, Object> headers = ImmutableMap.<String, Object> builder()
 				.put("simpMessageType", SimpMessageType.MESSAGE)
@@ -266,9 +356,11 @@ public class DebugRestController
 
 	@PostMapping("/websocket/view/fireRowChanges")
 	public void sendWebsocketViewChangedNotification(
-			@PathVariable("viewId") final String viewIdStr,
+			@RequestParam("viewId") final String viewIdStr,
 			@RequestParam("changedIds") final String changedIdsStr)
 	{
+		userSession.assertLoggedIn();
+
 		final ViewId viewId = ViewId.ofViewIdString(viewIdStr);
 		final DocumentIdsSelection changedRowIds = DocumentIdsSelection.ofCommaSeparatedString(changedIdsStr);
 		sendWebsocketViewChangedNotification(viewId, changedRowIds);
@@ -276,6 +368,8 @@ public class DebugRestController
 
 	private void sendWebsocketViewChangedNotification(final ViewId viewId, final DocumentIdsSelection changedRowIds)
 	{
+		userSession.assertLoggedIn();
+
 		final ViewChanges viewChanges = new ViewChanges(viewId);
 		viewChanges.addChangedRowIds(changedRowIds);
 		JSONViewChanges jsonViewChanges = JSONViewChanges.of(viewChanges);
@@ -294,21 +388,11 @@ public class DebugRestController
 
 	}
 
-	@RequestMapping(value = "/sql/loadLimit/warn", method = RequestMethod.PUT)
-	public void setSqlLoadLimitWarn(@RequestBody final int limit)
-	{
-		SqlDocumentsRepository.instance.setLoadLimitWarn(limit);
-	}
-
-	@RequestMapping(value = "/sql/loadLimit/max", method = RequestMethod.PUT)
-	public void setSqlLoadLimitMax(@RequestBody final int limit)
-	{
-		SqlDocumentsRepository.instance.setLoadLimitMax(limit);
-	}
-
 	@GetMapping("/logger/{loggerName}/_getUpToRoot")
 	public List<Map<String, Object>> getLoggersUpToRoot(@PathVariable("loggerName") final String loggerName)
 	{
+		userSession.assertLoggedIn();
+
 		final Logger logger = LogManager.getLogger(loggerName);
 		if (logger == null)
 		{
@@ -340,12 +424,20 @@ public class DebugRestController
 		return loggerInfos;
 	}
 
-	public static enum LoggingModule
+	public enum LoggingModule
 	{
-		websockets(de.metas.ui.web.websocket.WebSocketConfig.class.getPackage().getName()), view(de.metas.ui.web.view.IView.class.getPackage().getName()), cache(
-				de.metas.cache.CCache.class.getName() //
-				, de.metas.cache.CacheMgt.class.getName() //
-				, de.metas.cache.model.IModelCacheService.class.getName() // model caching
+		websockets_and_invalidation(
+				de.metas.ui.web.websocket.WebSocketConfig.class.getPackage().getName(),
+				de.metas.ui.web.window.invalidation.DocumentCacheInvalidationDispatcher.class.getName()), //
+		view(de.metas.ui.web.view.IView.class.getPackage().getName()), //
+		cache(
+				de.metas.cache.CCache.class.getName(),
+				de.metas.cache.CacheMgt.class.getName(),
+				de.metas.cache.model.IModelCacheService.class.getName() // model caching
+		), //
+		model_interceptors(
+				org.compiere.model.ModelValidationEngine.class.getName(), //
+				org.adempiere.ad.modelvalidator.IModelValidationEngine.class.getPackage().getName() // for annotated interceptors etc
 		) //
 		;
 
@@ -370,6 +462,8 @@ public class DebugRestController
 			, @PathVariable("level") final String levelStr //
 	)
 	{
+		userSession.assertLoggedIn();
+
 		//
 		// Get Level to set
 		final Level level;
@@ -421,6 +515,8 @@ public class DebugRestController
 	@GetMapping("http.cache.maxAge")
 	public Map<String, Object> setHttpCacheMaxAge(@RequestParam("value") @ApiParam("Cache-control's max age in seconds") final int httpCacheMaxAge)
 	{
+		userSession.assertLoggedIn();
+
 		final long httpCacheMaxAgeOld = userSession.getHttpCacheMaxAge();
 		userSession.setHttpCacheMaxAge(httpCacheMaxAge);
 		return ImmutableMap.of("value", httpCacheMaxAge, "valueOld", httpCacheMaxAgeOld);
@@ -429,6 +525,8 @@ public class DebugRestController
 	@GetMapping("http.use.AcceptLanguage")
 	public Map<String, Object> setUseHttpAcceptLanguage(@RequestParam("value") @ApiParam("Cache-control's max age in seconds") final boolean useHttpAcceptLanguage)
 	{
+		userSession.assertLoggedIn();
+
 		final boolean useHttpAcceptLanguageOld = userSession.isUseHttpAcceptLanguage();
 		userSession.setUseHttpAcceptLanguage(useHttpAcceptLanguage);
 		return ImmutableMap.of("value", useHttpAcceptLanguage, "valueOld", useHttpAcceptLanguageOld);
@@ -439,6 +537,8 @@ public class DebugRestController
 			@RequestParam("enabled") final boolean enabled,
 			@RequestParam(value = "maxLoggedEvents", defaultValue = "500") final int maxLoggedEvents)
 	{
+		userSession.assertLoggedIn();
+
 		websocketSender.setLogEventsEnabled(enabled);
 		websocketSender.setLogEventsMaxSize(maxLoggedEvents);
 	}
@@ -446,6 +546,8 @@ public class DebugRestController
 	@GetMapping("websocketEvents")
 	public List<WebsocketEventLogRecord> getWebsocketLoggedEvents(@RequestParam(value = "destinationFilter", required = false) final String destinationFilter)
 	{
+		userSession.assertLoggedIn();
+
 		return websocketSender.getLoggedEvents(destinationFilter);
 	}
 
@@ -454,6 +556,8 @@ public class DebugRestController
 			@PathVariable("viewId") final String viewIdStr,
 			@RequestParam("ids") final String rowIdsStr)
 	{
+		userSession.assertLoggedIn();
+
 		final ViewId viewId = ViewId.ofViewIdString(viewIdStr);
 		final DocumentIdsSelection rowIds = DocumentIdsSelection.ofCommaSeparatedString(rowIdsStr);
 
@@ -462,7 +566,7 @@ public class DebugRestController
 		String sql = "DELETE FROM " + I_T_WEBUI_ViewSelection.Table_Name
 				+ " WHERE " + I_T_WEBUI_ViewSelection.COLUMNNAME_UUID + "=" + DB.TO_STRING(viewId.getViewId())
 				+ " AND " + I_T_WEBUI_ViewSelection.COLUMNNAME_IntKey1 + "=" + DB.buildSqlList(rowIds.toIntSet());
-		final int countDeleted = DB.executeUpdate(sql, ITrx.TRXNAME_None);
+		final int countDeleted = DB.executeUpdateEx(sql, ITrx.TRXNAME_None);
 
 		//
 		// Clear view's cache
@@ -474,5 +578,36 @@ public class DebugRestController
 		sendWebsocketViewChangedNotification(viewId, rowIds);
 
 		return "Deleted " + countDeleted + " rows";
+	}
+
+	@GetMapping("/changeJsonEngineCofiguration")
+	public void changeJsonEngineConfiguration(
+			@RequestParam(value = "failOnUnknownProperties", required = false) final Boolean failOnUnknownProperties)
+	{
+		if (failOnUnknownProperties != null)
+		{
+			sharedJsonObjectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, failOnUnknownProperties);
+		}
+	}
+
+	@GetMapping("/conext")
+	public Map<String, String> getContext()
+	{
+		userSession.assertLoggedIn();
+
+		final LinkedHashMap<String, String> map = new LinkedHashMap<>();
+
+		final Properties ctx = Env.getCtx();
+
+		final ArrayList<String> keys = new ArrayList<>(ctx.stringPropertyNames());
+		Collections.sort(keys);
+
+		for (final String key : keys)
+		{
+			final String value = ctx.getProperty(key);
+			map.put(key, value);
+		}
+
+		return map;
 	}
 }

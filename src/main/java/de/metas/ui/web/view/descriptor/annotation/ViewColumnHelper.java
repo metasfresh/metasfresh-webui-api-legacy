@@ -12,10 +12,13 @@ import java.util.stream.Stream;
 import javax.annotation.Nullable;
 
 import org.adempiere.exceptions.AdempiereException;
+import org.adempiere.mm.attributes.api.IAttributeDAO;
 import org.adempiere.service.ISysConfigBL;
 import org.adempiere.util.reflect.FieldReference;
+import org.compiere.Adempiere;
 import org.compiere.util.Env;
 import org.reflections.ReflectionUtils;
+import org.slf4j.Logger;
 
 import com.google.common.base.Predicates;
 import com.google.common.cache.CacheBuilder;
@@ -28,15 +31,17 @@ import com.google.common.collect.Maps;
 
 import de.metas.i18n.IMsgBL;
 import de.metas.i18n.ITranslatableString;
-import de.metas.i18n.ImmutableTranslatableString;
+import de.metas.i18n.TranslatableStrings;
+import de.metas.logging.LogManager;
 import de.metas.ui.web.view.IViewRow;
+import de.metas.ui.web.view.ViewRowFieldNameAndJsonValues;
+import de.metas.ui.web.view.descriptor.annotation.ViewColumn.TranslationSource;
 import de.metas.ui.web.view.descriptor.annotation.ViewColumn.ViewColumnLayout;
 import de.metas.ui.web.view.descriptor.annotation.ViewColumn.ViewColumnLayout.Displayed;
 import de.metas.ui.web.view.json.JSONViewDataType;
 import de.metas.ui.web.window.datatypes.LookupValue;
 import de.metas.ui.web.window.datatypes.LookupValue.StringLookupValue;
 import de.metas.ui.web.window.datatypes.MediaType;
-import de.metas.ui.web.window.datatypes.Values;
 import de.metas.ui.web.window.datatypes.json.JSONNullValue;
 import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
 import de.metas.ui.web.window.descriptor.DocumentLayoutElementDescriptor;
@@ -48,7 +53,7 @@ import de.metas.util.Check;
 import de.metas.util.GuavaCollectors;
 import de.metas.util.Services;
 import de.metas.util.StringUtils;
-
+import de.metas.util.lang.ReferenceListAwareEnum;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
@@ -84,6 +89,8 @@ import lombok.experimental.UtilityClass;
 @UtilityClass
 public final class ViewColumnHelper
 {
+	private static final Logger logger = LogManager.getLogger(ViewColumnHelper.class);
+
 	private static final LoadingCache<Class<?>, ClassViewDescriptor> descriptorsByClass = CacheBuilder.newBuilder()
 			.weakKeys()
 			.build(new CacheLoader<Class<?>, ClassViewDescriptor>()
@@ -200,18 +207,16 @@ public final class ViewColumnHelper
 
 	private static ClassViewColumnDescriptor createClassViewColumnDescriptor(@NonNull final Field field)
 	{
-		final IMsgBL msgBL = Services.get(IMsgBL.class);
 
 		final String fieldName = extractFieldName(field);
 
 		final ViewColumn viewColumnAnn = field.getAnnotation(ViewColumn.class);
-		final String captionKey = !Check.isEmpty(viewColumnAnn.captionKey()) ? viewColumnAnn.captionKey() : fieldName;
 
 		final ImmutableMap<JSONViewDataType, ClassViewColumnLayoutDescriptor> layoutsByViewType = createViewColumnLayoutDescriptors(viewColumnAnn, fieldName);
 
 		return ClassViewColumnDescriptor.builder()
 				.fieldName(fieldName)
-				.caption(!Check.isEmpty(captionKey, true) ? msgBL.translatable(captionKey) : ImmutableTranslatableString.empty())
+				.caption(extractCaption(field))
 				.widgetType(viewColumnAnn.widgetType())
 				.listReferenceId(viewColumnAnn.listReferenceId())
 				.editorRenderMode(viewColumnAnn.editor())
@@ -221,6 +226,33 @@ public final class ViewColumnHelper
 				.widgetSize(viewColumnAnn.widgetSize())
 				.restrictToMediaTypes(ImmutableSet.copyOf(viewColumnAnn.restrictToMediaTypes()))
 				.build();
+	}
+
+	private static ITranslatableString extractCaption(@NonNull final Field field)
+	{
+		final ViewColumn viewColumnAnn = field.getAnnotation(ViewColumn.class);
+
+		final String captionKey = !Check.isEmpty(viewColumnAnn.captionKey())
+				? viewColumnAnn.captionKey()
+				: extractFieldName(field);
+
+		final TranslationSource captionTranslationSource = viewColumnAnn.captionTranslationSource();
+		if (captionTranslationSource == TranslationSource.DEFAULT)
+		{
+			final IMsgBL msgBL = Services.get(IMsgBL.class);
+			return msgBL.translatable(captionKey);
+		}
+		else if (captionTranslationSource == TranslationSource.ATTRIBUTE_NAME)
+		{
+			final IAttributeDAO attributesRepo = Services.get(IAttributeDAO.class);
+			return attributesRepo.getAttributeDisplayNameByValue(captionKey)
+					.orElseGet(() -> TranslatableStrings.anyLanguage(captionKey));
+		}
+		else
+		{
+			logger.warn("Unknown TranslationSource={} for {}. Returning the captionKey={}", captionTranslationSource, field, captionKey);
+			return TranslatableStrings.anyLanguage(captionKey);
+		}
 	}
 
 	private static String extractFieldName(@NonNull final Field field)
@@ -252,7 +284,7 @@ public final class ViewColumnHelper
 			return Stream.of(JSONViewDataType.values())
 					.map(viewType -> ClassViewColumnLayoutDescriptor.builder()
 							.viewType(viewType)
-							.displayed(true)
+							.displayed(viewColumnAnn.displayed())
 							.seqNo(defaultSeqNo)
 							.build())
 					.collect(GuavaCollectors.toImmutableMapByKey(ClassViewColumnLayoutDescriptor::getViewType));
@@ -283,7 +315,7 @@ public final class ViewColumnHelper
 			return Services.get(ISysConfigBL.class)
 					.getBooleanValue(
 							sysConfigKey,
-							false,
+							viewColumnLayout.defaultDisplaySysConfig(),
 							Env.getAD_Client_ID(),
 							Env.getAD_Org_ID(Env.getCtx()));
 		}
@@ -308,25 +340,40 @@ public final class ViewColumnHelper
 				.addField(DocumentLayoutElementFieldDescriptor.builder(column.getFieldName()));
 	}
 
+	public static <T extends IViewRow> ImmutableSet<String> extractFieldNames(@NonNull final T row)
+	{
+		final Class<? extends IViewRow> rowClass = row.getClass();
+		return extractFieldNames(rowClass);
+	}
+
+	public static <T extends IViewRow> ImmutableSet<String> extractFieldNames(@NonNull final Class<T> rowType)
+	{
+		return getDescriptor(rowType).getFieldNames();
+	}
+
 	/**
 	 * This helper method is intended to support individual implementations of {@link IViewRow#getFieldNameAndJsonValues()}.
 	 * <b>
 	 * Note that the individual fields maybe be {@code instanceof} {@link Supplier}.
 	 * Useful because if a field is configured not to be shown at all, then the respective supplier won't be invoked.
 	 */
-	public static <T extends IViewRow> ImmutableMap<String, Object> extractJsonMap(@NonNull final T row)
+	public static <T extends IViewRow> ViewRowFieldNameAndJsonValues extractJsonMap(@NonNull final T row)
 	{
 		final Class<? extends IViewRow> rowClass = row.getClass();
-		return getDescriptor(rowClass)
+		final ImmutableMap<String, Object> map = getDescriptor(rowClass)
 				.streamColumns()
-				.map(column -> extractFieldNameAndValueAsJson(row, column))
+				.map(column -> extractFieldNameAndValueAsJsonObject(row, column))
 				.filter(Predicates.notNull())
 				.collect(GuavaCollectors.toImmutableMap());
+
+		return ViewRowFieldNameAndJsonValues.ofMap(map);
 	}
 
-	private static final <T extends IViewRow> Map.Entry<String, Object> extractFieldNameAndValueAsJson(final T row, final ClassViewColumnDescriptor column)
+	private static <T extends IViewRow> Map.Entry<String, Object> extractFieldNameAndValueAsJsonObject(
+			@NonNull final T row,
+			@NonNull final ClassViewColumnDescriptor column)
 	{
-		final Object value = extractFieldValueAsJson(row, column);
+		final Object value = extractFieldValueAsJsonObject(row, column);
 		if (JSONNullValue.isNull(value))
 		{
 			return null;
@@ -335,7 +382,9 @@ public final class ViewColumnHelper
 		return GuavaCollectors.entry(column.getFieldName(), value);
 	}
 
-	private static final <T extends IViewRow> Object extractFieldValueAsJson(final T row, final ClassViewColumnDescriptor column)
+	private static <T extends IViewRow> Object extractFieldValueAsJsonObject(
+			@NonNull final T row,
+			@NonNull final ClassViewColumnDescriptor column)
 	{
 		try
 		{
@@ -349,11 +398,11 @@ public final class ViewColumnHelper
 			if (value instanceof Supplier<?>)
 			{
 				final Supplier<?> supplier = (Supplier<?>)value;
-				return convertValueToJson(supplier.get(), column);
+				return normalizeAndResolveValue(supplier.get(), column);
 			}
 			else
 			{
-				return convertValueToJson(value, column);
+				return normalizeAndResolveValue(value, column);
 			}
 		}
 		catch (final Exception ex)
@@ -364,7 +413,9 @@ public final class ViewColumnHelper
 		}
 	}
 
-	private static Object convertValueToJson(final Object valueParam, final ClassViewColumnDescriptor column)
+	private static Object normalizeAndResolveValue(
+			@Nullable final Object valueParam,
+			@NonNull final ClassViewColumnDescriptor column)
 	{
 		Object result = valueParam;
 
@@ -376,7 +427,12 @@ public final class ViewColumnHelper
 			}
 		}
 
-		return Values.valueToJsonObject(result);
+		if (result == null)
+		{
+			return JSONNullValue.instance;
+		}
+
+		return result;
 	}
 
 	private static LookupValue resolveListValueByCode(final int listReferenceId, final Object code)
@@ -384,6 +440,18 @@ public final class ViewColumnHelper
 		if (code == null)
 		{
 			return null;
+		}
+
+		if (Adempiere.isUnitTestMode())
+		{
+			if (code instanceof ReferenceListAwareEnum)
+			{
+				return StringLookupValue.of(((ReferenceListAwareEnum)code).getCode(), code.toString());
+			}
+			else
+			{
+				return StringLookupValue.unknown(code.toString());
+			}
 		}
 
 		final LookupValue lookupValue = LookupDataSourceFactory.instance.listByAD_Reference_Value_ID(listReferenceId).findById(code);
@@ -418,6 +486,11 @@ public final class ViewColumnHelper
 			columnsByName = Maps.uniqueIndex(columns, ClassViewColumnDescriptor::getFieldName);
 			widgetTypesByFieldName = columns.stream()
 					.collect(ImmutableMap.toImmutableMap(ClassViewColumnDescriptor::getFieldName, ClassViewColumnDescriptor::getWidgetType));
+		}
+
+		public ImmutableSet<String> getFieldNames()
+		{
+			return columnsByName.keySet();
 		}
 
 		public Stream<ClassViewColumnDescriptor> streamColumns()

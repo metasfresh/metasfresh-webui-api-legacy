@@ -11,6 +11,8 @@ import de.metas.ui.web.document.filter.DocumentFilter;
 import de.metas.ui.web.window.model.sql.SqlOptions;
 import lombok.NonNull;
 
+import javax.annotation.Nullable;
+
 /*
  * #%L
  * metasfresh-webui-api
@@ -48,16 +50,15 @@ public interface SqlDocumentFilterConverter
 	 * Converts given <code>filter</code> to SQL and returns it.
 	 * In case the produced SQL requires parameters, those parameters will be added to <code>sqlParamsOut</code> parameter.
 	 *
-	 * @param sqlParamsOut
-	 * @param filter
 	 * @return SQL
 	 */
+	@Nullable
 	String getSql(SqlParamsCollector sqlParamsOut,
 			DocumentFilter filter,
 			final SqlOptions sqlOpts,
 			final SqlDocumentFilterConverterContext context);
 
-	default String getSql(
+	/* final */ default String getSql(
 			@NonNull final SqlParamsCollector sqlParamsOut,
 			@NonNull final List<DocumentFilter> filters,
 			@NonNull final SqlOptions sqlOpts,

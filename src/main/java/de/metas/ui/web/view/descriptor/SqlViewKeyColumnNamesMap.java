@@ -11,6 +11,8 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import javax.annotation.Nullable;
+
 import org.adempiere.exceptions.AdempiereException;
 import org.adempiere.exceptions.DBException;
 import org.compiere.util.DB;
@@ -290,8 +292,8 @@ public final class SqlViewKeyColumnNamesMap
 	@Builder(builderMethodName = "prepareSqlFilterByRowIds", builderClassName = "SqlFilterByRowIdsBuilder")
 	private SqlAndParams getSqlFilterByRowIds(
 			@NonNull final DocumentIdsSelection rowIds,
-			final SqlViewRowIdsConverter rowIdsConverter,
-			final String sqlColumnPrefix,
+			@Nullable final SqlViewRowIdsConverter rowIdsConverter,
+			@Nullable final String sqlColumnPrefix,
 			final boolean useKeyColumnName,
 			final boolean embedSqlParams)
 	{
@@ -305,6 +307,10 @@ public final class SqlViewKeyColumnNamesMap
 			final String selectionColumnName = useKeyColumnName ? getSingleKeyColumnName() : getSingleWebuiSelectionColumnName();
 			final String keyColumnName = (sqlColumnPrefix != null ? sqlColumnPrefix : "") + selectionColumnName;
 			final Set<Integer> recordIds = rowIdsConverter != null ? rowIdsConverter.convertToRecordIds(rowIds) : rowIds.toIntSet();
+			if (recordIds.isEmpty())
+			{
+				throw new AdempiereException("No recordIds were extracted from " + rowIds);
+			}
 
 			final List<Object> sqlParams = embedSqlParams ? null : new ArrayList<>();
 			final String sql = DB.buildSqlList(keyColumnName, recordIds, sqlParams);
@@ -312,7 +318,6 @@ public final class SqlViewKeyColumnNamesMap
 		}
 		else
 		{
-
 			final List<SqlAndParams> sqls = rowIds.toSet()
 					.stream()
 					.map(rowId -> getSqlFilterByRowId(rowId, sqlColumnPrefix, useKeyColumnName, embedSqlParams))
@@ -363,6 +368,18 @@ public final class SqlViewKeyColumnNamesMap
 		return SqlAndParams.of(sql.toString(), sqlParams);
 	}
 
+	public List<Object> getSqlValuesList(@NonNull final DocumentId rowId)
+	{
+		return ImmutableList.copyOf(extractComposedKey(rowId).values());
+	}
+
+	public DocumentId retrieveRowId(final ResultSet rs)
+	{
+		final String sqlColumnPrefix = null;
+		final boolean useKeyColumnNames = true;
+		return retrieveRowId(rs, sqlColumnPrefix, useKeyColumnNames);
+	}
+
 	public DocumentId retrieveRowId(final ResultSet rs, final String sqlColumnPrefix, final boolean useKeyColumnNames)
 	{
 		final List<Object> rowIdParts = keyFields
@@ -381,7 +398,7 @@ public final class SqlViewKeyColumnNamesMap
 		return DocumentId.ofComposedKeyParts(rowIdParts);
 	}
 
-	private final String buildKeyColumnNameEffective(final String keyColumnName, final String sqlColumnPrefix, final boolean useKeyColumnName)
+	private String buildKeyColumnNameEffective(final String keyColumnName, final String sqlColumnPrefix, final boolean useKeyColumnName)
 	{
 		final String selectionColumnName = useKeyColumnName ? keyColumnName : getWebuiSelectionColumnNameForKeyColumnName(keyColumnName);
 		if (sqlColumnPrefix != null && !sqlColumnPrefix.isEmpty())

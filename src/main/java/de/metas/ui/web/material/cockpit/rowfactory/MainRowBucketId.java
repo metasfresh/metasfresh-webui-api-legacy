@@ -1,12 +1,13 @@
 package de.metas.ui.web.material.cockpit.rowfactory;
 
 import java.math.BigDecimal;
-import java.sql.Timestamp;
+import java.time.LocalDate;
 
 import org.compiere.util.TimeUtil;
 
 import de.metas.material.cockpit.model.I_MD_Cockpit;
 import de.metas.material.cockpit.model.I_MD_Stock;
+import de.metas.product.ProductId;
 import lombok.NonNull;
 import lombok.Value;
 
@@ -39,26 +40,26 @@ public class MainRowBucketId
 			@NonNull final I_MD_Cockpit dataRecord)
 	{
 		return new MainRowBucketId(
-				dataRecord.getM_Product_ID(),
-				TimeUtil.getDay(dataRecord.getDateGeneral()));
+				ProductId.ofRepoId(dataRecord.getM_Product_ID()),
+				TimeUtil.asLocalDate(dataRecord.getDateGeneral()));
 	}
 
 	public static MainRowBucketId createInstanceForStockRecord(
 			@NonNull final I_MD_Stock stockRecord,
-			@NonNull final Timestamp date)
+			@NonNull final LocalDate date)
 	{
 		return new MainRowBucketId(
-				stockRecord.getM_Product_ID(),
-				TimeUtil.getDay(date));
+				ProductId.ofRepoId(stockRecord.getM_Product_ID()),
+				date);
 	}
 
-	public static MainRowBucketId createPlainInstance(final int productId, @NonNull final Timestamp date)
+	public static MainRowBucketId createPlainInstance(@NonNull final ProductId productId, @NonNull final LocalDate date)
 	{
 		return new MainRowBucketId(productId, date);
 	}
 
-	int productId;
-	Timestamp date;
+	ProductId productId;
+	LocalDate date;
 
 	private BigDecimal pmmQtyPromised = BigDecimal.ZERO;
 
@@ -74,12 +75,12 @@ public class MainRowBucketId
 
 	private BigDecimal qtyOnHand = BigDecimal.ZERO;
 
-	private MainRowBucketId(final int productId, @NonNull final Timestamp date)
+	private MainRowBucketId(
+			@NonNull final ProductId productId,
+			@NonNull final LocalDate date)
 	{
 		this.productId = productId;
 		this.date = date;
 	}
-
-
 
 }

@@ -1,11 +1,15 @@
 package de.metas.ui.web.handlingunits.process;
 
+import static org.adempiere.model.InterfaceWrapperHelper.loadOutOfTrx;
+
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Stream;
 
 import org.adempiere.ad.trx.api.ITrx;
 import org.adempiere.model.InterfaceWrapperHelper;
+import org.compiere.model.I_C_UOM;
+import org.compiere.model.I_M_Product;
 import org.springframework.context.annotation.Profile;
 
 import com.google.common.collect.ImmutableList;
@@ -27,8 +31,10 @@ import de.metas.process.IProcessPreconditionsContext;
 import de.metas.process.ProcessPreconditionsResolution;
 import de.metas.process.RunOutOfTrx;
 import de.metas.quantity.Quantity;
+import de.metas.quantity.StockQtyAndUOMQty;
 import de.metas.util.GuavaCollectors;
 import de.metas.util.Services;
+import lombok.NonNull;
 
 /*
  * #%L
@@ -203,10 +209,10 @@ public class WEBUI_M_ReceiptSchedule_ReceiveCUs extends ReceiptScheduleBasedProc
 		return vhu;
 	}
 
-	protected final BigDecimal getDefaultAvailableQtyToReceive(final I_M_ReceiptSchedule rs)
+	protected final BigDecimal getDefaultAvailableQtyToReceive(@NonNull final I_M_ReceiptSchedule rs)
 	{
-		final BigDecimal qty = receiptScheduleBL.getQtyToMove(rs);
-		return qty == null || qty.signum() <= 0 ? BigDecimal.ZERO : qty;
+		final StockQtyAndUOMQty qty = receiptScheduleBL.getQtyToMove(rs);
+		return qty == null || qty.signum() <= 0 ? BigDecimal.ZERO : qty.getStockQty().toBigDecimal();
 	}
 
 	protected BigDecimal getEffectiveQtyToReceive(final I_M_ReceiptSchedule rs)
@@ -229,8 +235,8 @@ public class WEBUI_M_ReceiptSchedule_ReceiveCUs extends ReceiptScheduleBasedProc
 		final IAllocationRequest allocationRequest = AllocationUtils.createAllocationRequestBuilder()
 				.setHUContext(huContextInitial)
 				.setDateAsToday()
-				.setProduct(rs.getM_Product())
-				.setQuantity(new Quantity(qty, rs.getC_UOM()))
+				.setProduct(loadOutOfTrx(rs.getM_Product_ID(), I_M_Product.class))
+				.setQuantity(new Quantity(qty, loadOutOfTrx(rs.getC_UOM_ID(), I_C_UOM.class)))
 				.setFromReferencedModel(rs)
 				.setForceQtyAllocation(true)
 				.create();

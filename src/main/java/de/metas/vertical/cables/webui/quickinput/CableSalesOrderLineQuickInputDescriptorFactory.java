@@ -4,7 +4,9 @@ import java.util.Optional;
 import java.util.Set;
 
 import org.adempiere.ad.callout.api.ICalloutField;
+import org.adempiere.ad.element.api.AdWindowId;
 import org.adempiere.ad.expression.api.ConstantLogicExpression;
+import org.adempiere.ad.window.api.IADWindowDAO;
 import org.compiere.model.I_C_OrderLine;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
@@ -14,6 +16,7 @@ import com.google.common.collect.ImmutableSet;
 import de.metas.adempiere.model.I_C_Order;
 import de.metas.i18n.IMsgBL;
 import de.metas.i18n.ITranslatableString;
+import de.metas.lang.SOTrx;
 import de.metas.ui.web.quickinput.IQuickInputDescriptorFactory;
 import de.metas.ui.web.quickinput.QuickInputDescriptor;
 import de.metas.ui.web.quickinput.QuickInputLayoutDescriptor;
@@ -57,7 +60,8 @@ import lombok.NonNull;
 @Profile(CablesConstants.PROFILE)
 /* package */ class CableSalesOrderLineQuickInputDescriptorFactory implements IQuickInputDescriptorFactory
 {
-	private static final int WINDOW_ID_SalesOrder = 143; // FIXME: hardcoded sales order window id = 143
+	private static final AdWindowId WINDOW_ID_SalesOrder_DEFAULT = AdWindowId.ofRepoId(143); // sales order window id = 143
+	private static final AdWindowId WINDOW_ID_PurchaseOrder_DEFAULT = AdWindowId.ofRepoId(181); // purchase order window id = 181
 
 	private ProductLookupDescriptor productLookupDescriptor;
 
@@ -74,11 +78,21 @@ import lombok.NonNull;
 	@Override
 	public Set<MatchingKey> getMatchingKeys()
 	{
-		return ImmutableSet.of(MatchingKey.includedDocument(DocumentType.Window, WINDOW_ID_SalesOrder, org.compiere.model.I_C_OrderLine.Table_Name));
+		final IADWindowDAO windowDAO = Services.get(IADWindowDAO.class);
+		final AdWindowId salesOrderWindowId = windowDAO.getAdWindowId(I_C_OrderLine.Table_Name, SOTrx.SALES, WINDOW_ID_SalesOrder_DEFAULT);
+		final AdWindowId purchaseOrderWindowId = windowDAO.getAdWindowId(I_C_OrderLine.Table_Name, SOTrx.PURCHASE, WINDOW_ID_PurchaseOrder_DEFAULT);
+
+		return ImmutableSet.of(
+				MatchingKey.includedDocument(DocumentType.Window, salesOrderWindowId.getRepoId(), I_C_OrderLine.Table_Name),
+				MatchingKey.includedDocument(DocumentType.Window, purchaseOrderWindowId.getRepoId(), I_C_OrderLine.Table_Name));
 	}
 
 	@Override
-	public QuickInputDescriptor createQuickInputDescriptor(final DocumentType documentType, final DocumentId documentTypeId, final DetailId detailId, final Optional<Boolean> soTrx)
+	public QuickInputDescriptor createQuickInputDescriptor(
+			final DocumentType documentType,
+			final DocumentId documentTypeId,
+			final DetailId detailId,
+			final Optional<SOTrx> soTrx)
 	{
 		final DocumentEntityDescriptor entityDescriptor = createDescriptorBuilder(documentTypeId, detailId, soTrx)
 				.addField(createProductFieldBuilder(ICablesOrderLineQuickInput.COLUMNNAME_Plug1_Product_ID)
@@ -93,18 +107,29 @@ import lombok.NonNull;
 						.setMandatoryLogic(true))
 				.build();
 
-		final QuickInputLayoutDescriptor layout = QuickInputLayoutDescriptor.builder()
-				.addElement(DocumentLayoutElementDescriptor.builder(
-						entityDescriptor,
+		final QuickInputLayoutDescriptor.Builder quickInputBuilder = QuickInputLayoutDescriptor.builder();
+
+		DocumentLayoutElementDescriptor
+				.builderOrEmpty(entityDescriptor,
 						ICablesOrderLineQuickInput.COLUMNNAME_Plug1_Product_ID,
 						ICablesOrderLineQuickInput.COLUMNNAME_Cable_Product_ID,
 						ICablesOrderLineQuickInput.COLUMNNAME_Plug2_Product_ID)
-						.setWidgetSize(WidgetSize.Large))
-				.addElement(DocumentLayoutElementDescriptor.builder(entityDescriptor, ICablesOrderLineQuickInput.COLUMNNAME_CableLength)
-						.setWidgetSize(WidgetSize.Small))
-				.addElement(DocumentLayoutElementDescriptor.builder(entityDescriptor, ICablesOrderLineQuickInput.COLUMNNAME_Qty)
-						.setWidgetSize(WidgetSize.Small))
-				.build();
+				.map(b -> b.setWidgetSize(WidgetSize.Large))
+				.ifPresent(quickInputBuilder::element);
+
+		DocumentLayoutElementDescriptor
+				.builderOrEmpty(entityDescriptor,
+						ICablesOrderLineQuickInput.COLUMNNAME_CableLength)
+				.map(b -> b.setWidgetSize(WidgetSize.Small))
+				.ifPresent(quickInputBuilder::element);
+
+		DocumentLayoutElementDescriptor
+				.builderOrEmpty(entityDescriptor,
+						ICablesOrderLineQuickInput.COLUMNNAME_Qty)
+				.map(b -> b.setWidgetSize(WidgetSize.Small))
+				.ifPresent(quickInputBuilder::element);
+
+		final QuickInputLayoutDescriptor layout = quickInputBuilder.build();
 
 		return QuickInputDescriptor.of(entityDescriptor, layout, CableSalesOrderLineQuickInputProcessor.class);
 	}
@@ -112,7 +137,7 @@ import lombok.NonNull;
 	private static DocumentEntityDescriptor.Builder createDescriptorBuilder(
 			final DocumentId documentTypeId,
 			final DetailId detailId,
-			@NonNull final Optional<Boolean> soTrx)
+			@NonNull final Optional<SOTrx> soTrx)
 	{
 		return DocumentEntityDescriptor.builder()
 				.setDocumentType(DocumentType.QuickInput, documentTypeId)

@@ -2,31 +2,34 @@ package de.metas.ui.web.view.descriptor;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import javax.annotation.Nullable;
 
 import org.adempiere.exceptions.AdempiereException;
-import org.adempiere.util.comparator.FixedOrderByKeyComparator;
 import org.slf4j.Logger;
 
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Maps;
 
 import de.metas.i18n.ITranslatableString;
-import de.metas.i18n.ImmutableTranslatableString;
+import de.metas.i18n.TranslatableStrings;
 import de.metas.logging.LogManager;
 import de.metas.ui.web.cache.ETag;
 import de.metas.ui.web.cache.ETagAware;
 import de.metas.ui.web.document.filter.DocumentFilterDescriptor;
 import de.metas.ui.web.view.IViewRow;
+import de.metas.ui.web.view.ViewCloseAction;
 import de.metas.ui.web.view.ViewProfileId;
 import de.metas.ui.web.view.descriptor.annotation.ViewColumnHelper;
 import de.metas.ui.web.view.descriptor.annotation.ViewColumnHelper.ClassViewColumnOverrides;
@@ -34,12 +37,13 @@ import de.metas.ui.web.view.json.JSONViewDataType;
 import de.metas.ui.web.window.datatypes.WindowId;
 import de.metas.ui.web.window.descriptor.DetailId;
 import de.metas.ui.web.window.descriptor.DocumentLayoutElementDescriptor;
+import de.metas.ui.web.window.descriptor.DocumentLayoutElementFieldDescriptor;
 import de.metas.ui.web.window.descriptor.factory.standard.LayoutFactory;
 import de.metas.ui.web.window.model.DocumentQueryOrderBy;
 import de.metas.util.Check;
 import de.metas.util.GuavaCollectors;
-
 import lombok.AccessLevel;
+import lombok.Getter;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 
@@ -77,8 +81,13 @@ public class ViewLayout implements ETagAware
 	private final WindowId windowId;
 	private final DetailId detailId;
 	private final ViewProfileId profileId;
+
+	@Getter
 	private final ITranslatableString caption;
+
+	@Getter
 	private final ITranslatableString description;
+
 	private final ITranslatableString emptyResultText;
 	private final ITranslatableString emptyResultHint;
 
@@ -89,10 +98,14 @@ public class ViewLayout implements ETagAware
 	private final ImmutableList<DocumentLayoutElementDescriptor> elements;
 
 	private final String idFieldName;
+	private final String focusOnFieldName;
 
 	private final boolean hasAttributesSupport;
 	private final IncludedViewLayout includedViewLayout;
 	private final String allowNewCaption;
+
+	@Getter
+	private final ImmutableSet<ViewCloseAction> allowedViewCloseActions;
 
 	private final boolean hasTreeSupport;
 	private final boolean treeCollapsible;
@@ -104,6 +117,8 @@ public class ViewLayout implements ETagAware
 	/** If false, frontend shall not allow double clicking on a row in order to open it as a document */
 	private final boolean allowOpeningRowDetails;
 
+	private final boolean geoLocationSupport;
+
 	// ETag support
 	private static final AtomicInteger nextETagVersionSupplier = new AtomicInteger(1);
 	private final ETag eTag;
@@ -111,12 +126,12 @@ public class ViewLayout implements ETagAware
 	private ViewLayout(final Builder builder)
 	{
 		windowId = builder.windowId;
-		detailId = builder.getDetailId();
+		detailId = builder.detailId;
 		profileId = ViewProfileId.NULL;
-		caption = builder.caption != null ? builder.caption : ImmutableTranslatableString.empty();
-		description = builder.description != null ? builder.description : ImmutableTranslatableString.empty();
-		emptyResultText = ImmutableTranslatableString.copyOfNullable(builder.emptyResultText);
-		emptyResultHint = ImmutableTranslatableString.copyOfNullable(builder.emptyResultHint);
+		caption = TranslatableStrings.nullToEmpty(builder.caption);
+		description = TranslatableStrings.nullToEmpty(builder.description);
+		emptyResultText = TranslatableStrings.copyOfNullable(builder.emptyResultText);
+		emptyResultHint = TranslatableStrings.copyOfNullable(builder.emptyResultHint);
 
 		elements = ImmutableList.copyOf(builder.buildElements());
 
@@ -125,8 +140,11 @@ public class ViewLayout implements ETagAware
 		defaultOrderBys = ImmutableList.copyOf(builder.getDefaultOrderBys());
 
 		idFieldName = builder.getIdFieldName();
+		focusOnFieldName = builder.focusOnFieldName;
 
 		hasAttributesSupport = builder.hasAttributesSupport;
+
+		allowedViewCloseActions = builder.getAllowedViewCloseActions();
 
 		hasTreeSupport = builder.hasTreeSupport;
 		treeCollapsible = builder.treeCollapsible;
@@ -137,6 +155,8 @@ public class ViewLayout implements ETagAware
 		allowNewCaption = null;
 
 		allowOpeningRowDetails = builder.allowOpeningRowDetails;
+
+		geoLocationSupport = false;
 
 		eTag = ETag.of(nextETagVersionSupplier.getAndIncrement(), extractETagAttributes(filters, allowNewCaption));
 	}
@@ -150,7 +170,10 @@ public class ViewLayout implements ETagAware
 			final ImmutableList<DocumentFilterDescriptor> filters,
 			final ImmutableList<DocumentQueryOrderBy> defaultOrderBys,
 			final String allowNewCaption,
-			final boolean hasTreeSupport, final boolean treeCollapsible, final int treeExpandedDepth,
+			final boolean hasTreeSupport,
+			final boolean treeCollapsible,
+			final int treeExpandedDepth,
+			final boolean geoLocationSupport,
 			final ImmutableList<DocumentLayoutElementDescriptor> elements)
 	{
 		Check.assumeNotEmpty(elements, "elements is not empty");
@@ -169,8 +192,12 @@ public class ViewLayout implements ETagAware
 		this.defaultOrderBys = defaultOrderBys;
 
 		idFieldName = from.idFieldName;
+		focusOnFieldName = from.focusOnFieldName;
 
 		hasAttributesSupport = from.hasAttributesSupport;
+
+		allowedViewCloseActions = from.allowedViewCloseActions;
+
 		this.hasTreeSupport = hasTreeSupport;
 		this.treeCollapsible = treeCollapsible;
 		this.treeExpandedDepth = treeExpandedDepth;
@@ -180,6 +207,8 @@ public class ViewLayout implements ETagAware
 		this.allowNewCaption = allowNewCaption;
 
 		this.allowOpeningRowDetails = from.allowOpeningRowDetails;
+
+		this.geoLocationSupport = geoLocationSupport;
 
 		eTag = from.eTag.overridingAttributes(extractETagAttributes(filters, allowNewCaption));
 	}
@@ -270,6 +299,15 @@ public class ViewLayout implements ETagAware
 		return elements;
 	}
 
+	public Set<String> getFieldNames()
+	{
+		return getElements()
+				.stream()
+				.flatMap(element -> element.getFields().stream())
+				.map(DocumentLayoutElementFieldDescriptor::getField)
+				.collect(ImmutableSet.toImmutableSet());
+	}
+
 	public boolean hasElements()
 	{
 		return !elements.isEmpty();
@@ -315,10 +353,20 @@ public class ViewLayout implements ETagAware
 	{
 		return allowNewCaption;
 	}
-	
+
 	public boolean isAllowOpeningRowDetails()
 	{
 		return allowOpeningRowDetails;
+	}
+
+	public boolean isGeoLocationSupport()
+	{
+		return geoLocationSupport;
+	}
+
+	public String getFocusOnFieldName()
+	{
+		return focusOnFieldName;
 	}
 
 	@Override
@@ -343,19 +391,21 @@ public class ViewLayout implements ETagAware
 		private Boolean hasTreeSupport;
 		private Boolean treeCollapsible;
 		private Integer treeExpandedDepth;
+		private Boolean geoLocationSupport;
 
 		private ArrayList<DocumentLayoutElementDescriptor> elements = null;
 		private ArrayList<DocumentQueryOrderBy> defaultOrderBys = null;
 
 		public ViewLayout build()
 		{
-			final WindowId windowIdEffective = windowId != null ? windowId : from.windowId;
+			final WindowId windowIdEffective = getWindowIdEffective();
 			final ViewProfileId profileIdEffective = !ViewProfileId.isNull(profileId) ? profileId : from.profileId;
 			final ImmutableList<DocumentFilterDescriptor> filtersEffective = ImmutableList.copyOf(filters != null ? filters : from.getFilters());
 			final String allowNewCaptionEffective = allowNewCaption != null ? allowNewCaption : from.allowNewCaption;
 			final boolean hasTreeSupportEffective = hasTreeSupport != null ? hasTreeSupport.booleanValue() : from.hasTreeSupport;
 			final boolean treeCollapsibleEffective = treeCollapsible != null ? treeCollapsible.booleanValue() : from.treeCollapsible;
 			final int treeExpandedDepthEffective = treeExpandedDepth != null ? treeExpandedDepth.intValue() : from.treeExpandedDepth;
+			final boolean geoLocationSupportEffective = geoLocationSupport != null ? geoLocationSupport.booleanValue() : from.geoLocationSupport;
 
 			final ImmutableList<DocumentLayoutElementDescriptor> elementsEffective = elements != null ? ImmutableList.copyOf(elements) : from.elements;
 			final ImmutableList<DocumentQueryOrderBy> defaultOrderBysEffective = defaultOrderBys != null ? ImmutableList.copyOf(defaultOrderBys) : from.defaultOrderBys;
@@ -369,7 +419,8 @@ public class ViewLayout implements ETagAware
 					&& from.treeCollapsible == treeCollapsibleEffective
 					&& from.treeExpandedDepth == treeExpandedDepthEffective
 					&& Objects.equals(from.elements, elementsEffective)
-					&& Objects.equals(from.defaultOrderBys, defaultOrderBysEffective))
+					&& Objects.equals(from.defaultOrderBys, defaultOrderBysEffective)
+					&& Objects.equals(from.geoLocationSupport, geoLocationSupportEffective))
 			{
 				return from;
 			}
@@ -380,7 +431,10 @@ public class ViewLayout implements ETagAware
 					filtersEffective,
 					defaultOrderBysEffective,
 					allowNewCaptionEffective,
-					hasTreeSupportEffective, treeCollapsibleEffective, treeExpandedDepthEffective,
+					hasTreeSupportEffective,
+					treeCollapsibleEffective,
+					treeExpandedDepthEffective,
+					geoLocationSupportEffective,
 					elementsEffective);
 		}
 
@@ -388,6 +442,11 @@ public class ViewLayout implements ETagAware
 		{
 			this.windowId = windowId;
 			return this;
+		}
+
+		private WindowId getWindowIdEffective()
+		{
+			return windowId != null ? windowId : from.windowId;
 		}
 
 		public ChangeBuilder profileId(final ViewProfileId profileId)
@@ -416,6 +475,12 @@ public class ViewLayout implements ETagAware
 			return this;
 		}
 
+		public ChangeBuilder geoLocationSupport(final boolean geoLocationSupport)
+		{
+			this.geoLocationSupport = geoLocationSupport;
+			return this;
+		}
+
 		private ArrayList<DocumentLayoutElementDescriptor> getElementsToEdit()
 		{
 			if (elements == null)
@@ -438,17 +503,26 @@ public class ViewLayout implements ETagAware
 
 		public ChangeBuilder elementsOrder(final String... fieldNames)
 		{
-			final List<String> fieldNamesList = ImmutableList.copyOf(fieldNames);
+			final ImmutableMap<String, DocumentLayoutElementDescriptor> elementsByFieldName = Maps.uniqueIndex(getElementsToEdit(), DocumentLayoutElementDescriptor::getFirstFieldName);
 
-			final ArrayList<DocumentLayoutElementDescriptor> elementsNew = getElementsToEdit()
-					.stream()
-					.filter(element -> fieldNamesList.contains(element.getFirstFieldName()))
-					.sorted(FixedOrderByKeyComparator.<DocumentLayoutElementDescriptor, String> builder()
-							.fixedOrderKeys(fieldNamesList)
-							.keyMapper(DocumentLayoutElementDescriptor::getFirstFieldName)
-							.notMatchedMarkerIndex(Integer.MAX_VALUE)
-							.build())
-					.collect(Collectors.toCollection(ArrayList::new));
+			final ArrayList<DocumentLayoutElementDescriptor> elementsNew = new ArrayList<>();
+			for (final String fieldName : fieldNames)
+			{
+				final DocumentLayoutElementDescriptor element = elementsByFieldName.get(fieldName);
+				if (element == null)
+				{
+					logger.warn("Field {} was not found. Will be ignored."
+							+ "\n Available field names are: {}."
+							+ "\n If this is a standard view, pls check if the field added to window {}.",
+							fieldName,
+							elementsByFieldName.keySet(),
+							getWindowIdEffective());
+					continue;
+				}
+
+				elementsNew.add(element);
+			}
+
 			setElements(elementsNew);
 
 			return this;
@@ -492,6 +566,9 @@ public class ViewLayout implements ETagAware
 		private boolean hasAttributesSupport = false;
 		private IncludedViewLayout includedViewLayout;
 
+		private LinkedHashSet<ViewCloseAction> allowedViewCloseActions;
+		private static final ImmutableSet<ViewCloseAction> DEFAULT_allowedViewCloseActions = ImmutableSet.of(ViewCloseAction.DONE);
+
 		private boolean hasTreeSupport = false;
 		private boolean treeCollapsible = false;
 		private int treeExpandedDepth = TreeExpandedDepth_AllExpanded;
@@ -501,6 +578,7 @@ public class ViewLayout implements ETagAware
 		private final List<DocumentLayoutElementDescriptor.Builder> elementBuilders = new ArrayList<>();
 
 		private String idFieldName;
+		private String focusOnFieldName;
 
 		private Builder()
 		{
@@ -542,11 +620,6 @@ public class ViewLayout implements ETagAware
 			return this;
 		}
 
-		public DetailId getDetailId()
-		{
-			return detailId;
-		}
-
 		public Builder setCaption(@Nullable final ITranslatableString caption)
 		{
 			this.caption = caption;
@@ -555,7 +628,7 @@ public class ViewLayout implements ETagAware
 
 		public Builder setCaption(@Nullable final String caption)
 		{
-			setCaption(ImmutableTranslatableString.constant(caption));
+			setCaption(TranslatableStrings.constant(caption));
 			return this;
 		}
 
@@ -580,6 +653,25 @@ public class ViewLayout implements ETagAware
 		public Builder clearElements()
 		{
 			elementBuilders.clear();
+			return this;
+		}
+
+		public Builder removeElementByFieldName(final String fieldName)
+		{
+			for (final Iterator<DocumentLayoutElementDescriptor.Builder> it = elementBuilders.iterator(); it.hasNext();)
+			{
+				final DocumentLayoutElementDescriptor.Builder element = it.next();
+				if (element.getFieldNames().contains(fieldName))
+				{
+					element.removeFieldByFieldName(fieldName);
+					if (element.getFieldsCount() == 0)
+					{
+						it.remove();
+						continue;
+					}
+				}
+			}
+
 			return this;
 		}
 
@@ -700,6 +792,31 @@ public class ViewLayout implements ETagAware
 			return this;
 		}
 
+		public Builder clearViewCloseActions()
+		{
+			allowedViewCloseActions = new LinkedHashSet<>();
+			return this;
+		}
+
+		public Builder allowViewCloseAction(@NonNull final ViewCloseAction viewCloseAction)
+		{
+			if (allowedViewCloseActions == null)
+			{
+				allowedViewCloseActions = new LinkedHashSet<>();
+			}
+
+			allowedViewCloseActions.add(viewCloseAction);
+
+			return this;
+		}
+
+		private ImmutableSet<ViewCloseAction> getAllowedViewCloseActions()
+		{
+			return allowedViewCloseActions != null
+					? ImmutableSet.copyOf(allowedViewCloseActions)
+					: DEFAULT_allowedViewCloseActions;
+		}
+
 		public Builder setHasTreeSupport(final boolean hasTreeSupport)
 		{
 			this.hasTreeSupport = hasTreeSupport;
@@ -724,5 +841,10 @@ public class ViewLayout implements ETagAware
 			return this;
 		}
 
+		public Builder setFocusOnFieldName(final String focusOnFieldName)
+		{
+			this.focusOnFieldName = focusOnFieldName;
+			return this;
+		}
 	}
 }

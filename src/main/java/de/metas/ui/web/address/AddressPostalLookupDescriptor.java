@@ -11,14 +11,15 @@ import java.util.Set;
 import org.adempiere.ad.trx.api.ITrx;
 import org.adempiere.exceptions.DBException;
 import org.compiere.model.I_C_Location;
+import org.compiere.model.I_C_Postal;
 import org.compiere.util.DB;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
-import de.metas.adempiere.model.I_C_Postal;
 import de.metas.cache.CCache.CCacheStats;
 import de.metas.i18n.ITranslatableString;
+import de.metas.i18n.TranslatableStrings;
 import de.metas.ui.web.window.datatypes.LookupValue;
 import de.metas.ui.web.window.datatypes.LookupValue.IntegerLookupValue;
 import de.metas.ui.web.window.datatypes.LookupValuesList;
@@ -27,8 +28,8 @@ import de.metas.ui.web.window.descriptor.DocumentLayoutElementFieldDescriptor.Lo
 import de.metas.ui.web.window.descriptor.LookupDescriptor;
 import de.metas.ui.web.window.model.lookup.LookupDataSourceContext;
 import de.metas.ui.web.window.model.lookup.LookupDataSourceContext.Builder;
-import de.metas.util.Check;
 import de.metas.ui.web.window.model.lookup.LookupDataSourceFetcher;
+import de.metas.util.Check;
 import lombok.NonNull;
 
 /*
@@ -84,7 +85,7 @@ public class AddressPostalLookupDescriptor implements LookupDescriptor, LookupDa
 	{
 		return true; // not cached but returning true to avoid caching
 	}
-	
+
 	@Override
 	public void cacheInvalidate()
 	{
@@ -200,6 +201,7 @@ public class AddressPostalLookupDescriptor implements LookupDescriptor, LookupDa
 				+ "\n " + I_C_Postal.COLUMNNAME_C_Postal_ID
 				+ "\n, " + I_C_Postal.COLUMNNAME_Postal
 				+ "\n, " + I_C_Postal.COLUMNNAME_City
+				+ "\n, " + I_C_Postal.COLUMNNAME_Township
 				+ "\n, " + I_C_Postal.COLUMNNAME_C_Country_ID
 				+ "\n FROM " + I_C_Postal.Table_Name
 				+ "\n WHERE "
@@ -224,11 +226,12 @@ public class AddressPostalLookupDescriptor implements LookupDescriptor, LookupDa
 				final int postalId = rs.getInt(I_C_Postal.COLUMNNAME_C_Postal_ID);
 				final String postal = rs.getString(I_C_Postal.COLUMNNAME_Postal);
 				final String city = rs.getString(I_C_Postal.COLUMNNAME_City);
+				final String township = rs.getString(I_C_Postal.COLUMNNAME_Township);
 				final int countryId = rs.getInt(I_C_Postal.COLUMNNAME_C_Country_ID);
-				
+
 				final LookupValue countryLookupValue = countryLookup.getLookupValueById(countryId);
 
-				lookupValues.add(buildPostalLookupValue(postalId, postal, city, countryLookupValue.getDisplayNameTrl()));
+				lookupValues.add(buildPostalLookupValue(postalId, postal, city, township, countryLookupValue.getDisplayNameTrl()));
 			}
 
 			return LookupValuesList.fromCollection(lookupValues);
@@ -242,7 +245,7 @@ public class AddressPostalLookupDescriptor implements LookupDescriptor, LookupDa
 			DB.close(rs, pstmt);
 		}
 	}
-	
+
 	public IntegerLookupValue getLookupValueFromLocation(final I_C_Location locationRecord)
 	{
 		final I_C_Postal postalRecord = locationRecord.getC_Postal();
@@ -250,15 +253,25 @@ public class AddressPostalLookupDescriptor implements LookupDescriptor, LookupDa
 		{
 			return null;
 		}
-		
+
 		final LookupValue countryLookupValue = countryLookup.getLookupValueById(postalRecord.getC_Country_ID());
 
-		return buildPostalLookupValue(postalRecord.getC_Postal_ID(), postalRecord.getPostal(), postalRecord.getCity(), countryLookupValue.getDisplayNameTrl());
+		return buildPostalLookupValue(
+				postalRecord.getC_Postal_ID(),
+				postalRecord.getPostal(),
+				postalRecord.getCity(),
+				postalRecord.getTownship(),
+				countryLookupValue.getDisplayNameTrl());
 	}
 
-	private static final IntegerLookupValue buildPostalLookupValue(final int postalId, final String postal, final String city, final ITranslatableString countryName)
+	private static final IntegerLookupValue buildPostalLookupValue(
+			final int postalId,
+			final String postal,
+			final String city,
+			final String township,
+			final ITranslatableString countryName)
 	{
-		final ITranslatableString displayName = ITranslatableString.compose("", postal, " ", city, " (", countryName, ")");
-		return IntegerLookupValue.of(postalId, displayName);
+		final ITranslatableString displayName = TranslatableStrings.join("", postal, " ", city, " ", township, " (", countryName, ")");
+		return IntegerLookupValue.of(postalId, displayName, null/* description */);
 	}
 }

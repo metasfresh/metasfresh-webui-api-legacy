@@ -21,7 +21,7 @@ import de.metas.handlingunits.stock.HUStockInfoRepository;
 import de.metas.product.ProductId;
 import de.metas.ui.web.document.filter.DocumentFilter;
 import de.metas.ui.web.document.filter.DocumentFilterDescriptor;
-import de.metas.ui.web.document.filter.ImmutableDocumentFilterDescriptorsProvider;
+import de.metas.ui.web.document.filter.provider.ImmutableDocumentFilterDescriptorsProvider;
 import de.metas.ui.web.material.cockpit.MaterialCockpitUtil;
 import de.metas.ui.web.material.cockpit.filters.ProductFilterUtil;
 import de.metas.ui.web.view.CreateViewRequest;
@@ -29,6 +29,7 @@ import de.metas.ui.web.view.IView;
 import de.metas.ui.web.view.IViewFactory;
 import de.metas.ui.web.view.IViewsIndexStorage;
 import de.metas.ui.web.view.IViewsRepository;
+import de.metas.ui.web.view.ViewCloseAction;
 import de.metas.ui.web.view.ViewFactory;
 import de.metas.ui.web.view.ViewId;
 import de.metas.ui.web.view.ViewProfileId;
@@ -100,7 +101,7 @@ public class StockDetailsViewFactory implements IViewFactory, IViewsIndexStorage
 	}
 
 	@Override
-	public void removeById(ViewId viewId)
+	public void closeById(@NonNull final ViewId viewId, @NonNull final ViewCloseAction closeAction)
 	{
 		views.invalidate(viewId);
 		views.cleanUp(); // also cleanup to prevent views cache to grow.

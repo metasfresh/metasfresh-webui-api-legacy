@@ -23,15 +23,14 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Sets;
 
 import de.metas.i18n.ITranslatableString;
-import de.metas.i18n.ImmutableTranslatableString;
+import de.metas.i18n.TranslatableStrings;
 import de.metas.logging.LogManager;
+import de.metas.process.BarcodeScannerType;
 import de.metas.ui.web.window.WindowConstants;
 import de.metas.ui.web.window.datatypes.DataTypes;
 import de.metas.ui.web.window.datatypes.LookupValue.IntegerLookupValue;
 import de.metas.ui.web.window.datatypes.LookupValue.StringLookupValue;
 import de.metas.ui.web.window.descriptor.DocumentFieldDependencyMap.DependencyType;
-import de.metas.ui.web.window.descriptor.DocumentLayoutElementFieldDescriptor.LookupSource;
-import de.metas.ui.web.window.descriptor.LookupDescriptorProvider.LookupScope;
 import de.metas.ui.web.window.model.IDocumentFieldValueProvider;
 import de.metas.ui.web.window.model.lookup.LookupDataSource;
 import de.metas.ui.web.window.model.lookup.LookupDataSourceFactory;
@@ -64,7 +63,7 @@ import lombok.NonNull;
 
 public final class DocumentFieldDescriptor
 {
-	public static final Builder builder(final String fieldName)
+	public static Builder builder(final String fieldName)
 	{
 		return new Builder(fieldName);
 	}
@@ -90,6 +89,7 @@ public final class DocumentFieldDescriptor
 	private final DocumentFieldWidgetType widgetType;
 	private final boolean allowShowPassword; // in case widgetType is Password
 	private final ButtonFieldActionDescriptor buttonActionDescriptor;
+	private final BarcodeScannerType barcodeScannerType;
 
 	private final WidgetSize widgetSize;
 
@@ -104,7 +104,7 @@ public final class DocumentFieldDescriptor
 	private final Optional<IExpression<?>> defaultValueExpression;
 	private final ImmutableList<IDocumentFieldCallout> callouts;
 
-	public static enum Characteristic
+	public enum Characteristic
 	{
 		PublicField //
 		, AdvancedField //
@@ -116,7 +116,7 @@ public final class DocumentFieldDescriptor
 		, SpecialField_DocAction //
 		// , SpecialField_DocumentSummary //
 		;
-	};
+	}
 
 	private static final List<Characteristic> SPECIALFIELDS_ToExcludeFromLayout = ImmutableList.of(
 			// Characteristic.SpecialField_DocumentNo // NOP, don't exclude it (see https://github.com/metasfresh/metasfresh-webui-api/issues/291 )
@@ -158,6 +158,7 @@ public final class DocumentFieldDescriptor
 		widgetSize = builder.getWidgetSize();
 		allowShowPassword = builder.isAllowShowPassword();
 		buttonActionDescriptor = builder.getButtonActionDescriptor();
+		barcodeScannerType = builder.getBarcodeScannerType();
 		valueClass = builder.getValueClass();
 
 		lookupDescriptorProvider = builder.getLookupDescriptorProvider();
@@ -253,6 +254,11 @@ public final class DocumentFieldDescriptor
 		return allowShowPassword;
 	}
 
+	public BarcodeScannerType getBarcodeScannerType()
+	{
+		return barcodeScannerType;
+	}
+
 	public ButtonFieldActionDescriptor getButtonActionDescriptor()
 	{
 		return buttonActionDescriptor;
@@ -268,39 +274,20 @@ public final class DocumentFieldDescriptor
 		return supportZoomInto;
 	}
 
-	public LookupDescriptor getLookupDescriptor(final LookupScope scope)
+	public Optional<LookupDescriptor> getLookupDescriptor()
 	{
-		return lookupDescriptorProvider.provideForScope(scope);
+		return lookupDescriptorProvider.provide();
 	}
 
-	public LookupSource getLookupSourceType()
+	public Optional<LookupDescriptor> getLookupDescriptorForFiltering()
 	{
-		final LookupDescriptor lookupDescriptor = lookupDescriptorProvider.provideForScope(LookupScope.DocumentField);
-		return lookupDescriptor == null ? null : lookupDescriptor.getLookupSourceType();
+		return lookupDescriptorProvider.provideForFilter();
 	}
 
-	public Optional<String> getLookupTableName()
+	public Optional<LookupDataSource> createLookupDataSource()
 	{
-		return extractLookupTableName(lookupDescriptorProvider);
-	}
-
-	private static final Optional<String> extractLookupTableName(final LookupDescriptorProvider lookupDescriptorProvider)
-	{
-		final LookupDescriptor lookupDescriptor = lookupDescriptorProvider.provideForScope(LookupScope.DocumentField);
-		return lookupDescriptor == null ? Optional.empty() : lookupDescriptor.getTableName();
-	}
-
-	@Nullable
-	public LookupDataSource createLookupDataSource(final LookupScope scope)
-	{
-		final LookupDescriptor lookupDescriptor = getLookupDescriptor(scope);
-		if (lookupDescriptor == null)
-		{
-			return null;
-		}
-
-		return LookupDataSourceFactory.instance.getLookupDataSource(lookupDescriptor);
-
+		return getLookupDescriptor()
+				.map(LookupDataSourceFactory.instance::getLookupDataSource);
 	}
 
 	public Optional<IExpression<?>> getDefaultValueExpression()
@@ -353,7 +340,7 @@ public final class DocumentFieldDescriptor
 		return dependencies;
 	}
 
-	public Object convertToValueClass(final Object value, final LookupValueByIdSupplier lookupDataSource)
+	public Object convertToValueClass(@Nullable final Object value, @Nullable final LookupValueByIdSupplier lookupDataSource)
 	{
 		return DataTypes.convertToValueClass(fieldName, value, widgetType, valueClass, lookupDataSource);
 	}
@@ -367,7 +354,11 @@ public final class DocumentFieldDescriptor
 	 * @param lookupDataSource optional Lookup data source, if needed
 	 * @return converted value
 	 */
-	public <T> T convertToValueClass(final Object value, final DocumentFieldWidgetType widgetType, final Class<T> targetType, final LookupValueByIdSupplier lookupDataSource)
+	public <T> T convertToValueClass(
+			@Nullable final Object value,
+			@Nullable final DocumentFieldWidgetType widgetType,
+			@NonNull final Class<T> targetType,
+			@Nullable final LookupValueByIdSupplier lookupDataSource)
 	{
 		return DataTypes.convertToValueClass(fieldName, value, widgetType, targetType, lookupDataSource);
 	}
@@ -410,9 +401,10 @@ public final class DocumentFieldDescriptor
 		private WidgetSize _widgetSize;
 		private Class<?> _valueClass;
 		private boolean _allowShowPassword = false; // in case widgetType is Password
+		private BarcodeScannerType _barcodeScannerType;
 
 		// Lookup
-		private LookupDescriptorProvider lookupDescriptorProvider = LookupDescriptorProvider.NULL;
+		private LookupDescriptorProvider lookupDescriptorProvider = LookupDescriptorProviders.NULL;
 
 		private Optional<IExpression<?>> defaultValueExpression = Optional.empty();
 
@@ -467,7 +459,7 @@ public final class DocumentFieldDescriptor
 			return _fieldBuilt;
 		}
 
-		private final void assertNotBuilt()
+		private void assertNotBuilt()
 		{
 			if (_fieldBuilt != null)
 			{
@@ -482,7 +474,7 @@ public final class DocumentFieldDescriptor
 
 		public Builder setCaption(final Map<String, String> captionTrls, final String defaultCaption)
 		{
-			caption = ImmutableTranslatableString.ofMap(captionTrls, defaultCaption);
+			caption = TranslatableStrings.ofMap(captionTrls, defaultCaption);
 			return this;
 		}
 
@@ -494,7 +486,7 @@ public final class DocumentFieldDescriptor
 
 		public Builder setCaption(final String caption)
 		{
-			this.caption = ImmutableTranslatableString.constant(caption);
+			this.caption = TranslatableStrings.constant(caption);
 			return this;
 		}
 
@@ -502,7 +494,7 @@ public final class DocumentFieldDescriptor
 		{
 			if (caption == null)
 			{
-				return ImmutableTranslatableString.constant(fieldName);
+				return TranslatableStrings.constant(fieldName);
 			}
 
 			return caption;
@@ -510,7 +502,7 @@ public final class DocumentFieldDescriptor
 
 		public Builder setDescription(final Map<String, String> descriptionTrls, final String defaultDescription)
 		{
-			description = ImmutableTranslatableString.ofMap(descriptionTrls, defaultDescription);
+			description = TranslatableStrings.ofMap(descriptionTrls, defaultDescription);
 			return this;
 		}
 
@@ -522,7 +514,7 @@ public final class DocumentFieldDescriptor
 
 		public Builder setDescription(final String description)
 		{
-			this.description = ImmutableTranslatableString.constant(description);
+			this.description = TranslatableStrings.constant(description);
 			return this;
 		}
 
@@ -530,7 +522,7 @@ public final class DocumentFieldDescriptor
 		{
 			if (description == null)
 			{
-				return ImmutableTranslatableString.constant("");
+				return TranslatableStrings.empty();
 			}
 			return description;
 		}
@@ -651,23 +643,32 @@ public final class DocumentFieldDescriptor
 			return _allowShowPassword;
 		}
 
-		public Builder setLookupDescriptorProvider(final LookupDescriptorProvider lookupDescriptorProvider)
+		public Builder barcodeScannerType(final BarcodeScannerType barcodeScannerType)
 		{
-			Check.assumeNotNull(lookupDescriptorProvider, "Parameter lookupDescriptorProvider is not null");
+			this._barcodeScannerType = barcodeScannerType;
+			return this;
+		}
+
+		private BarcodeScannerType getBarcodeScannerType()
+		{
+			return _barcodeScannerType;
+		}
+
+		public Builder setLookupDescriptorProvider(@NonNull final LookupDescriptorProvider lookupDescriptorProvider)
+		{
 			this.lookupDescriptorProvider = lookupDescriptorProvider;
 			return this;
 		}
 
 		public Builder setLookupDescriptorProvider(@Nullable final LookupDescriptor lookupDescriptor)
 		{
-			final LookupDescriptorProvider provider = lookupDescriptor != null ? LookupDescriptorProvider.singleton(lookupDescriptor) : LookupDescriptorProvider.NULL;
-			setLookupDescriptorProvider(provider);
+			setLookupDescriptorProvider(LookupDescriptorProviders.ofNullableInstance(lookupDescriptor));
 			return this;
 		}
 
 		public Builder setLookupDescriptorProvider_None()
 		{
-			setLookupDescriptorProvider(LookupDescriptorProvider.NULL);
+			setLookupDescriptorProvider(LookupDescriptorProviders.NULL);
 			return this;
 		}
 
@@ -676,15 +677,14 @@ public final class DocumentFieldDescriptor
 			return lookupDescriptorProvider;
 		}
 
-		public LookupSource getLookupSourceType()
+		public Optional<LookupDescriptor> getLookupDescriptor()
 		{
-			final LookupDescriptor lookupDescriptor = lookupDescriptorProvider.provideForScope(LookupScope.DocumentField);
-			return lookupDescriptor == null ? null : lookupDescriptor.getLookupSourceType();
+			return getLookupDescriptorProvider().provide();
 		}
 
 		public Optional<String> getLookupTableName()
 		{
-			return extractLookupTableName(lookupDescriptorProvider);
+			return getLookupDescriptorProvider().getTableName();
 		}
 
 		public Builder setValueClass(final Class<?> valueClass)
@@ -937,7 +937,7 @@ public final class DocumentFieldDescriptor
 			return _mandatoryLogicEffective;
 		}
 
-		private final ILogicExpression buildMandatoryLogicEffective()
+		private ILogicExpression buildMandatoryLogicEffective()
 		{
 			if (isParentLinkEffective())
 			{
@@ -1011,7 +1011,7 @@ public final class DocumentFieldDescriptor
 					.add(fieldName, getDisplayLogic().getParameterNames(), DependencyType.DisplayLogic)
 					.add(fieldName, getMandatoryLogicEffective().getParameterNames(), DependencyType.MandatoryLogic);
 
-			final LookupDescriptor lookupDescriptor = getLookupDescriptorProvider().provideForScope(LookupScope.DocumentField);
+			final LookupDescriptor lookupDescriptor = getLookupDescriptorProvider().provide().orElse(null);
 			if (lookupDescriptor != null)
 			{
 				dependencyMapBuilder.add(fieldName, lookupDescriptor.getDependsOnFieldNames(), DependencyType.LookupValues);

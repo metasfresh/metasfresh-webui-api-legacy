@@ -14,6 +14,7 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 import org.adempiere.ad.dao.IQueryBL;
+import org.adempiere.ad.element.api.AdWindowId;
 import org.adempiere.ad.expression.api.IExpressionEvaluator.OnVariableNotFound;
 import org.adempiere.ad.expression.api.IStringExpression;
 import org.adempiere.ad.expression.api.impl.CompositeStringExpression;
@@ -33,7 +34,6 @@ import org.compiere.util.DisplayType;
 import org.compiere.util.Env;
 import org.compiere.util.Evaluatees;
 import org.slf4j.Logger;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
 import com.google.common.base.Joiner;
@@ -43,14 +43,14 @@ import com.google.common.collect.ImmutableSet;
 
 import de.metas.cache.CCache;
 import de.metas.currency.Amount;
-import de.metas.currency.ICurrencyDAO;
-import de.metas.i18n.DateTimeTranslatableString;
+import de.metas.currency.CurrencyCode;
+import de.metas.currency.CurrencyRepository;
 import de.metas.i18n.IModelTranslationMap;
 import de.metas.i18n.IMsgBL;
 import de.metas.i18n.ITranslatableString;
-import de.metas.i18n.ImmutableTranslatableString;
-import de.metas.i18n.NumberTranslatableString;
+import de.metas.i18n.TranslatableStrings;
 import de.metas.logging.LogManager;
+import de.metas.money.CurrencyId;
 import de.metas.ui.web.base.model.I_WEBUI_Board;
 import de.metas.ui.web.base.model.I_WEBUI_Board_CardField;
 import de.metas.ui.web.base.model.I_WEBUI_Board_Lane;
@@ -76,7 +76,6 @@ import de.metas.ui.web.window.descriptor.DocumentFieldDescriptor;
 import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
 import de.metas.ui.web.window.descriptor.LookupDescriptor;
 import de.metas.ui.web.window.descriptor.LookupDescriptorProvider;
-import de.metas.ui.web.window.descriptor.LookupDescriptorProvider.LookupScope;
 import de.metas.ui.web.window.descriptor.factory.DocumentDescriptorFactory;
 import de.metas.ui.web.window.descriptor.sql.DocumentFieldValueLoader;
 import de.metas.ui.web.window.descriptor.sql.SqlDocumentEntityDataBindingDescriptor;
@@ -116,11 +115,9 @@ public class BoardDescriptorRepository
 {
 	private static final transient Logger logger = LogManager.getLogger(BoardDescriptorRepository.class);
 
-	@Autowired
-	private DocumentDescriptorFactory documentDescriptors;
-
-	@Autowired
-	private WebsocketSender websocketSender;
+	private final DocumentDescriptorFactory documentDescriptors;
+	private final WebsocketSender websocketSender;
+	private final CurrencyRepository currenciesRepo;
 
 	private final CCache<Integer, BoardDescriptor> boardDescriptors = CCache.<Integer, BoardDescriptor> builder()
 			.cacheName(I_WEBUI_Board.Table_Name + "#BoardDescriptor")
@@ -129,6 +126,16 @@ public class BoardDescriptorRepository
 			.additionalTableNameToResetFor(I_WEBUI_Board_Lane.Table_Name)
 			.additionalTableNameToResetFor(I_WEBUI_Board_CardField.Table_Name)
 			.build();
+	
+	public BoardDescriptorRepository(
+			@NonNull final DocumentDescriptorFactory documentDescriptors, 
+			@NonNull final WebsocketSender websocketSender, 
+			@NonNull final CurrencyRepository currenciesRepo)
+	{
+		this.documentDescriptors = documentDescriptors;
+		this.websocketSender = websocketSender;
+		this.currenciesRepo = currenciesRepo;
+	}
 
 	private void sendEvents(final BoardDescriptor board, final JSONBoardChangedEventsList events)
 	{
@@ -170,10 +177,10 @@ public class BoardDescriptorRepository
 
 		//
 		// Board document info
-		int adWindowId = 0; // TODO boardPO.getAD_Window_ID();
-		if (adWindowId <= 0)
+		AdWindowId adWindowId = null; // TODO boardPO.getAD_Window_ID();
+		if (adWindowId == null)
 		{
-			adWindowId = RecordZoomWindowFinder.findAD_Window_ID(tableName);
+			adWindowId = RecordZoomWindowFinder.findAdWindowId(tableName).get();
 		}
 		final WindowId documentWindowId = WindowId.of(adWindowId);
 
@@ -284,15 +291,14 @@ public class BoardDescriptorRepository
 					return null;
 				}
 
-				final int currencyId = rs.getInt(WindowConstants.FIELDNAME_C_Currency_ID);
-				final String currencyCode = Services.get(ICurrencyDAO.class).getISO_Code(Env.getCtx(), currencyId);
-				if (currencyCode == null)
+				final CurrencyId currencyId = CurrencyId.ofRepoIdOrNull(rs.getInt(WindowConstants.FIELDNAME_C_Currency_ID));
+				if (currencyId == null)
 				{
 					return valueBD;
 				}
 
+				final CurrencyCode currencyCode = currenciesRepo.getCurrencyCodeById(currencyId);
 				return Amount.of(valueBD, currencyCode);
-
 			};
 
 		}
@@ -300,7 +306,7 @@ public class BoardDescriptorRepository
 		{
 			sqlSelectValues = ImmutableSet.of(fieldBinding.getSqlSelectValue());
 			final DocumentFieldValueLoader documentFieldValueLoader = fieldBinding.getDocumentFieldValueLoader();
-			final LookupDescriptor lookupDescriptor = documentField.getLookupDescriptor(LookupScope.DocumentField);
+			final LookupDescriptor lookupDescriptor = documentField.getLookupDescriptor().orElse(null);
 			fieldLoader = (rs, adLanguage) -> documentFieldValueLoader.retrieveFieldValue(rs, isDisplayColumnAvailable, adLanguage, lookupDescriptor);
 		}
 
@@ -367,13 +373,13 @@ public class BoardDescriptorRepository
 			final String tableAlias = "r";
 			final String keyColumnNameFQ = tableAlias + "." + keyColumnName;
 			final String userIdColumnNameFQ = tableAlias + "." + userIdColumnName;
-			final SqlLookupDescriptor documentLookup = SqlLookupDescriptor.cast(boardDescriptor.getDocumentLookupDescriptorProvider().provideForScope(LookupScope.DocumentField));
+			final SqlLookupDescriptor documentLookup = SqlLookupDescriptor.cast(boardDescriptor.getLookupDescriptor());
 
 			sqlExpr = IStringExpression.composer()
 					.append("SELECT ")
 					.append("\n  a." + I_WEBUI_Board_RecordAssignment.COLUMNNAME_WEBUI_Board_Lane_ID)
 					.append("\n, a." + I_WEBUI_Board_RecordAssignment.COLUMNNAME_Record_ID)
-					.append("\n, (").append(documentLookup.getSqlForFetchingDisplayNameByIdExpression(keyColumnNameFQ)).append(") AS card$caption")
+					.append("\n, (").append(documentLookup.getSqlForFetchingLookupByIdExpression(keyColumnNameFQ)).append(") AS card$caption")
 					//
 					.append("\n, u." + I_AD_User.COLUMNNAME_AD_User_ID + " AS card$user_id")
 					.append("\n, u." + I_AD_User.COLUMNNAME_Avatar_ID + " AS card$user_avatar_id")
@@ -430,13 +436,13 @@ public class BoardDescriptorRepository
 			final String tableAlias = "r";
 			final String keyColumnNameFQ = tableAlias + "." + keyColumnName;
 			final String userIdColumnNameFQ = tableAlias + "." + userIdColumnName;
-			final SqlLookupDescriptor documentLookup = SqlLookupDescriptor.cast(boardDescriptor.getDocumentLookupDescriptorProvider().provideForScope(LookupScope.DocumentField));
+			final SqlLookupDescriptor documentLookup = SqlLookupDescriptor.cast(boardDescriptor.getLookupDescriptor());
 
 			sqlExpr = IStringExpression.composer()
 					.append("SELECT ")
 					.append("\n  NULL AS " + I_WEBUI_Board_RecordAssignment.COLUMNNAME_WEBUI_Board_Lane_ID)
 					.append("\n, " + keyColumnNameFQ + " AS " + I_WEBUI_Board_RecordAssignment.COLUMNNAME_Record_ID)
-					.append("\n, (").append(documentLookup.getSqlForFetchingDisplayNameByIdExpression(keyColumnNameFQ)).append(") AS card$caption")
+					.append("\n, (").append(documentLookup.getSqlForFetchingLookupByIdExpression(keyColumnNameFQ)).append(") AS card$caption")
 					//
 					.append("\n, u." + I_AD_User.COLUMNNAME_AD_User_ID + " AS card$user_id")
 					.append("\n, u." + I_AD_User.COLUMNNAME_Avatar_ID + " AS card$user_avatar_id")
@@ -560,7 +566,7 @@ public class BoardDescriptorRepository
 				.cardId(recordId)
 				.laneId(laneId)
 				//
-				.caption(ImmutableTranslatableString.constant(caption))
+				.caption(TranslatableStrings.constant(caption))
 				.description(description)
 				.documentPath(DocumentPath.rootDocumentPath(boardDescriptor.getDocumentWindowId(), DocumentId.of(recordId)))
 				//
@@ -586,14 +592,14 @@ public class BoardDescriptorRepository
 				.filter(fieldDescription -> fieldDescription != null)
 				.collect(ImmutableList.toImmutableList());
 
-		return ITranslatableString.compose("\n", fieldDescriptions);
+		return TranslatableStrings.joinList("\n", fieldDescriptions);
 	}
 
 	private static ITranslatableString toDisplayValue(final Object value, final DocumentFieldWidgetType widgetType)
 	{
 		if (value == null)
 		{
-			return ITranslatableString.empty();
+			return TranslatableStrings.empty();
 		}
 
 		//
@@ -601,9 +607,7 @@ public class BoardDescriptorRepository
 		if (value instanceof Amount)
 		{
 			final Amount amount = (Amount)value;
-			return ITranslatableString.compose(" ",
-					NumberTranslatableString.of(amount.getValue(), DisplayType.Amount),
-					ITranslatableString.constant(amount.getCurrencyCode()));
+			return TranslatableStrings.join(" ", TranslatableStrings.amount(amount));
 
 		}
 
@@ -612,26 +616,26 @@ public class BoardDescriptorRepository
 		if (widgetType == DocumentFieldWidgetType.Password)
 		{
 			// hide passwords
-			return ITranslatableString.constant("*****");
+			return TranslatableStrings.constant("*****");
 		}
 		else if (widgetType.isText())
 		{
-			return ITranslatableString.constant(value.toString());
+			return TranslatableStrings.constant(value.toString());
 		}
 		else if (widgetType.isDateOrTime())
 		{
-			return DateTimeTranslatableString.ofObject(value, widgetType.getDisplayType());
+			return TranslatableStrings.date(value, widgetType.getDisplayType());
 		}
 		else if (widgetType == DocumentFieldWidgetType.Integer)
 		{
-			return ITranslatableString.constant(value.toString());
+			return TranslatableStrings.constant(value.toString());
 		}
 		else if (widgetType.isNumeric())
 		{
 			final BigDecimal valueBD = NumberUtils.asBigDecimal(value, null);
 			if (valueBD != null)
 			{
-				return NumberTranslatableString.of(valueBD, widgetType.getDisplayType());
+				return TranslatableStrings.number(valueBD, widgetType.getDisplayType());
 			}
 		}
 		else if (widgetType.isLookup())
@@ -642,7 +646,7 @@ public class BoardDescriptorRepository
 			}
 			else if (value instanceof JSONLookupValue)
 			{
-				return ImmutableTranslatableString.constant(((JSONLookupValue)value).getCaption().trim());
+				return TranslatableStrings.constant(((JSONLookupValue)value).getCaption().trim());
 			}
 		}
 		else if (widgetType.isBoolean())
@@ -651,7 +655,7 @@ public class BoardDescriptorRepository
 			return Services.get(IMsgBL.class).getTranslatableMsgText(valueBoolean ? "Y" : "N");
 		}
 
-		return ITranslatableString.constant(value.toString());
+		return TranslatableStrings.constant(value.toString());
 	}
 
 	private static final ITranslatableString buildDescription(final Object value, final BoardCardFieldDescriptor cardField)
@@ -662,7 +666,7 @@ public class BoardDescriptorRepository
 		}
 
 		final ITranslatableString valueStr = toDisplayValue(value, cardField.getWidgetType());
-		return ITranslatableString.compose(": ", cardField.getCaption(), valueStr);
+		return TranslatableStrings.join(": ", cardField.getCaption(), valueStr);
 	}
 
 	private LaneCardsSequence retrieveCardIdsOrdered(final int boardId, final int laneId)

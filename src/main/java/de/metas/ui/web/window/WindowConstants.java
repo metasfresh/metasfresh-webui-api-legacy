@@ -57,6 +57,7 @@ public final class WindowConstants
 	public static final String FIELDNAME_IsActive = "IsActive";
 	public static final String FIELDNAME_DocStatus = "DocStatus";
 	public static final String FIELDNAME_DocAction = "DocAction";
+	public static final String FIELDNAME_Posted = "Posted";
 	public static final String FIELDNAME_IsSOTrx = "IsSOTrx";
 	public static final String FIELDNAME_Processing = "Processing";
 	public static final String FIELDNAME_Processed = "Processed";
@@ -66,6 +67,7 @@ public final class WindowConstants
 	public static final String FIELDNAME_M_AttributeSetInstance_ID = "M_AttributeSetInstance_ID";
 	public static final String FIELDNAME_Line = "Line";
 	public static final String FIELDNAME_C_Currency_ID = "C_Currency_ID";
+	public static final String FIELDNAME_TimeZone = "TimeZone";
 	
 
 	public static final String FIELDNAME_AD_Client_ID = "AD_Client_ID";

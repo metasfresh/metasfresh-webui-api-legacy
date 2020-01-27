@@ -11,10 +11,11 @@ import de.metas.ui.web.window.datatypes.LookupValue;
 import de.metas.ui.web.window.datatypes.LookupValue.IntegerLookupValue;
 import de.metas.ui.web.window.datatypes.LookupValue.StringLookupValue;
 import de.metas.ui.web.window.datatypes.Password;
-import de.metas.ui.web.window.datatypes.json.JSONDate;
+import de.metas.ui.web.window.datatypes.json.DateTimeConverters;
 import de.metas.ui.web.window.datatypes.json.JSONLookupValue;
 import de.metas.ui.web.window.datatypes.json.JSONNullValue;
 import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
+import de.metas.util.ColorId;
 import de.metas.util.IColorRepository;
 import de.metas.util.Services;
 import de.metas.util.lang.RepoIdAware;
@@ -30,12 +31,12 @@ import lombok.experimental.UtilityClass;
  * it under the terms of the GNU General Public License as
  * published by the Free Software Foundation, either version 2 of the
  * License, or (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public
  * License along with this program. If not, see
  * <http://www.gnu.org/licenses/gpl-2.0.html>.
@@ -45,7 +46,11 @@ import lombok.experimental.UtilityClass;
 @UtilityClass
 final class SqlValueConverters
 {
-	public static Object convertToPOValue(final Object value, final String columnName, final DocumentFieldWidgetType widgetType, final Class<?> targetClass)
+	public static Object convertToPOValue(
+			final Object value, 
+			final String columnName, 
+			final DocumentFieldWidgetType widgetType, 
+			final Class<?> targetClass)
 	{
 		final Class<?> valueClass = JSONNullValue.isNull(value) ? null : value.getClass();
 
@@ -81,8 +86,8 @@ final class SqlValueConverters
 			else if (ColorValue.class.equals(valueClass))
 			{
 				final ColorValue color = (ColorValue)value;
-				final int adColorId = Services.get(IColorRepository.class).saveFlatColorAndReturnId(color.getHexString());
-				return adColorId;
+				final ColorId adColorId = Services.get(IColorRepository.class).saveFlatColorAndReturnId(color.getHexString());
+				return adColorId.getRepoId();
 			}
 			else if (RepoIdAware.class.isAssignableFrom(valueClass))
 			{
@@ -119,18 +124,10 @@ final class SqlValueConverters
 			{
 				return null;
 			}
-			else if (java.util.Date.class.isAssignableFrom(valueClass))
-			{
-				return new Timestamp(((java.util.Date)value).getTime());
-			}
-			else if (value instanceof String)
-			{
-				final java.util.Date valueDate = JSONDate.fromJson(value.toString(), widgetType);
-				return TimeUtil.asTimestamp(valueDate);
-			}
 			else
 			{
-				return TimeUtil.asTimestamp(value);
+				final Object valueDate = DateTimeConverters.fromObject(value, widgetType);
+				return TimeUtil.asTimestamp(valueDate);
 			}
 		}
 		else if (Boolean.class.equals(targetClass) || boolean.class.equals(targetClass))

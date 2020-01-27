@@ -11,17 +11,18 @@ import de.metas.material.cockpit.model.I_MD_Cockpit;
 import de.metas.material.cockpit.model.I_MD_Stock;
 import de.metas.process.RelatedProcessDescriptor;
 import de.metas.ui.web.document.filter.DocumentFilter;
-import de.metas.ui.web.document.filter.DocumentFilterDescriptorsProvider;
+import de.metas.ui.web.document.filter.provider.DocumentFilterDescriptorsProvider;
 import de.metas.ui.web.material.cockpit.process.MD_Cockpit_DocumentDetail_Display;
 import de.metas.ui.web.process.view.ViewActionDescriptorsFactory;
 import de.metas.ui.web.process.view.ViewActionDescriptorsList;
-import de.metas.ui.web.view.AbstractCustomView;
 import de.metas.ui.web.view.IView;
 import de.metas.ui.web.view.ViewId;
+import de.metas.ui.web.view.template.AbstractCustomView;
+import de.metas.ui.web.view.template.IRowsData;
 import de.metas.ui.web.window.datatypes.DocumentId;
-
 import lombok.Builder;
 import lombok.NonNull;
+import lombok.Singular;
 
 /*
  * #%L
@@ -63,7 +64,7 @@ public class MaterialCockpitView extends AbstractCustomView<MaterialCockpitRow>
 			@NonNull final IRowsData<MaterialCockpitRow> rowsData,
 			@NonNull final ImmutableList<DocumentFilter> filters,
 			@NonNull final DocumentFilterDescriptorsProvider filterDescriptors,
-			@NonNull final RelatedProcessDescriptor relatedProcessDescriptor)
+			@Singular final List<RelatedProcessDescriptor> relatedProcessDescriptors)
 	{
 		super(viewId,
 				description,
@@ -71,7 +72,7 @@ public class MaterialCockpitView extends AbstractCustomView<MaterialCockpitRow>
 				filterDescriptors);
 
 		this.filters = filters;
-		this.relatedProcessDescriptors = ImmutableList.of(relatedProcessDescriptor);
+		this.relatedProcessDescriptors = ImmutableList.copyOf(relatedProcessDescriptors);
 	}
 
 	/**

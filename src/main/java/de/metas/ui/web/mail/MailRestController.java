@@ -12,9 +12,6 @@ import org.adempiere.ad.trx.api.ITrx;
 import org.adempiere.exceptions.AdempiereException;
 import org.adempiere.exceptions.FillMandatoryException;
 import org.adempiere.service.IClientDAO;
-import org.adempiere.user.api.IUserBL;
-import org.adempiere.user.api.IUserDAO;
-import org.compiere.model.I_AD_Client;
 import org.compiere.model.I_AD_User;
 import org.compiere.util.Env;
 import org.slf4j.Logger;
@@ -35,9 +32,13 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
 import de.metas.email.EMail;
+import de.metas.email.EMailAddress;
 import de.metas.email.EMailAttachment;
+import de.metas.email.EMailCustomType;
 import de.metas.email.EMailSentStatus;
-import de.metas.email.IMailBL;
+import de.metas.email.MailService;
+import de.metas.email.mailboxes.ClientEMailConfig;
+import de.metas.email.mailboxes.UserEMailConfig;
 import de.metas.letters.model.MADBoilerPlate;
 import de.metas.letters.model.MADBoilerPlate.BoilerPlateContext;
 import de.metas.logging.LogManager;
@@ -58,6 +59,9 @@ import de.metas.ui.web.window.datatypes.json.JSONLookupValue;
 import de.metas.ui.web.window.datatypes.json.JSONLookupValuesList;
 import de.metas.ui.web.window.model.DocumentCollection;
 import de.metas.ui.web.window.model.DocumentCollection.DocumentPrint;
+import de.metas.user.UserId;
+import de.metas.user.api.IUserBL;
+import de.metas.user.api.IUserDAO;
 import de.metas.util.Services;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiOperation;
@@ -94,15 +98,17 @@ public class MailRestController
 
 	public static final String ENDPOINT = WebConfig.ENDPOINT_ROOT + "/mail";
 
+	private final IClientDAO clientsRepo = Services.get(IClientDAO.class);
+	private final IUserBL usersService = Services.get(IUserBL.class);
+	private final IUserDAO userDAO = Services.get(IUserDAO.class);
 	@Autowired
 	private UserSession userSession;
-
 	@Autowired
 	private WebuiMailRepository mailRepo;
-
 	@Autowired
 	private WebuiMailAttachmentsRepository mailAttachmentsRepo;
-
+	@Autowired
+	private MailService mailService;
 	@Autowired
 	private DocumentCollection documentCollection;
 
@@ -116,13 +122,11 @@ public class MailRestController
 	private final void assertReadable(final WebuiEmail email)
 	{
 		// Make sure current logged in user is the owner
-		final int loggedUserId = userSession.getAD_User_ID();
-		if (email.getOwnerUserId() != loggedUserId)
+		if (!userSession.isLoggedInAs(email.getOwnerUserId()))
 		{
 			throw new AdempiereException("No credentials to change the email")
 					.setParameter("emailId", email.getEmailId())
-					.setParameter("ownerUserId", email.getOwnerUserId())
-					.setParameter("loggedUserId", loggedUserId);
+					.setParameter("ownerUserId", email.getOwnerUserId());
 		}
 
 	}
@@ -145,10 +149,10 @@ public class MailRestController
 	{
 		userSession.assertLoggedIn();
 
-		final int adUserId = userSession.getAD_User_ID();
-		Services.get(IUserBL.class).assertCanSendEMail(adUserId);
+		final UserId adUserId = userSession.getLoggedUserId();
+		usersService.assertCanSendEMail(adUserId);
 
-		final IntegerLookupValue from = IntegerLookupValue.of(adUserId, userSession.getUserFullname() + " <" + userSession.getUserEmail() + "> ");
+		final IntegerLookupValue from = IntegerLookupValue.of(adUserId.getRepoId(), userSession.getUserFullname() + " <" + userSession.getUserEmail() + "> ");
 		final DocumentPath contextDocumentPath = JSONDocumentPath.toDocumentPathOrNull(request.getDocumentPath());
 
 		final BoilerPlateContext attributes = documentCollection.createBoilerPlateContext(contextDocumentPath);
@@ -170,7 +174,7 @@ public class MailRestController
 			}
 		}
 
-		return JSONEmail.of(mailRepo.getEmail(emailId));
+		return JSONEmail.of(mailRepo.getEmail(emailId), userSession.getAD_Language());
 	}
 
 	@GetMapping("/{emailId}")
@@ -180,7 +184,7 @@ public class MailRestController
 		userSession.assertLoggedIn();
 		final WebuiEmail email = mailRepo.getEmail(emailId);
 		assertReadable(email);
-		return JSONEmail.of(email);
+		return JSONEmail.of(email, userSession.getAD_Language());
 	}
 
 	@PostMapping("/{emailId}/send")
@@ -199,19 +203,29 @@ public class MailRestController
 
 		//
 		// Create the email object
-		final I_AD_Client adClient = Services.get(IClientDAO.class).retriveClient(Env.getCtx(), userSession.getAD_Client_ID());
-		final String mailCustomType = null;
-		final I_AD_User from = Services.get(IUserDAO.class).retrieveUser(webuiEmail.getFrom().getIdAsInt());
-		final List<String> toList = extractEMailAddreses(webuiEmail.getTo()).collect(ImmutableList.toImmutableList());
+		final ClientEMailConfig tenantEmailConfig = clientsRepo.getEMailConfigById(userSession.getClientId());
+		final EMailCustomType mailCustomType = null;
+		
+		final UserId fromUserId = webuiEmail.getFrom().getIdAs(UserId::ofRepoId);
+		final UserEMailConfig userEmailConfig = usersService.getEmailConfigById(fromUserId);
+		
+		final List<EMailAddress> toList = extractEMailAddreses(webuiEmail.getTo()).collect(ImmutableList.toImmutableList());
 		if (toList.isEmpty())
 		{
 			throw new FillMandatoryException("To");
 		}
-		final String to = toList.get(0);
+		final EMailAddress to = toList.get(0);
 		final String subject = webuiEmail.getSubject();
 		final String message = webuiEmail.getMessage();
 		final boolean html = false;
-		final EMail email = Services.get(IMailBL.class).createEMail(adClient, mailCustomType, from, to, subject, message, html);
+		final EMail email = mailService.createEMail(
+				tenantEmailConfig, 
+				mailCustomType, 
+				userEmailConfig, 
+				to, 
+				subject, 
+				message, 
+				html);
 		toList.stream().skip(1).forEach(email::addTo);
 
 		webuiEmail.getAttachments()
@@ -238,30 +252,31 @@ public class MailRestController
 		return webuiEmail.toBuilder().sent(true).build();
 	}
 
-	private static final Stream<String> extractEMailAddreses(final LookupValuesList users)
+	private final Stream<EMailAddress> extractEMailAddreses(final LookupValuesList users)
 	{
-		final IUserDAO userDAO = Services.get(IUserDAO.class);
 
 		return users.stream()
-				.map(userLookupValue -> {
-					final int adUserId = userLookupValue.getIdAsInt();
-					if (adUserId < 0)
-					{
-						// consider the email as the DisplayName
-						return userLookupValue.getDisplayName();
-					}
-					else
-					{
-						final I_AD_User adUser = userDAO.retrieveUser(adUserId);
-						final String email = adUser.getEMail();
-						if (Check.isEmpty(email, true))
-						{
-							throw new AdempiereException("User " + adUser.getName() + " does not have email");
-						}
-						return email;
-					}
-				})
-				.flatMap(emails -> EMail.toEMailsList(emails).stream());
+				.map(userLookupValue -> extractEMailAddress(userLookupValue));
+	}
+
+	private EMailAddress extractEMailAddress(final LookupValue userLookupValue)
+	{
+		final UserId adUserId = userLookupValue.getIdAs(UserId::ofRepoIdOrNull);
+		if (adUserId == null)
+		{
+			// consider the email as the DisplayName
+			return EMailAddress.ofString(userLookupValue.getDisplayName());
+		}
+		else
+		{
+			final I_AD_User adUser = userDAO.getById(adUserId);
+			final String email = adUser.getEMail();
+			if (Check.isEmpty(email, true))
+			{
+				throw new AdempiereException("User " + adUser.getName() + " does not have email");
+			}
+			return EMailAddress.ofString(email);
+		}
 	}
 
 	@PatchMapping("/{emailId}")
@@ -271,7 +286,7 @@ public class MailRestController
 		userSession.assertLoggedIn();
 
 		final WebuiEmailChangeResult result = changeEmail(emailId, emailOld -> changeEmail(emailOld, events));
-		return JSONEmail.of(result.getEmail());
+		return JSONEmail.of(result.getEmail(), userSession.getAD_Language());
 	}
 
 	private WebuiEmailChangeResult changeEmail(final String emailId, final UnaryOperator<WebuiEmail> emailModifier)
@@ -370,7 +385,12 @@ public class MailRestController
 	public JSONLookupValuesList getToTypeahead(@PathVariable("emailId") final String emailId, @RequestParam("query") final String query)
 	{
 		userSession.assertLoggedIn();
-		return JSONLookupValuesList.ofLookupValuesList(mailRepo.getToTypeahead(emailId, query));
+		return toJSONLookupValuesList(mailRepo.getToTypeahead(emailId, query));
+	}
+
+	private JSONLookupValuesList toJSONLookupValuesList(final LookupValuesList lookupValuesList)
+	{
+		return JSONLookupValuesList.ofLookupValuesList(lookupValuesList, userSession.getAD_Language());
 	}
 
 	@PostMapping("/{emailId}/field/attachments")
@@ -380,7 +400,7 @@ public class MailRestController
 		userSession.assertLoggedIn();
 
 		final WebuiEmail email = attachFile(emailId, () -> mailAttachmentsRepo.createAttachment(emailId, file));
-		return JSONEmail.of(email);
+		return JSONEmail.of(email, userSession.getAD_Language());
 	}
 
 	private WebuiEmail attachFile(final String emailId, final Supplier<LookupValue> attachmentProducer)

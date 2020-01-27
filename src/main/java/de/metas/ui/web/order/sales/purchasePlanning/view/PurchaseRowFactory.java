@@ -11,6 +11,7 @@ import org.slf4j.Logger;
 import org.springframework.stereotype.Service;
 
 import de.metas.logging.LogManager;
+import de.metas.material.commons.attributes.AttributesKeyPatterns;
 import de.metas.material.dispo.commons.repository.atp.AvailableToPromiseQuery;
 import de.metas.material.dispo.commons.repository.atp.AvailableToPromiseRepository;
 import de.metas.material.event.commons.AttributesKey;
@@ -129,17 +130,19 @@ public class PurchaseRowFactory
 	{
 		final ProductId productId = demand.getProductId();
 
+		final AttributesKey attributesKey = AttributesKeys
+				.createAttributesKeyFromASIStorageAttributes(demand.getAttributeSetInstanceId())
+				.orElse(AttributesKey.ALL);
+
 		final AvailableToPromiseQuery query = AvailableToPromiseQuery.builder()
 				.productId(productId.getRepoId())
 				.date(demand.getSalesPreparationDate())
-				.storageAttributesKey(AttributesKeys
-						.createAttributesKeyFromASIStorageAttributes(demand.getAttributeSetInstanceId().getRepoId())
-						.orElse(AttributesKey.ALL))
+				.storageAttributesKeyPattern(AttributesKeyPatterns.ofAttributeKey(attributesKey))
 				.build();
 
 		final BigDecimal qtyAvailableToPromise = availableToPromiseRepository.retrieveAvailableStockQtySum(query);
 
-		final I_C_UOM uom = productsBL.getStockingUOM(productId);
+		final I_C_UOM uom = productsBL.getStockUOM(productId);
 
 		return Quantity.of(qtyAvailableToPromise, uom);
 	}

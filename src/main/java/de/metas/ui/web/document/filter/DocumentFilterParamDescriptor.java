@@ -1,7 +1,15 @@
 package de.metas.ui.web.document.filter;
 
+import java.util.Optional;
+
+import javax.annotation.Nullable;
+
+import org.slf4j.Logger;
+
 import de.metas.i18n.ITranslatableString;
-import de.metas.i18n.ImmutableTranslatableString;
+import de.metas.i18n.TranslatableStrings;
+import de.metas.logging.LogManager;
+import de.metas.process.BarcodeScannerType;
 import de.metas.ui.web.document.filter.DocumentFilterParam.Operator;
 import de.metas.ui.web.window.datatypes.DataTypes;
 import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
@@ -10,6 +18,7 @@ import de.metas.ui.web.window.descriptor.factory.standard.DescriptorsFactoryHelp
 import de.metas.ui.web.window.model.lookup.LookupDataSource;
 import de.metas.ui.web.window.model.lookup.LookupDataSourceFactory;
 import de.metas.util.Check;
+import lombok.NonNull;
 import lombok.Value;
 
 /*
@@ -37,10 +46,12 @@ import lombok.Value;
 @Value
 public final class DocumentFilterParamDescriptor
 {
-	public static final Builder builder()
+	public static Builder builder()
 	{
 		return new Builder();
 	}
+
+	private static final Logger logger = LogManager.getLogger(DocumentFilterParamDescriptor.class);
 
 	private final boolean joinAnd;
 	private final String parameterName;
@@ -55,10 +66,12 @@ public final class DocumentFilterParamDescriptor
 	private final Object defaultValueTo;
 
 	private final boolean mandatory;
-	private final LookupDescriptor lookupDescriptor;
+	private final Optional<LookupDescriptor> lookupDescriptor;
 
 	public static final String AUTOFILTER_INITIALVALUE_DATE_NOW = new String("NOW");
 	private final Object autoFilterInitialValue;
+
+	private final BarcodeScannerType barcodeScannerType;
 
 	private DocumentFilterParamDescriptor(final Builder builder)
 	{
@@ -89,6 +102,8 @@ public final class DocumentFilterParamDescriptor
 		mandatory = builder.mandatory;
 
 		autoFilterInitialValue = builder.autoFilterInitialValue;
+		
+		barcodeScannerType = builder.barcodeScannerType;
 	}
 
 	public String getDisplayName(final String adLanguage)
@@ -101,18 +116,9 @@ public final class DocumentFilterParamDescriptor
 		return operator != null && operator.isRangeOperator();
 	}
 
-	public LookupDataSource getLookupDataSource()
+	public Optional<LookupDataSource> getLookupDataSource()
 	{
-		return LookupDataSourceFactory.instance.getLookupDataSource(lookupDescriptor);
-	}
-
-	private final LookupDataSource getLookupDataSourceOrNull()
-	{
-		if (lookupDescriptor == null)
-		{
-			return null;
-		}
-		return LookupDataSourceFactory.instance.getLookupDataSource(lookupDescriptor);
+		return lookupDescriptor.map(LookupDataSourceFactory.instance::getLookupDataSource);
 	}
 
 	public Object getDefaultValueConverted()
@@ -132,7 +138,22 @@ public final class DocumentFilterParamDescriptor
 
 	private Object convertValueToFieldType(final Object value)
 	{
-		return DataTypes.convertToValueClass(getFieldName(), value, getWidgetType(), getValueClass(), getLookupDataSourceOrNull());
+		Object valueConv = DataTypes.convertToValueClass(
+				getFieldName(),
+				value,
+				getWidgetType(),
+				getValueClass(),
+				getLookupDataSource().orElse(null));
+
+		// Convert empty string to null
+		// This is a workaround until task https://github.com/metasfresh/metasfresh-webui-frontend/issues/2040 is done.
+		if (valueConv instanceof String && ((String)valueConv).isEmpty())
+		{
+			valueConv = null;
+			logger.warn("Converted empty string to null for value={}, descriptor={}. \n This issue shall be solved by https://github.com/metasfresh/metasfresh-webui-frontend/issues/2040.", value, this);
+		}
+
+		return valueConv;
 	}
 
 	public boolean isAutoFilter()
@@ -151,11 +172,12 @@ public final class DocumentFilterParamDescriptor
 		private String fieldName;
 		private String parameterName;
 		private DocumentFieldWidgetType widgetType;
+		private BarcodeScannerType barcodeScannerType;
 		private ITranslatableString displayName;
 		private Operator operator = Operator.EQUAL;
 		private Object defaultValue;
 		private Object defaultValueTo;
-		private LookupDescriptor lookupDescriptor;
+		private Optional<LookupDescriptor> lookupDescriptor = Optional.empty();
 		private boolean mandatory = false;
 		private boolean showIncrementDecrementButtons;
 
@@ -204,15 +226,21 @@ public final class DocumentFilterParamDescriptor
 			return widgetType;
 		}
 
+		public Builder barcodeScannerType(final BarcodeScannerType barcodeScannerType)
+		{
+			this.barcodeScannerType = barcodeScannerType;
+			return this;
+		}
+
 		public Builder setDisplayName(final ITranslatableString displayName)
 		{
-			this.displayName = ImmutableTranslatableString.copyOf(displayName);
+			this.displayName = TranslatableStrings.copyOf(displayName);
 			return this;
 		}
 
 		public Builder setDisplayName(final String displayName)
 		{
-			this.displayName = ImmutableTranslatableString.constant(displayName);
+			this.displayName = TranslatableStrings.constant(displayName);
 			return this;
 		}
 
@@ -240,10 +268,15 @@ public final class DocumentFilterParamDescriptor
 			return this;
 		}
 
-		public Builder setLookupDescriptor(final LookupDescriptor lookupDescriptor)
+		public Builder setLookupDescriptor(@NonNull final Optional<LookupDescriptor> lookupDescriptor)
 		{
 			this.lookupDescriptor = lookupDescriptor;
 			return this;
+		}
+
+		public Builder setLookupDescriptor(@Nullable final LookupDescriptor lookupDescriptor)
+		{
+			return setLookupDescriptor(Optional.ofNullable(lookupDescriptor));
 		}
 
 		public Builder setMandatory(final boolean mandatory)

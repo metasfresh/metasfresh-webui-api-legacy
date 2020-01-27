@@ -1,9 +1,11 @@
 package de.metas.ui.web.window.datatypes.json;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.LocalDate;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.function.IntFunction;
 
 import org.adempiere.exceptions.AdempiereException;
 import org.compiere.util.DisplayType;
@@ -14,11 +16,13 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
 
+import de.metas.ui.web.window.datatypes.DataTypes;
 import de.metas.ui.web.window.datatypes.DocumentIdsSelection;
 import de.metas.ui.web.window.datatypes.LookupValue;
 import de.metas.ui.web.window.datatypes.LookupValue.IntegerLookupValue;
-import de.metas.ui.web.window.datatypes.Values;
+import de.metas.util.lang.RepoIdAware;
 import io.swagger.annotations.ApiModel;
+import lombok.NonNull;
 import lombok.Value;
 
 /*
@@ -68,7 +72,7 @@ public class JSONDocumentChangedEvent
 	}
 
 	@ApiModel("operation")
-	public static enum JSONOperation
+	public enum JSONOperation
 	{
 		replace;
 	}
@@ -105,7 +109,8 @@ public class JSONDocumentChangedEvent
 
 	public int getValueAsInteger(final int defaultValueIfNull)
 	{
-		return Values.toInt(value, defaultValueIfNull);
+		final Integer valueInt = DataTypes.convertToInteger(value);
+		return valueInt != null ? valueInt : defaultValueIfNull;
 	}
 
 	public List<Integer> getValueAsIntegersList()
@@ -131,46 +136,56 @@ public class JSONDocumentChangedEvent
 		}
 	}
 
+	public <T extends RepoIdAware> T getValueAsId(@NonNull final IntFunction<T> mapper)
+	{
+		final int repoId = getValueAsInteger(-1);
+		return mapper.apply(repoId);
+	}
+
 	public BigDecimal getValueAsBigDecimal()
 	{
-		return Values.toBigDecimal(value);
+		return toBigDecimal(value);
 	}
 
 	public BigDecimal getValueAsBigDecimal(final BigDecimal defaultValueIfNull)
 	{
-		return value != null ? Values.toBigDecimal(value) : defaultValueIfNull;
+		return value != null ? toBigDecimal(value) : defaultValueIfNull;
 	}
 
-	public LocalDateTime getValueAsLocalDateTime()
-	{
-		return JSONDate.localDateTimeFromObject(value);
-	}
-
-	public LookupValue getValueAsIntegerLookupValue()
+	private static BigDecimal toBigDecimal(final Object value)
 	{
 		if (value == null)
 		{
 			return null;
 		}
-		else if (value instanceof Map)
+		else if (value instanceof BigDecimal)
 		{
-			@SuppressWarnings("unchecked")
-			final Map<String, Object> map = (Map<String, Object>)value;
-			return JSONLookupValue.integerLookupValueFromJsonMap(map);
-		}
-		else if (value instanceof JSONLookupValue)
-		{
-			final JSONLookupValue json = (JSONLookupValue)value;
-			if (json == null)
-			{
-				return null;
-			}
-			return json.toIntegerLookupValue();
+			return (BigDecimal)value;
 		}
 		else
 		{
-			throw new AdempiereException("Cannot convert value '" + value + "' (" + value.getClass() + ") to " + IntegerLookupValue.class);
+			final String valueStr = value.toString().trim();
+			if (valueStr.isEmpty())
+			{
+				return null;
+			}
+			return new BigDecimal(valueStr);
 		}
+	}
+
+	public ZonedDateTime getValueAsZonedDateTime()
+	{
+		return DateTimeConverters.fromObjectToZonedDateTime(value);
+	}
+
+	public LocalDate getValueAsLocalDate()
+	{
+		return DateTimeConverters.fromObjectToLocalDate(value);
+	}
+
+	public IntegerLookupValue getValueAsIntegerLookupValue()
+	{
+		return DataTypes.convertToIntegerLookupValue(value);
 	}
 
 	public LookupValue getValueAsStringLookupValue()

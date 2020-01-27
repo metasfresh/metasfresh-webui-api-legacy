@@ -1,42 +1,35 @@
 package de.metas.ui.web.pattribute;
 
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-import org.adempiere.ad.trx.api.ITrxListenerManager.TrxEventTiming;
 import org.adempiere.ad.trx.api.ITrxManager;
 import org.adempiere.mm.attributes.AttributeSetInstanceId;
 import org.adempiere.mm.attributes.api.IAttributeDAO;
-import org.adempiere.mm.attributes.util.ASIEditingInfo;
 import org.adempiere.util.lang.IAutoCloseable;
+import org.compiere.model.I_M_Attribute;
 import org.compiere.model.I_M_AttributeInstance;
-import org.compiere.model.MAttributeSetInstance;
 import org.slf4j.Logger;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Repository;
+
+import com.google.common.collect.ImmutableMap;
 
 import de.metas.cache.CCache;
-import de.metas.lang.SOTrx;
 import de.metas.logging.LogManager;
-import de.metas.product.ProductId;
 import de.metas.ui.web.exceptions.EntityNotFoundException;
 import de.metas.ui.web.pattribute.ASIDescriptorFactory.ASIAttributeFieldBinding;
-import de.metas.ui.web.pattribute.json.JSONCreateASIRequest;
 import de.metas.ui.web.window.datatypes.DocumentId;
-import de.metas.ui.web.window.datatypes.DocumentPath;
-import de.metas.ui.web.window.datatypes.DocumentType;
-import de.metas.ui.web.window.datatypes.LookupValue;
-import de.metas.ui.web.window.datatypes.json.JSONDocumentChangedEvent;
+import de.metas.ui.web.window.descriptor.DocumentEntityDescriptor;
+import de.metas.ui.web.window.descriptor.DocumentFieldDescriptor;
 import de.metas.ui.web.window.model.Document;
 import de.metas.ui.web.window.model.Document.CopyMode;
 import de.metas.ui.web.window.model.DocumentCollection;
 import de.metas.ui.web.window.model.IDocumentChangesCollector;
-import de.metas.ui.web.window.model.IDocumentChangesCollector.ReasonSupplier;
-import de.metas.util.Services;
-import de.metas.ui.web.window.model.IDocumentFieldView;
 import de.metas.ui.web.window.model.NullDocumentChangesCollector;
+import de.metas.util.Services;
+import lombok.NonNull;
 
 /*
  * #%L
@@ -60,52 +53,40 @@ import de.metas.ui.web.window.model.NullDocumentChangesCollector;
  * #L%
  */
 
-@Component
+@Repository
 public class ASIRepository
 {
 	// services
 	private static final Logger logger = LogManager.getLogger(ASIRepository.class);
-	@Autowired
-	private ASIDescriptorFactory descriptorsFactory;
-	@Autowired
-	@Lazy
-	private DocumentCollection documentsCollection;
+	private final ITrxManager trxManager = Services.get(ITrxManager.class);
+	private final IAttributeDAO attributesRepo = Services.get(IAttributeDAO.class);
+	private final ASIDescriptorFactory descriptorsFactory;
 
 	private final Supplier<DocumentId> nextASIDocId = DocumentId.supplier("N", 1);
 	private final CCache<DocumentId, ASIDocument> id2asiDoc = CCache.newLRUCache("ASIDocuments", 500, 0);
 
-	private static final String VERSION_DEFAULT = "0";
-	private static final ReasonSupplier REASON_ProcessASIDocumentChanges = () -> "process ASI document changes";
-
-	public ASIDocument createNewFrom(final JSONCreateASIRequest request)
+	public ASIRepository(
+			@NonNull final ASIDescriptorFactory descriptorsFactory)
 	{
-		final ASIEditingInfo info = createASIEditingInfo(request);
+		this.descriptorsFactory = descriptorsFactory;
+	}
 
+	public ASIDocument createNewFrom(@NonNull final WebuiASIEditingInfo info)
+	{
 		//
 		// Get the ASI descriptor
 		final ASIDescriptor asiDescriptor = descriptorsFactory.getASIDescriptor(info);
 
 		//
 		// Create the new ASI document
+		final AttributeSetInstanceId templateAsiId = info.getAttributeSetInstanceId();
 		final Document asiDocData = Document.builder(asiDescriptor.getEntityDescriptor())
-				.initializeAsNewDocument(nextASIDocId, VERSION_DEFAULT)
-				.build();
-
-		//
-		// If we have a template ASI, populate the ASI document from it
-		final MAttributeSetInstance templateASI = info.getM_AttributeSetInstance();
-		if (templateASI != null)
-		{
-			for (final I_M_AttributeInstance fromAI : Services.get(IAttributeDAO.class).retrieveAttributeInstances(templateASI))
-			{
-				loadASIDocumentField(asiDocData, fromAI);
-			}
-		}
+				.initializeAsNewDocument(createASIDocumentValuesSupplier(templateAsiId, asiDescriptor.getEntityDescriptor()));
 
 		//
 		// Validate, log and add the new ASI document to our index
 		asiDocData.checkAndGetValidStatus();
-		logger.trace("Created from ASI={}: {}", templateASI, asiDocData);
+		logger.trace("Created from ASI={}: {}", templateAsiId, asiDocData);
 
 		final ASIDocument asiDoc = new ASIDocument(asiDescriptor, asiDocData);
 		commit(asiDoc);
@@ -121,79 +102,74 @@ public class ASIRepository
 	 * @param attributeSetInstanceId
 	 * @return ASI document
 	 */
-	public ASIDocument loadReadonly(final AttributeSetInstanceId attributeSetInstanceId)
+	public ASIDocument loadReadonly(@NonNull final AttributeSetInstanceId attributeSetInstanceId)
 	{
-		if (!AttributeSetInstanceId.isRegular(attributeSetInstanceId))
+		if (!attributeSetInstanceId.isRegular())
 		{
 			throw new EntityNotFoundException("ASI " + attributeSetInstanceId);
 		}
 
-		final ASIEditingInfo info = ASIEditingInfo.readonlyASI(attributeSetInstanceId);
-
 		//
 		// Get the ASI descriptor
+		final WebuiASIEditingInfo info = WebuiASIEditingInfo.readonlyASI(attributeSetInstanceId);
 		final ASIDescriptor asiDescriptor = descriptorsFactory.getASIDescriptor(info);
 
 		//
 		// Create the new ASI document
 		final Document asiDocData = Document.builder(asiDescriptor.getEntityDescriptor())
-				.initializeAsNewDocument(() -> DocumentId.of(attributeSetInstanceId), VERSION_DEFAULT)
-				.build();
-
-		//
-		// If we have a template ASI, populate the ASI document from it
-		final MAttributeSetInstance templateASI = info.getM_AttributeSetInstance();
-		for (final I_M_AttributeInstance fromAI : Services.get(IAttributeDAO.class).retrieveAttributeInstances(templateASI))
-		{
-			loadASIDocumentField(asiDocData, fromAI);
-		}
+				.initializeAsNewDocument(createASIDocumentValuesSupplier(attributeSetInstanceId, asiDescriptor.getEntityDescriptor()));
 
 		//
 		// Validate, log and add the new ASI document to our index
 		asiDocData.checkAndGetValidStatus();
-		logger.trace("Created from ASI={}: {}", templateASI, asiDocData);
+		logger.trace("Created from ASI={}: {}", attributeSetInstanceId, asiDocData);
 
 		final ASIDocument asiDoc = new ASIDocument(asiDescriptor, asiDocData);
 		return asiDoc.copy(CopyMode.CheckInReadonly, NullDocumentChangesCollector.instance);
 	}
 
-	private ASIEditingInfo createASIEditingInfo(final JSONCreateASIRequest request)
+	private ASIDocumentValuesSupplier createASIDocumentValuesSupplier(
+			@NonNull final AttributeSetInstanceId asiId,
+			@NonNull final DocumentEntityDescriptor descriptor)
 	{
-		final DocumentPath documentPath = request.getDocumentPath();
-		final AttributeSetInstanceId attributeSetInstanceId = request.getTemplateId();
-
-		if (documentPath.getDocumentType() == DocumentType.Window)
-		{
-			return documentsCollection.forDocumentReadonly(
-					documentPath,
-					document -> createASIEditingInfoFromDocument(document, attributeSetInstanceId));
-		}
-		else if (documentPath.getDocumentType() == DocumentType.Process)
-		{
-			return ASIEditingInfo.processParameterASI(attributeSetInstanceId);
-		}
-		else
-		{
-			throw new IllegalStateException("Cannot create ASI editing info from " + documentPath);
-		}
+		return ASIDocumentValuesSupplier.builder()
+				.documentIdSupplier(nextASIDocId)
+				.values(retrieveASIValuesMap(asiId, descriptor))
+				.build();
 	}
 
-	private static ASIEditingInfo createASIEditingInfoFromDocument(
-			final Document document,
-			final AttributeSetInstanceId attributeSetInstanceId)
+	private Map<String, Object> retrieveASIValuesMap(
+			@NonNull final AttributeSetInstanceId asiId,
+			@NonNull final DocumentEntityDescriptor descriptor)
 	{
-		final ProductId productId = ProductId.ofRepoIdOrNull(document.asEvaluatee().get_ValueAsInt("M_Product_ID", -1));
-		final boolean isSOTrx = document.asEvaluatee().get_ValueAsBoolean("IsSOTrx", true);
-		final SOTrx soTrx = SOTrx.ofBoolean(isSOTrx);
+		if (asiId.isNone())
+		{
+			return ImmutableMap.of();
+		}
 
-		final String callerTableName = document.getEntityDescriptor().getTableNameOrNull();
-		final int callerColumnId = -1; // FIXME implement
-		return ASIEditingInfo.of(productId, attributeSetInstanceId, callerTableName, callerColumnId, soTrx);
-	}
+		final HashMap<String, Object> valuesMap = new HashMap<>();
+		for (final I_M_AttributeInstance fromAI : attributesRepo.retrieveAttributeInstances(asiId))
+		{
+			final I_M_Attribute attribute = attributesRepo.getAttributeById(fromAI.getM_Attribute_ID());
+			final String fieldName = attribute.getValue();
+			final DocumentFieldDescriptor fieldDescriptor = descriptor.getFieldOrNull(fieldName);
 
-	public ASILayout getLayout(final DocumentId asiDocId)
-	{
-		return forASIDocumentReadonly(asiDocId, asiDoc -> asiDoc.getLayout());
+			// Skip loading the attribute instance if it's no longer exist.
+			// This can happen if we are trying to load an old ASI but in meantime the AttributeSet was changed and the attribute was removed or deactivated.
+			if (fieldDescriptor == null)
+			{
+				logger.warn("Attribute {} no longer exist in {}", fieldName, descriptor);
+				continue;
+			}
+
+			final Object value = fieldDescriptor
+					.getDataBindingNotNull(ASIAttributeFieldBinding.class)
+					.readValue(fromAI);
+
+			valuesMap.put(fieldName, value);
+		}
+
+		return valuesMap;
 	}
 
 	private ASIDocument getASIDocumentNoLock(final DocumentId asiDocId)
@@ -222,63 +198,37 @@ public class ASIRepository
 		}
 	}
 
-	public <R> R forASIDocumentReadonly(final DocumentId asiDocId, final Function<ASIDocument, R> processor)
+	public <R> R forASIDocumentReadonly(
+			@NonNull final DocumentId asiDocId,
+			@NonNull final DocumentCollection documentsCollection,
+			@NonNull final Function<ASIDocument, R> processor)
 	{
 		try (final IAutoCloseable readLock = getASIDocumentNoLock(asiDocId).lockForReading())
 		{
-			final ASIDocument asiDoc = getASIDocumentNoLock(asiDocId).copy(CopyMode.CheckInReadonly, NullDocumentChangesCollector.instance);
+			final ASIDocument asiDoc = getASIDocumentNoLock(asiDocId)
+					.copy(CopyMode.CheckInReadonly, NullDocumentChangesCollector.instance)
+					.bindContextDocumentIfPossible(documentsCollection);
 			return processor.apply(asiDoc);
 		}
 	}
 
-	public <R> R forASIDocumentWritable(final DocumentId asiDocId, final IDocumentChangesCollector changesCollector, final Function<ASIDocument, R> processor)
+	public <R> R forASIDocumentWritable(
+			@NonNull final DocumentId asiDocId,
+			@NonNull final IDocumentChangesCollector changesCollector,
+			@NonNull final DocumentCollection documentsCollection,
+			@NonNull final Function<ASIDocument, R> processor)
 	{
 		try (final IAutoCloseable readLock = getASIDocumentNoLock(asiDocId).lockForWriting())
 		{
-			final ASIDocument asiDoc = getASIDocumentNoLock(asiDocId).copy(CopyMode.CheckOutWritable, changesCollector);
+			final ASIDocument asiDoc = getASIDocumentNoLock(asiDocId)
+					.copy(CopyMode.CheckOutWritable, changesCollector)
+					.bindContextDocumentIfPossible(documentsCollection);
+
 			final R result = processor.apply(asiDoc);
 
-			Services.get(ITrxManager.class)
-					.getCurrentTrxListenerManagerOrAutoCommit()
-					.newEventListener(TrxEventTiming.AFTER_COMMIT)
-					.registerHandlingMethod(trx -> commit(asiDoc));
+			trxManager.runAfterCommit(() -> commit(asiDoc));
 
 			return result;
 		}
-	}
-
-	public void processASIDocumentChanges(final DocumentId asiDocId, final List<JSONDocumentChangedEvent> events, final IDocumentChangesCollector changesCollector)
-	{
-		forASIDocumentWritable(asiDocId, changesCollector, asiDoc -> {
-			asiDoc.processValueChanges(events, REASON_ProcessASIDocumentChanges);
-			return null; // no response
-		});
-	}
-
-	private static void loadASIDocumentField(final Document asiDoc, final I_M_AttributeInstance fromAI)
-	{
-		final String fieldName = fromAI.getM_Attribute().getValue();
-		final IDocumentFieldView field = asiDoc.getFieldViewOrNull(fieldName);
-
-		// Skip loading the attribute instance if it's no longer exist.
-		// This can happen if we are trying to load an old ASI but in meantime the AttributeSet was changed and the attribute was removed or deactivated.
-		if (field == null)
-		{
-			logger.warn("Attribute {} no longer exist in {}", fieldName, asiDoc.getEntityDescriptor());
-			return;
-		}
-
-		final Object value = field
-				.getDescriptor()
-				.getDataBindingNotNull(ASIAttributeFieldBinding.class)
-				.readValue(fromAI);
-
-		asiDoc.processValueChange(fieldName, value, () -> "update from " + fromAI);
-	}
-
-	public LookupValue complete(final DocumentId asiDocId)
-	{
-		final IDocumentChangesCollector changesCollector = NullDocumentChangesCollector.instance;
-		return forASIDocumentWritable(asiDocId, changesCollector, ASIDocument::complete);
 	}
 }

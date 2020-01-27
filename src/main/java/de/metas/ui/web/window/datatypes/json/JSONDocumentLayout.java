@@ -21,6 +21,7 @@ import de.metas.ui.web.window.descriptor.DocumentLayoutDescriptor;
 import de.metas.ui.web.window.descriptor.DocumentLayoutDetailDescriptor;
 import de.metas.ui.web.window.descriptor.DocumentLayoutSingleRow;
 import io.swagger.annotations.ApiModel;
+import lombok.NonNull;
 
 /*
  * #%L
@@ -48,12 +49,12 @@ import io.swagger.annotations.ApiModel;
 @SuppressWarnings("serial")
 public final class JSONDocumentLayout implements Serializable
 {
-	public static final JSONDocumentLayout ofHeaderLayout(final DocumentLayoutDescriptor layout, final JSONOptions jsonOpts)
+	public static JSONDocumentLayout ofHeaderLayout(final DocumentLayoutDescriptor layout, final JSONDocumentLayoutOptions options)
 	{
-		return new JSONDocumentLayout(layout, jsonOpts);
+		return new JSONDocumentLayout(layout, options);
 	}
 
-	public static final JSONDocumentLayout ofDetailTab(final DocumentLayoutDetailDescriptor detailLayout, final JSONOptions jsonOpts)
+	public static JSONDocumentLayout ofDetailTab(final DocumentLayoutDetailDescriptor detailLayout, final JSONDocumentLayoutOptions jsonOpts)
 	{
 		return new JSONDocumentLayout(detailLayout, jsonOpts);
 	}
@@ -79,11 +80,6 @@ public final class JSONDocumentLayout implements Serializable
 	@JsonProperty("caption")
 	@JsonInclude(Include.NON_EMPTY)
 	private final String caption;
-
-	// NOTE: we are no longer using documentNoElement (see https://github.com/metasfresh/metasfresh-webui-api/issues/291 ).
-	// @JsonProperty("documentNoElement")
-	// @JsonInclude(Include.NON_NULL)
-	// private final JSONDocumentLayoutElement documentNoElement;
 
 	@JsonProperty("documentSummaryElement")
 	@JsonInclude(Include.NON_NULL)
@@ -119,34 +115,36 @@ public final class JSONDocumentLayout implements Serializable
 	/**
 	 * Header layout constructor
 	 */
-	private JSONDocumentLayout(final DocumentLayoutDescriptor layout, final JSONOptions jsonOpts)
+	private JSONDocumentLayout(
+			@NonNull final DocumentLayoutDescriptor layout,
+			@NonNull final JSONDocumentLayoutOptions options)
 	{
 		this.windowId = layout.getWindowId();
 		type = windowId;
 
 		tabId = null;
 		tabid = tabId;
-		
+
 		internalName = null;
 
-		caption = layout.getCaption(jsonOpts.getAD_Language());
+		caption = layout.getCaption(options.getAdLanguage());
 
-		documentSummaryElement = JSONDocumentLayoutElement.fromNullable(layout.getDocumentSummaryElement(), jsonOpts);
-		docActionElement = JSONDocumentLayoutElement.fromNullable(layout.getDocActionElement(), jsonOpts);
+		documentSummaryElement = JSONDocumentLayoutElement.fromNullable(layout.getDocumentSummaryElement(), options);
+		docActionElement = JSONDocumentLayoutElement.fromNullable(layout.getDocActionElement(), options);
 
 		final DocumentLayoutSingleRow singleRowLayout = layout.getSingleRowLayout();
-		sections = JSONDocumentLayoutSection.ofSectionsList(singleRowLayout.getSections(), jsonOpts);
+		sections = JSONDocumentLayoutSection.ofSectionsList(singleRowLayout.getSections(), options);
 
 		//
 		// Included tabs
-		if (jsonOpts.isShowAdvancedFields())
+		if (options.isShowAdvancedFields())
 		{
 			tabs = ImmutableList.of();
 			putDebugProperty("tabs-info", "not showing tabs when showing advanced fields");
 		}
 		else
 		{
-			tabs = JSONDocumentLayoutTab.ofList(layout.getDetails(), jsonOpts);
+			tabs = JSONDocumentLayoutTab.ofList(layout.getDetails(), options);
 		}
 
 		filters = null;
@@ -157,17 +155,14 @@ public final class JSONDocumentLayout implements Serializable
 		if (WindowConstants.isProtocolDebugging())
 		{
 			putDebugProperties(layout.getDebugProperties());
-			putDebugProperty(JSONOptions.DEBUG_ATTRNAME, jsonOpts.toString());
+			putDebugProperty(JSONOptions.DEBUG_ATTRNAME, options.toString());
 		}
 	}
 
 	/**
 	 * From detail tab constructor.
-	 *
-	 * @param detailLayout
-	 * @param jsonOpts
 	 */
-	private JSONDocumentLayout(final DocumentLayoutDetailDescriptor detailLayout, final JSONOptions jsonOpts)
+	private JSONDocumentLayout(final DocumentLayoutDetailDescriptor detailLayout, final JSONDocumentLayoutOptions jsonOpts)
 	{
 		this.windowId = detailLayout.getWindowId();
 		type = windowId;
@@ -178,13 +173,13 @@ public final class JSONDocumentLayout implements Serializable
 		internalName = detailLayout.getInternalName();
 
 		final DocumentLayoutSingleRow singleRowLayout = detailLayout.getSingleRowLayout();
-		caption = singleRowLayout.getCaption(jsonOpts.getAD_Language());
+		caption = singleRowLayout.getCaption(jsonOpts.getAdLanguage());
 
 		documentSummaryElement = null;
 		docActionElement = null;
 
 		sections = JSONDocumentLayoutSection.ofSectionsList(singleRowLayout.getSections(), jsonOpts);
-		tabs = ImmutableList.of(); // Included tabs
+		tabs = ImmutableList.of(); // a tab(-group) has no included tabs
 
 		filters = null;
 
@@ -199,8 +194,8 @@ public final class JSONDocumentLayout implements Serializable
 				.omitNullValues()
 				.add("windowId", windowId)
 				.add("sections", sections.isEmpty() ? null : sections)
-				.add("tabs", tabs.isEmpty() ? null : tabs)
-				.add("filters", filters.isEmpty() ? null : filters)
+				.add("tabGroups", tabs.isEmpty() ? null : tabs)
+				.add("filters", (filters == null || filters.isEmpty()) ? null : filters)
 				.toString();
 	}
 

@@ -4,6 +4,7 @@ import static org.adempiere.model.InterfaceWrapperHelper.load;
 import static org.adempiere.model.InterfaceWrapperHelper.save;
 
 import java.math.BigDecimal;
+import java.util.Set;
 
 import org.adempiere.exceptions.AdempiereException;
 import org.adempiere.mm.attributes.api.IAttributeSetInstanceBL;
@@ -14,12 +15,13 @@ import org.compiere.model.I_M_Forecast;
 import org.compiere.model.I_M_ForecastLine;
 import org.compiere.model.I_M_Product;
 
+import com.google.common.collect.ImmutableSet;
+
 import de.metas.adempiere.gui.search.HUPackingAwareCopy.ASICopyMode;
 import de.metas.adempiere.gui.search.IHUPackingAware;
 import de.metas.adempiere.gui.search.IHUPackingAwareBL;
 import de.metas.adempiere.gui.search.impl.ForecastLineHUPackingAware;
 import de.metas.adempiere.gui.search.impl.PlainHUPackingAware;
-import de.metas.handlingunits.model.I_M_HU_PI_Item_Product;
 import de.metas.ui.web.quickinput.IQuickInputProcessor;
 import de.metas.ui.web.quickinput.QuickInput;
 import de.metas.ui.web.window.datatypes.DocumentId;
@@ -55,14 +57,15 @@ public class ForecastLineQuickInputProcessor implements IQuickInputProcessor
 	private final transient IHUPackingAwareBL huPackingAwareBL = Services.get(IHUPackingAwareBL.class);
 
 	@Override
-	public DocumentId process(final QuickInput quickInput)
+	public Set<DocumentId> process(final QuickInput quickInput)
 	{
 		final I_M_Forecast forecast = quickInput.getRootDocumentAs(I_M_Forecast.class);
 		final I_M_ForecastLine forecastLine = InterfaceWrapperHelper.newInstance(I_M_ForecastLine.class, forecast);
 		forecastLine.setM_Forecast(forecast);
 		updateForecastLine(forecastLine, quickInput);
 		save(forecastLine);
-		return DocumentId.of(forecastLine.getM_ForecastLine_ID());
+		final DocumentId documentId = DocumentId.of(forecastLine.getM_ForecastLine_ID());
+		return ImmutableSet.of(documentId);
 	}
 
 	private final void updateForecastLine(final I_M_ForecastLine forecastLine, final QuickInput fromQuickInput)
@@ -101,18 +104,17 @@ public class ForecastLineQuickInputProcessor implements IQuickInputProcessor
 			@NonNull final IForecastLineQuickInput quickInput)
 	{
 		final PlainHUPackingAware huPackingAware = new PlainHUPackingAware();
-		huPackingAware.setC_BPartner(forecast.getC_BPartner());
-		huPackingAware.setDateOrdered(forecast.getDatePromised());
+		huPackingAware.setC_BPartner_ID(forecast.getC_BPartner_ID());
 		huPackingAware.setInDispute(false);
 
 		final ProductAndAttributes productAndAttributes = ProductLookupDescriptor.toProductAndAttributes(quickInput.getM_Product_ID());
 		final I_M_Product product = load(productAndAttributes.getProductId(), I_M_Product.class);
 		huPackingAware.setM_Product_ID(product.getM_Product_ID());
-		huPackingAware.setC_UOM(product.getC_UOM());
+		huPackingAware.setC_UOM_ID(product.getC_UOM_ID());
 		huPackingAware.setM_AttributeSetInstance_ID(createASI(productAndAttributes));
 
-		final I_M_HU_PI_Item_Product piItemProduct = quickInput.getM_HU_PI_Item_Product();
-		huPackingAware.setM_HU_PI_Item_Product(piItemProduct);
+		final int piItemProductId = quickInput.getM_HU_PI_Item_Product_ID();
+		huPackingAware.setM_HU_PI_Item_Product_ID(piItemProductId);
 
 		return huPackingAware;
 	}

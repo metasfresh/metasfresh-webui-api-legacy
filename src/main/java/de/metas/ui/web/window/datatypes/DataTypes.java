@@ -2,12 +2,14 @@ package de.metas.ui.web.window.datatypes;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZonedDateTime;
 import java.util.Map;
 import java.util.Objects;
+
+import javax.annotation.Nullable;
 
 import org.adempiere.exceptions.AdempiereException;
 import org.compiere.util.DisplayType;
@@ -18,7 +20,7 @@ import de.metas.logging.LogManager;
 import de.metas.ui.web.upload.WebuiImageId;
 import de.metas.ui.web.window.datatypes.LookupValue.IntegerLookupValue;
 import de.metas.ui.web.window.datatypes.LookupValue.StringLookupValue;
-import de.metas.ui.web.window.datatypes.json.JSONDate;
+import de.metas.ui.web.window.datatypes.json.DateTimeConverters;
 import de.metas.ui.web.window.datatypes.json.JSONLookupValue;
 import de.metas.ui.web.window.datatypes.json.JSONLookupValuesList;
 import de.metas.ui.web.window.datatypes.json.JSONRange;
@@ -26,6 +28,7 @@ import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
 import de.metas.ui.web.window.model.lookup.LookupValueByIdSupplier;
 import de.metas.util.Check;
 import de.metas.util.lang.RepoIdAware;
+import lombok.NonNull;
 import lombok.experimental.UtilityClass;
 
 /*
@@ -65,7 +68,7 @@ public final class DataTypes
 	 * @param value2
 	 * @return
 	 */
-	public static final <T> boolean equals(final T value1, final T value2)
+	public static <T> boolean equals(final T value1, final T value2)
 	{
 		if (value1 == value2)
 		{
@@ -98,11 +101,11 @@ public final class DataTypes
 	 * @return converted value
 	 */
 	public static <T> T convertToValueClass(
-			final String fieldName,
-			final Object value,
-			final DocumentFieldWidgetType widgetType,
-			final Class<T> targetType,
-			final LookupValueByIdSupplier lookupDataSource)
+			@NonNull final String fieldName,
+			@Nullable final Object value,
+			@Nullable final DocumentFieldWidgetType widgetType,
+			@NonNull final Class<T> targetType,
+			@Nullable final LookupValueByIdSupplier lookupDataSource)
 	{
 		if (value == null)
 		{
@@ -115,9 +118,11 @@ public final class DataTypes
 		// If we would not return java.util.Date then all value changed comparing will fail.
 		if (targetType.equals(value.getClass()))
 		{
-			@SuppressWarnings("unchecked")
-			final T valueConv = (T)value;
-			return valueConv;
+			return cast(value);
+		}
+		else if (Object.class == targetType)
+		{
+			return cast(value);
 		}
 
 		try
@@ -128,27 +133,33 @@ public final class DataTypes
 			}
 			else if (java.util.Date.class == targetType)
 			{
-				return cast(convertToJULDate(value, widgetType));
+				final DocumentFieldWidgetType widgetTypeEffective = widgetType != null ? widgetType : DocumentFieldWidgetType.ZonedDateTime;
+				return cast(TimeUtil.asDate(DateTimeConverters.fromObject(value, widgetTypeEffective)));
 			}
 			else if (Timestamp.class == targetType)
 			{
-				return cast(convertToTimestamp(value, widgetType));
+				final DocumentFieldWidgetType widgetTypeEffective = widgetType != null ? widgetType : DocumentFieldWidgetType.ZonedDateTime;
+				return cast(TimeUtil.asTimestamp(DateTimeConverters.fromObject(value, widgetTypeEffective)));
 			}
 			else if (ZonedDateTime.class == targetType)
 			{
-				return cast(convertToZonedDateTime(value));
-			}
-			else if (LocalDateTime.class == targetType)
-			{
-				return cast(convertToLocalDateTime(value));
+				final DocumentFieldWidgetType widgetTypeEffective = widgetType != null ? widgetType : DocumentFieldWidgetType.ZonedDateTime;
+				return cast(TimeUtil.asZonedDateTime(DateTimeConverters.fromObject(value, widgetTypeEffective)));
 			}
 			else if (LocalDate.class == targetType)
 			{
-				return cast(convertToLocalDate(value));
+				final DocumentFieldWidgetType widgetTypeEffective = widgetType != null ? widgetType : DocumentFieldWidgetType.LocalDate;
+				return cast(TimeUtil.asLocalDate(DateTimeConverters.fromObject(value, widgetTypeEffective)));
 			}
 			else if (LocalTime.class == targetType)
 			{
-				return cast(convertToLocalTime(value));
+				final DocumentFieldWidgetType widgetTypeEffective = widgetType != null ? widgetType : DocumentFieldWidgetType.LocalTime;
+				return cast(TimeUtil.asLocalTime(DateTimeConverters.fromObject(value, widgetTypeEffective)));
+			}
+			else if (Instant.class == targetType)
+			{
+				final DocumentFieldWidgetType widgetTypeEffective = widgetType != null ? widgetType : DocumentFieldWidgetType.Timestamp;
+				return cast(TimeUtil.asInstant(DateTimeConverters.fromObject(value, widgetTypeEffective)));
 			}
 			else if (Integer.class == targetType || int.class == targetType)
 			{
@@ -208,7 +219,9 @@ public final class DataTypes
 						+ "\n Target type: " + targetType
 						+ "\n Source type: " + value.getClass()
 						+ "\n Value: " + value
-						+ "\n LookupDataSource: " + lookupDataSource);
+						+ "\n LookupDataSource: " + lookupDataSource
+						+ "\n\n Suggestions:"
+						+ "\n * if the call is coming from a proxy interface, try using right type (e.g. IntegerLookupValue instead of LookupValue).");
 				return cast(value);
 			}
 			else
@@ -229,7 +242,7 @@ public final class DataTypes
 	}
 
 	@SuppressWarnings("unchecked")
-	private static final <T> T cast(final Object value)
+	private static <T> T cast(final Object value)
 	{
 		return (T)value;
 	}
@@ -261,7 +274,7 @@ public final class DataTypes
 		}
 	}
 
-	private static Integer convertToInteger(final Object value)
+	public static Integer convertToInteger(final Object value)
 	{
 		if (value == null)
 		{
@@ -290,6 +303,10 @@ public final class DataTypes
 		{
 			return ((LookupValue)value).getIdAsInt();
 		}
+		else if (value instanceof JSONLookupValue)
+		{
+			return ((JSONLookupValue)value).getKeyAsInt();
+		}
 		else if (value instanceof Map)
 		{
 			@SuppressWarnings("unchecked")
@@ -303,7 +320,9 @@ public final class DataTypes
 		}
 		else
 		{
-			throw new ValueConversionException();
+			throw new ValueConversionException()
+					.setFromValue(value)
+					.setTargetType(Integer.class);
 		}
 	}
 
@@ -320,7 +339,7 @@ public final class DataTypes
 		if (value instanceof String)
 		{
 			final String valueStr = (String)value;
-			return valueStr.isEmpty() ? BigDecimal.ZERO : new BigDecimal(valueStr);
+			return valueStr.isEmpty() ? null : new BigDecimal(valueStr);
 		}
 		else if (value instanceof Integer)
 		{
@@ -363,7 +382,15 @@ public final class DataTypes
 		}
 	}
 
-	private static IntegerLookupValue convertToIntegerLookupValue(final Object value, final LookupValueByIdSupplier lookupDataSource)
+	public static IntegerLookupValue convertToIntegerLookupValue(@Nullable final Object value)
+	{
+		final LookupValueByIdSupplier lookupDataSource = null;
+		return convertToIntegerLookupValue(value, lookupDataSource);
+	}
+
+	private static IntegerLookupValue convertToIntegerLookupValue(
+			@Nullable final Object value,
+			@Nullable final LookupValueByIdSupplier lookupDataSource)
 	{
 		if (value == null)
 		{
@@ -373,6 +400,11 @@ public final class DataTypes
 		{
 			final LookupValue lookupValue = (LookupValue)value;
 			return toIntegerLookupValue(lookupValue);
+		}
+		else if (value instanceof JSONLookupValue)
+		{
+			final JSONLookupValue json = (JSONLookupValue)value;
+			return json.toIntegerLookupValue();
 		}
 		else if (value instanceof Map)
 		{
@@ -393,6 +425,22 @@ public final class DataTypes
 				return lookupValue;
 			}
 		}
+		else if (value instanceof RepoIdAware)
+		{
+			final int valueInt = ((RepoIdAware)value).getRepoId();
+			if (lookupDataSource != null)
+			{
+				final LookupValue lookupValue = lookupDataSource.findById(valueInt);
+				return toIntegerLookupValue(lookupValue);
+			}
+			else
+			{
+				throw new ValueConversionException()
+						.setFromValue(value)
+						.setTargetType(IntegerLookupValue.class)
+						.setLookupDataSource(lookupDataSource);
+			}
+		}
 		else if (value instanceof Number)
 		{
 			final int valueInt = ((Number)value).intValue();
@@ -404,7 +452,10 @@ public final class DataTypes
 			}
 			else
 			{
-				throw new ValueConversionException();
+				throw new ValueConversionException()
+						.setFromValue(value)
+						.setTargetType(IntegerLookupValue.class)
+						.setLookupDataSource(lookupDataSource);
 			}
 		}
 		else if (value instanceof String)
@@ -423,12 +474,18 @@ public final class DataTypes
 			}
 			else
 			{
-				throw new ValueConversionException();
+				throw new ValueConversionException()
+						.setFromValue(value)
+						.setTargetType(IntegerLookupValue.class)
+						.setLookupDataSource(lookupDataSource);
 			}
 		}
 		else
 		{
-			throw new ValueConversionException();
+			throw new ValueConversionException()
+					.setFromValue(value)
+					.setTargetType(IntegerLookupValue.class)
+					.setLookupDataSource(lookupDataSource);
 		}
 	}
 
@@ -454,7 +511,15 @@ public final class DataTypes
 		}
 	}
 
-	private static StringLookupValue convertToStringLookupValue(final Object value, final LookupValueByIdSupplier lookupDataSource)
+	public static StringLookupValue convertToStringLookupValue(final Object value)
+	{
+		final LookupValueByIdSupplier lookupDataSource = null;
+		return convertToStringLookupValue(value, lookupDataSource);
+	}
+
+	private static StringLookupValue convertToStringLookupValue(
+			@Nullable final Object value,
+			@Nullable final LookupValueByIdSupplier lookupDataSource)
 	{
 		if (value == null)
 		{
@@ -465,7 +530,12 @@ public final class DataTypes
 			final LookupValue lookupValue = (LookupValue)value;
 			return toStringLookupValue(lookupValue);
 		}
-		if (value instanceof Map)
+		else if (value instanceof JSONLookupValue)
+		{
+			final JSONLookupValue json = (JSONLookupValue)value;
+			return json.toStringLookupValue();
+		}
+		else if (value instanceof Map)
 		{
 			@SuppressWarnings("unchecked")
 			final Map<String, Object> map = (Map<String, Object>)value;
@@ -500,12 +570,18 @@ public final class DataTypes
 			}
 			else
 			{
-				throw new ValueConversionException();
+				throw new ValueConversionException()
+						.setFromValue(value)
+						.setTargetType(IntegerLookupValue.class)
+						.setLookupDataSource(lookupDataSource);
 			}
 		}
 		else
 		{
-			throw new ValueConversionException();
+			throw new ValueConversionException()
+					.setFromValue(value)
+					.setTargetType(IntegerLookupValue.class)
+					.setLookupDataSource(lookupDataSource);
 		}
 	}
 
@@ -536,15 +612,25 @@ public final class DataTypes
 		{
 			return null;
 		}
+		else if (value instanceof String && ((String)value).isEmpty())
+		{
+			return null;
+		}
 		else if (value instanceof LookupValuesList)
 		{
-			return (LookupValuesList)value;
+			final LookupValuesList lookupValuesList = (LookupValuesList)value;
+			return lookupValuesList;
 		}
 		else if (value instanceof Map)
 		{
 			@SuppressWarnings("unchecked")
 			final Map<String, Object> map = (Map<String, Object>)value;
-			return JSONLookupValuesList.lookupValuesListFromJsonMap(map);
+			final LookupValuesList lookupValuesList = JSONLookupValuesList.lookupValuesListFromJsonMap(map);
+			if (lookupValuesList.isEmpty())
+			{
+				return null;
+			}
+			return lookupValuesList;
 		}
 		else
 		{
@@ -591,120 +677,6 @@ public final class DataTypes
 		else
 		{
 			throw new ValueConversionException();
-		}
-	}
-
-	private static ZonedDateTime convertToZonedDateTime(final Object value)
-	{
-		if (value == null)
-		{
-			return null;
-		}
-		else if (value instanceof ZonedDateTime)
-		{
-			return (ZonedDateTime)value;
-		}
-		else if (value instanceof String)
-		{
-			final String valueStr = value.toString().trim();
-			if (valueStr.isEmpty())
-			{
-				return null;
-			}
-			else
-			{
-				return JSONDate.zonedDateTimeFromJson(valueStr);
-			}
-		}
-		else
-		{
-			return TimeUtil.asZonedDateTime(value);
-		}
-	}
-
-	private static LocalDateTime convertToLocalDateTime(final Object value)
-	{
-		if (value == null)
-		{
-			return null;
-		}
-		else if (value instanceof LocalDateTime)
-		{
-			return (LocalDateTime)value;
-		}
-		else if (value instanceof String)
-		{
-			final String valueStr = value.toString().trim();
-			if (valueStr.isEmpty())
-			{
-				return null;
-			}
-			else
-			{
-				return JSONDate.localDateTimeFromJson(valueStr);
-			}
-		}
-		else
-		{
-			return TimeUtil.asLocalDateTime(value);
-		}
-	}
-
-	private static LocalDate convertToLocalDate(final Object value)
-	{
-		final LocalDateTime localDateTime = convertToLocalDateTime(value);
-		return localDateTime != null ? localDateTime.toLocalDate() : null;
-	}
-
-	private static LocalTime convertToLocalTime(final Object value)
-	{
-		final LocalDateTime localDateTime = convertToLocalDateTime(value);
-		return localDateTime != null ? localDateTime.toLocalTime() : null;
-	}
-
-	private static Timestamp convertToTimestamp(final Object value, final DocumentFieldWidgetType widgetType)
-	{
-		if (value == null)
-		{
-			return null;
-		}
-		else if (value instanceof Timestamp)
-		{
-			return (Timestamp)value;
-		}
-		else if (value instanceof String)
-		{
-			final java.util.Date date = JSONDate.fromJson((String)value, widgetType);
-			return TimeUtil.asTimestamp(date);
-		}
-		else
-		{
-			return TimeUtil.asTimestamp(value);
-		}
-	}
-
-	private static java.util.Date convertToJULDate(final Object value, final DocumentFieldWidgetType widgetType)
-	{
-		if (value == null)
-		{
-			return null;
-		}
-		else if (value instanceof Timestamp)
-		{
-			// Corner case: we need to convert Timestamp(which extends Date) to strict Date because else all value changed comparing methods will fail
-			return JSONDate.fromTimestamp((Timestamp)value);
-		}
-		else if (value instanceof java.util.Date)
-		{
-			return (java.util.Date)value;
-		}
-		else if (value instanceof String)
-		{
-			return JSONDate.fromJson((String)value, widgetType);
-		}
-		else
-		{
-			return TimeUtil.asDate(value);
 		}
 	}
 

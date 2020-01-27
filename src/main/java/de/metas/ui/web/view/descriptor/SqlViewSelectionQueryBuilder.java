@@ -15,8 +15,6 @@ import org.adempiere.ad.expression.api.IStringExpression;
 import org.adempiere.ad.expression.api.IStringExpressionWrapper;
 import org.adempiere.ad.expression.api.impl.CompositeStringExpression;
 import org.adempiere.ad.expression.api.impl.ConstantStringExpression;
-import org.adempiere.ad.security.IUserRolePermissions;
-import org.adempiere.ad.security.impl.AccessSqlStringExpression;
 import org.adempiere.exceptions.AdempiereException;
 import org.compiere.util.DB;
 import org.slf4j.Logger;
@@ -24,6 +22,9 @@ import org.slf4j.Logger;
 import com.google.common.collect.ImmutableList;
 
 import de.metas.logging.LogManager;
+import de.metas.security.IUserRolePermissions;
+import de.metas.security.impl.AccessSqlStringExpression;
+import de.metas.security.permissions.Access;
 import de.metas.ui.web.base.model.I_T_WEBUI_ViewSelection;
 import de.metas.ui.web.base.model.I_T_WEBUI_ViewSelectionLine;
 import de.metas.ui.web.document.filter.DocumentFilter;
@@ -38,8 +39,8 @@ import de.metas.ui.web.window.datatypes.DocumentIdsSelection;
 import de.metas.ui.web.window.model.DocumentQueryOrderBy;
 import de.metas.ui.web.window.model.sql.SqlDocumentOrderByBuilder;
 import de.metas.ui.web.window.model.sql.SqlDocumentOrderByBuilder.SqlOrderByBindings;
-import de.metas.util.Check;
 import de.metas.ui.web.window.model.sql.SqlOptions;
+import de.metas.util.Check;
 import lombok.Builder;
 import lombok.NonNull;
 import lombok.Value;
@@ -81,7 +82,7 @@ public final class SqlViewSelectionQueryBuilder
 	private boolean applySecurityRestrictions = true;
 	private SqlDocumentFilterConverter _sqlDocumentFieldConverter; // lazy
 
-	public static final SqlViewSelectionQueryBuilder newInstance(final SqlViewBinding viewBinding)
+	public static SqlViewSelectionQueryBuilder newInstance(final SqlViewBinding viewBinding)
 	{
 		return new SqlViewSelectionQueryBuilder(viewBinding);
 	}
@@ -249,7 +250,6 @@ public final class SqlViewSelectionQueryBuilder
 			final IStringExpression sqlSeqNo = IStringExpression.composer()
 					.append("row_number() OVER (ORDER BY ").append(sqlOrderBy).append(")")
 					.build();
-			// final IStringExpression sqlRecordId = ConstantStringExpression.of(keyColumnName);
 
 			sqlBuilder.append(
 					IStringExpression.composer()
@@ -451,7 +451,7 @@ public final class SqlViewSelectionQueryBuilder
 		return SqlAndParams.of(sqlCreateSelectionFromLines, sqlCreateSelectionFromLinesParams);
 	}
 
-	private final IStringExpression buildSqlWhereClause(final SqlParamsCollector sqlParams,
+	private IStringExpression buildSqlWhereClause(final SqlParamsCollector sqlParams,
 			@Nullable final List<DocumentFilter> filters,
 			final SqlOptions sqlOpts,
 			final SqlDocumentFilterConverterContext context)
@@ -795,7 +795,7 @@ public final class SqlViewSelectionQueryBuilder
 	{
 		if (applySecurityRestrictions)
 		{
-			return AccessSqlStringExpression.wrapper(sqlTableAlias, IUserRolePermissions.SQL_FULLYQUALIFIED, IUserRolePermissions.SQL_RO);
+			return AccessSqlStringExpression.wrapper(sqlTableAlias, IUserRolePermissions.SQL_FULLYQUALIFIED, Access.READ);
 		}
 		else
 		{

@@ -10,25 +10,29 @@ import java.util.stream.Stream;
 
 import javax.annotation.Nullable;
 
+import org.adempiere.model.InterfaceWrapperHelper;
 import org.adempiere.util.lang.impl.TableRecordReferenceSet;
 import org.compiere.util.Evaluatee;
+import org.eevolution.api.IPPOrderDAO;
+import org.eevolution.api.PPOrderPlanningStatus;
 import org.eevolution.model.I_PP_Order;
 import org.eevolution.model.I_PP_Order_BOMLine;
-import org.eevolution.model.X_PP_Order;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
 import de.metas.i18n.ITranslatableString;
+import de.metas.material.planning.pporder.IPPOrderBOMDAO;
+import de.metas.material.planning.pporder.PPOrderId;
+import de.metas.order.OrderLineId;
 import de.metas.process.RelatedProcessDescriptor;
 import de.metas.ui.web.document.filter.DocumentFilter;
 import de.metas.ui.web.exceptions.EntityNotFoundException;
 import de.metas.ui.web.view.IView;
 import de.metas.ui.web.view.IViewRow;
-import de.metas.ui.web.view.ViewCloseReason;
 import de.metas.ui.web.view.ViewId;
 import de.metas.ui.web.view.ViewResult;
+import de.metas.ui.web.view.ViewRowsOrderBy;
 import de.metas.ui.web.view.event.ViewChangesCollector;
 import de.metas.ui.web.view.json.JSONViewDataType;
 import de.metas.ui.web.window.datatypes.DocumentId;
@@ -38,6 +42,7 @@ import de.metas.ui.web.window.datatypes.LookupValuesList;
 import de.metas.ui.web.window.model.DocumentQueryOrderBy;
 import de.metas.ui.web.window.model.sql.SqlOptions;
 import de.metas.util.GuavaCollectors;
+import de.metas.util.Services;
 import lombok.Builder;
 import lombok.NonNull;
 
@@ -72,8 +77,8 @@ public class PPOrderLinesView implements IView
 	private final JSONViewDataType viewType;
 	private final ImmutableSet<DocumentPath> referencingDocumentPaths;
 
-	private final int ppOrderId;
-	private final int salesOrderLineId;
+	private final PPOrderId ppOrderId;
+	private final OrderLineId salesOrderLineId;
 
 	private final PPOrderLinesViewDataSupplier dataSupplier;
 
@@ -91,7 +96,7 @@ public class PPOrderLinesView implements IView
 			@NonNull final ViewId viewId,
 			@NonNull final JSONViewDataType viewType,
 			final Set<DocumentPath> referencingDocumentPaths,
-			final int ppOrderId,
+			@NonNull final PPOrderId ppOrderId,
 			final PPOrderLinesViewDataSupplier dataSupplier,
 			@NonNull final List<RelatedProcessDescriptor> additionalRelatedProcessDescriptors)
 	{
@@ -103,10 +108,9 @@ public class PPOrderLinesView implements IView
 
 		this.additionalRelatedProcessDescriptors = ImmutableList.copyOf(additionalRelatedProcessDescriptors);
 
-		Preconditions.checkArgument(ppOrderId > 0, "PP_Order_ID not provided");
 		this.ppOrderId = ppOrderId;
 		final I_PP_Order ppOrder = load(ppOrderId, I_PP_Order.class);
-		this.salesOrderLineId = ppOrder.getC_OrderLine_ID();
+		this.salesOrderLineId = OrderLineId.ofRepoIdOrNull(ppOrder.getC_OrderLine_ID());
 
 		this.dataSupplier = dataSupplier;
 	}
@@ -117,19 +121,19 @@ public class PPOrderLinesView implements IView
 		return getData().getDescription();
 	}
 
-	public String getPlanningStatus()
+	public PPOrderPlanningStatus getPlanningStatus()
 	{
 		return getData().getPlanningStatus();
 	}
 
 	public boolean isStatusPlanning()
 	{
-		return X_PP_Order.PLANNINGSTATUS_Planning.equals(getPlanningStatus());
+		return PPOrderPlanningStatus.PLANNING.equals(getPlanningStatus());
 	}
 
 	public boolean isStatusReview()
 	{
-		return X_PP_Order.PLANNINGSTATUS_Review.equals(getPlanningStatus());
+		return PPOrderPlanningStatus.REVIEW.equals(getPlanningStatus());
 	}
 
 	@Override
@@ -181,12 +185,12 @@ public class PPOrderLinesView implements IView
 		return ppOrderLine.getType().getTableName();
 	}
 
-	public int getPP_Order_ID()
+	public PPOrderId getPpOrderId()
 	{
 		return ppOrderId;
 	}
 
-	public int getSalesOrderLineId()
+	public OrderLineId getSalesOrderLineId()
 	{
 		return salesOrderLineId;
 	}
@@ -198,7 +202,7 @@ public class PPOrderLinesView implements IView
 	}
 
 	@Override
-	public void close(final ViewCloseReason reason)
+	public void afterDestroy()
 	{
 		invalidateAllNoNotify();
 	}
@@ -216,7 +220,10 @@ public class PPOrderLinesView implements IView
 	}
 
 	@Override
-	public ViewResult getPage(final int firstRow, final int pageLength, final List<DocumentQueryOrderBy> orderBys)
+	public ViewResult getPage(
+			final int firstRow, 
+			final int pageLength, 
+			@NonNull final ViewRowsOrderBy orderBys)
 	{
 		final Stream<PPOrderLineRow> stream = getData().stream()
 				.skip(firstRow)
@@ -224,7 +231,7 @@ public class PPOrderLinesView implements IView
 
 		final List<IViewRow> page = stream.collect(GuavaCollectors.toImmutableList());
 
-		return ViewResult.ofViewAndPage(this, firstRow, pageLength, orderBys, page);
+		return ViewResult.ofViewAndPage(this, firstRow, pageLength, orderBys.toDocumentQueryOrderByList(), page);
 	}
 
 	@Override
@@ -301,23 +308,32 @@ public class PPOrderLinesView implements IView
 	{
 		if (I_PP_Order.class.isAssignableFrom(modelClass))
 		{
-			if (ppOrderLineRow.getPP_Order_ID() <= 0)
+			if (ppOrderLineRow.getOrderId() == null)
 			{
 				return Optional.empty();
 			}
-			return Optional.of(load(ppOrderLineRow.getPP_Order_ID(), modelClass));
+			else
+			{
+				final I_PP_Order order = Services.get(IPPOrderDAO.class).getById(ppOrderLineRow.getOrderId());
+				return Optional.of(InterfaceWrapperHelper.create(order, modelClass));
+			}
 		}
-
-		if (I_PP_Order_BOMLine.class.isAssignableFrom(modelClass))
+		else if (I_PP_Order_BOMLine.class.isAssignableFrom(modelClass))
 		{
-			if (ppOrderLineRow.getPP_Order_BOMLine_ID() <= 0)
+			if (ppOrderLineRow.getOrderBOMLineId() == null)
 			{
 				return Optional.empty();
 			}
-			return Optional.of(load(ppOrderLineRow.getPP_Order_BOMLine_ID(), modelClass));
+			else
+			{
+				final I_PP_Order_BOMLine orderBOMLine = Services.get(IPPOrderBOMDAO.class).getOrderBOMLineById(ppOrderLineRow.getOrderBOMLineId());
+				return Optional.of(InterfaceWrapperHelper.create(orderBOMLine, modelClass));
+			}
 		}
-
-		return Optional.empty();
+		else
+		{
+			return Optional.empty();
+		}
 	}
 
 	@Override

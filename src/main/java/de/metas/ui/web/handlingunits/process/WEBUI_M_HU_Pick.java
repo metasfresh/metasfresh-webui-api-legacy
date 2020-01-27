@@ -11,10 +11,12 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
 import de.metas.handlingunits.HuId;
+import de.metas.handlingunits.picking.PickFrom;
 import de.metas.handlingunits.picking.PickingCandidateService;
-import de.metas.handlingunits.picking.requests.PickHURequest;
+import de.metas.handlingunits.picking.requests.PickRequest;
 import de.metas.inoutcandidate.api.ShipmentScheduleId;
 import de.metas.logging.LogManager;
+import de.metas.order.OrderLineId;
 import de.metas.picking.api.PickingSlotId;
 import de.metas.process.IProcessDefaultParameter;
 import de.metas.process.IProcessDefaultParametersProvider;
@@ -151,7 +153,7 @@ public class WEBUI_M_HU_Pick extends ViewBasedProcessTemplate implements IProces
 		return filler.getPickingSlotValues(context);
 	}
 
-	private int getSalesOrderLineId()
+	private OrderLineId getSalesOrderLineId()
 	{
 		final IView view = getView();
 		if (view instanceof PPOrderLinesView)
@@ -161,7 +163,7 @@ public class WEBUI_M_HU_Pick extends ViewBasedProcessTemplate implements IProces
 		}
 		else
 		{
-			return -1;
+			return null;
 		}
 	}
 
@@ -179,9 +181,9 @@ public class WEBUI_M_HU_Pick extends ViewBasedProcessTemplate implements IProces
 		final HuId huId = row.getHuId();
 		final PickingSlotId pickingSlotId = PickingSlotId.ofRepoId(pickingSlotIdInt);
 		final ShipmentScheduleId shipmentScheduleId = ShipmentScheduleId.ofRepoId(shipmentScheduleIdInt);
-		pickingCandidateService.pickHU(PickHURequest.builder()
+		pickingCandidateService.pickHU(PickRequest.builder()
 				.shipmentScheduleId(shipmentScheduleId)
-				.pickFromHuId(huId)
+				.pickFrom(PickFrom.ofHuId(huId))
 				.pickingSlotId(pickingSlotId)
 				.build());
 		// NOTE: we are not moving the HU to shipment schedule's locator.
@@ -226,7 +228,7 @@ public class WEBUI_M_HU_Pick extends ViewBasedProcessTemplate implements IProces
 				return null;
 			}
 			return HURow.builder()
-					.huId(HuId.ofRepoIdOrNull(ppOrderLineRow.getM_HU_ID()))
+					.huId(ppOrderLineRow.getHuId())
 					.topLevelHU(ppOrderLineRow.isTopLevelHU())
 					.huStatusActive(ppOrderLineRow.isHUStatusActive())
 					.build();

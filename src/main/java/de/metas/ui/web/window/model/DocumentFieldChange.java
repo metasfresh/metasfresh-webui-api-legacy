@@ -13,6 +13,7 @@ import com.google.common.collect.ImmutableMap;
 
 import de.metas.logging.LogManager;
 import de.metas.ui.web.window.datatypes.Values;
+import de.metas.ui.web.window.datatypes.json.JSONOptions;
 import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
 import de.metas.ui.web.window.model.IDocumentChangesCollector.ReasonSupplier;
 import lombok.NonNull;
@@ -47,7 +48,7 @@ import lombok.NonNull;
  */
 public final class DocumentFieldChange
 {
-	/* package */static final DocumentFieldChange of(final String fieldName, final boolean key, final boolean publicField, final boolean advancedField, final DocumentFieldWidgetType widgetType)
+	/* package */static DocumentFieldChange of(final String fieldName, final boolean key, final boolean publicField, final boolean advancedField, final DocumentFieldWidgetType widgetType)
 	{
 		return new DocumentFieldChange(fieldName, key, publicField, advancedField, widgetType);
 	}
@@ -89,7 +90,6 @@ public final class DocumentFieldChange
 
 	private DocumentFieldChange(final String fieldName, final boolean key, final boolean publicField, final boolean advancedField, final DocumentFieldWidgetType widgetType)
 	{
-		super();
 		this.fieldName = Preconditions.checkNotNull(fieldName, "fieldName shall not be null");
 		this.key = key;
 		this.publicField = publicField;
@@ -192,9 +192,9 @@ public final class DocumentFieldChange
 		return value;
 	}
 
-	public Object getValueAsJsonObject()
+	public Object getValueAsJsonObject(final JSONOptions jsonOpts)
 	{
-		return Values.valueToJsonObject(value);
+		return Values.valueToJsonObject(value, jsonOpts);
 	}
 
 	public ReasonSupplier getValueReason()
@@ -327,7 +327,7 @@ public final class DocumentFieldChange
 		{
 			validStatus = fromEvent.validStatus;
 		}
-		
+
 		if(fromEvent.fieldWarning != null)
 		{
 			fieldWarning = fromEvent.fieldWarning;

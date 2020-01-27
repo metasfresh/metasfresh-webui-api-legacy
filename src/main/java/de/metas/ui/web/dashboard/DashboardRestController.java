@@ -34,6 +34,7 @@ import de.metas.ui.web.dashboard.json.JsonKPI;
 import de.metas.ui.web.dashboard.json.JsonUserDashboardItemAddRequest;
 import de.metas.ui.web.session.UserSession;
 import de.metas.ui.web.websocket.WebsocketSender;
+import de.metas.ui.web.window.datatypes.json.JSONDocumentLayoutOptions;
 import de.metas.ui.web.window.datatypes.json.JSONOptions;
 import de.metas.ui.web.window.datatypes.json.JSONPatchEvent;
 import de.metas.util.Services;
@@ -82,6 +83,11 @@ public class DashboardRestController
 		return JSONOptions.of(userSession);
 	}
 
+	private JSONDocumentLayoutOptions newJSONLayoutOptions()
+	{
+		return JSONDocumentLayoutOptions.of(userSession);
+	}
+
 	private UserDashboard getUserDashboardForReading()
 	{
 		if (!isElasticSearchEnabled())
@@ -89,7 +95,7 @@ public class DashboardRestController
 			return UserDashboard.EMPTY;
 		}
 
-		final UserDashboard dashboard = userDashboardRepo.getUserDashboard(UserDashboardKey.of(userSession.getAD_Client_ID()));
+		final UserDashboard dashboard = userDashboardRepo.getUserDashboard(UserDashboardKey.of(userSession.getClientId()));
 		// TODO: assert readable by current user
 		return dashboard;
 	}
@@ -106,7 +112,7 @@ public class DashboardRestController
 			return UserDashboard.EMPTY;
 		}
 
-		final UserDashboard dashboard = userDashboardRepo.getUserDashboard(UserDashboardKey.of(userSession.getAD_Client_ID()));
+		final UserDashboard dashboard = userDashboardRepo.getUserDashboard(UserDashboardKey.of(userSession.getClientId()));
 		// TODO: assert writable by current user
 		return dashboard;
 	}
@@ -140,7 +146,7 @@ public class DashboardRestController
 		userSession.assertLoggedIn();
 
 		final UserDashboard userDashboard = getUserDashboardForReading();
-		return JSONDashboard.of(userDashboard.getItems(widgetType), userDashboard.getWebsocketEndpoint(), newJSONOpts());
+		return JSONDashboard.of(userDashboard.getItems(widgetType), userDashboard.getWebsocketEndpoint(), newJSONLayoutOptions());
 	}
 
 	@GetMapping("/kpis/available")
@@ -189,7 +195,7 @@ public class DashboardRestController
 
 		// Return newly created item
 		final UserDashboardItem targetIndicatorItem = dashboard.getItemById(widgetType, itemId);
-		return JSONDashboardItem.of(targetIndicatorItem, newJSONOpts());
+		return JSONDashboardItem.of(targetIndicatorItem, newJSONLayoutOptions());
 	}
 
 	@GetMapping("/kpis/{itemId}/data")
@@ -224,7 +230,8 @@ public class DashboardRestController
 		final KPI kpi = dashboardItem.getKPI();
 		final TimeRange timeRange = dashboardItem.getTimeRangeDefaults().createTimeRange(fromMillis, toMillis);
 
-		return KPIDataLoader.newInstance(elasticsearchClient, kpi)
+		final JSONOptions jsonOptions = JSONOptions.of(userSession);
+		return KPIDataLoader.newInstance(elasticsearchClient, kpi, jsonOptions)
 				.setTimeRange(timeRange)
 				.setFormatValues(prettyValues)
 				.retrieveData()
@@ -296,7 +303,7 @@ public class DashboardRestController
 		// Return the changed item
 		{
 			final UserDashboardItem item = dashboard.getItemById(widgetType, itemId);
-			return JSONDashboardItem.of(item, newJSONOpts());
+			return JSONDashboardItem.of(item, newJSONLayoutOptions());
 		}
 	}
 }

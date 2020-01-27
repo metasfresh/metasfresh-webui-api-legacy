@@ -12,8 +12,8 @@ import com.google.common.collect.ImmutableSet;
 
 import de.metas.process.RelatedProcessDescriptor;
 import de.metas.ui.web.document.filter.DocumentFilter;
-import de.metas.ui.web.document.filter.DocumentFilterDescriptorsProvider;
-import de.metas.ui.web.document.filter.NullDocumentFilterDescriptorsProvider;
+import de.metas.ui.web.document.filter.provider.DocumentFilterDescriptorsProvider;
+import de.metas.ui.web.document.filter.provider.NullDocumentFilterDescriptorsProvider;
 import de.metas.ui.web.document.filter.sql.SqlDocumentFilterConverterContext;
 import de.metas.ui.web.process.view.ViewActionDescriptorsList;
 import de.metas.ui.web.view.ViewId;
@@ -264,8 +264,8 @@ public final class HUEditorViewBuilder
 			if (parameters == null)
 			{
 				parameters = new LinkedHashMap<>();
-				parameters.put(name, value);
 			}
+			parameters.put(name, value);
 		}
 
 		return this;
@@ -282,13 +282,20 @@ public final class HUEditorViewBuilder
 		return parameters != null ? ImmutableMap.copyOf(parameters) : ImmutableMap.of();
 	}
 
+	public <T> T getParameter(@NonNull final String name)
+	{
+		@SuppressWarnings("unchecked")
+		final T value = (T)parameters.get(name);
+		return value;
+	}
+
 	public HUEditorViewBuilder setHUEditorViewRepository(final HUEditorViewRepository huEditorViewRepository)
 	{
 		this.huEditorViewRepository = huEditorViewRepository;
 		return this;
 	}
 
-	final HUEditorViewBuffer createRowsBuffer(@NonNull final SqlDocumentFilterConverterContext context)
+	HUEditorViewBuffer createRowsBuffer(@NonNull final SqlDocumentFilterConverterContext context)
 	{
 		final ViewId viewId = getViewId();
 		final List<DocumentFilter> stickyFilters = getStickyFilters();

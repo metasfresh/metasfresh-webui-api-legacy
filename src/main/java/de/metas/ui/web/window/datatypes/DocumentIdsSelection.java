@@ -18,6 +18,7 @@ import javax.annotation.concurrent.Immutable;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableSet;
 
+import de.metas.process.SelectionSize;
 import de.metas.util.lang.RepoIdAware;
 import lombok.EqualsAndHashCode;
 import lombok.NonNull;
@@ -230,7 +231,7 @@ public final class DocumentIdsSelection
 		return this == ALL;
 	}
 
-	private final void assertNotAll()
+	private void assertNotAll()
 	{
 		if (all)
 		{
@@ -267,7 +268,7 @@ public final class DocumentIdsSelection
 		return documentIds;
 	}
 
-	public <T> Set<T> toSet(@NonNull final Function<DocumentId, T> mapper)
+	public <T> ImmutableSet<T> toSet(@NonNull final Function<DocumentId, T> mapper)
 	{
 		assertNotAll();
 		if (documentIds.isEmpty())
@@ -282,7 +283,7 @@ public final class DocumentIdsSelection
 		return toSet(DocumentId::toInt);
 	}
 
-	public <ID extends RepoIdAware> Set<ID> toIds(@NonNull final Function<Integer, ID> idMapper)
+	public <ID extends RepoIdAware> ImmutableSet<ID> toIds(@NonNull final Function<Integer, ID> idMapper)
 	{
 		return toSet(idMapper.compose(DocumentId::toInt));
 	}
@@ -295,5 +296,14 @@ public final class DocumentIdsSelection
 		}
 
 		return toSet(DocumentId::toJson);
+	}
+
+	public SelectionSize toSelectionSize()
+	{
+		if (isAll())
+		{
+			return SelectionSize.ofAll();
+		}
+		return SelectionSize.ofSize(size());
 	}
 }

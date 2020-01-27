@@ -47,7 +47,7 @@ node('agent && linux') // shall only run on a jenkins agent with linux
     	final MvnConf mvnConf = new MvnConf(
     		'pom.xml', // pomFile
     		MAVEN_SETTINGS, // settingsFile
-    		"mvn-${MF_UPSTREAM_BRANCH}", // mvnRepoName
+			"mvn-${MF_UPSTREAM_BRANCH}".replace("/", "-"), // mvnRepoName
     		'https://repo.metasfresh.com' // mvnRepoBaseURL
     	)
     	echo "mvnConf=${mvnConf}"
@@ -84,13 +84,12 @@ node('agent && linux') // shall only run on a jenkins agent with linux
 		}
 
 				// update the metasfresh.version property. either to the latest version or to the given params.MF_UPSTREAM_VERSION.
-				sh "mvn --debug --settings ${mvnConf.settingsFile} --file ${mvnConf.pomFile} --batch-mode ${mvnConf.resolveParams} ${mavenUpdatePropertyParam} versions:update-property"
+				sh "mvn --settings ${mvnConf.settingsFile} --file ${mvnConf.pomFile} --batch-mode ${mvnConf.resolveParams} ${mavenUpdatePropertyParam} versions:update-property"
 
 				// set the artifact version of everything below the webui's ${mvnConf.pomFile}
 				sh "mvn --settings ${mvnConf.settingsFile} --file ${mvnConf.pomFile} --batch-mode -DnewVersion=${MF_VERSION} -DallowSnapshots=false -DgenerateBackupPoms=true -DprocessDependencies=false -DprocessParent=true -DexcludeReactor=true -Dincludes=\"de.metas.ui.web*:*\" ${mvnConf.resolveParams} versions:set"
 
 		final def misc = new de.metas.jenkins.Misc();
-
 		final String BUILD_ARTIFACT_URL = "${mvnConf.deployRepoURL}/de/metas/ui/web/metasfresh-webui-api/${misc.urlEncode(MF_VERSION)}/metasfresh-webui-api-${misc.urlEncode(MF_VERSION)}.jar"
 
 		// do the actual building and deployment
@@ -111,15 +110,15 @@ node('agent && linux') // shall only run on a jenkins agent with linux
 		env.BUILD_ARTIFACT_URL = BUILD_ARTIFACT_URL
 		env.BUILD_CHANGE_URL = env.CHANGE_URL
 		env.MF_VERSION = MF_VERSION
-		env.BUILD_GIT_SHA1 = misc.getCommitSha1()
-		env.BUILD_DOCKER_IMAGE = publishedDockerImageName
+		env.BUILD_GIT_SHA1 = scmVars.GIT_COMMIT
+		env.MF_DOCKER_IMAGE = publishedDockerImageName
 		env.MF_VERSION = MF_VERSION
 
 		currentBuild.description="""This build's main artifacts (if not yet cleaned up) are
 <ul>
 <li>The executable jar <a href=\"${BUILD_ARTIFACT_URL}\">metasfresh-webui-api-${MF_VERSION}.jar</a></li>
 <li>A docker image which you can run in docker via<br>
-<code>docker run --rm -d -p 8080:8080 -e "DB_HOST=localhost" --name metasfresh-webui-api-${MF_VERSION} ${publishedDockerImageName}</code></li>
+<code>docker run --rm -d --memory=512m -p 8080:8080 -e "DB_HOST=localhost" --name metasfresh-webui-api-${misc.mkDockerTag(MF_VERSION)} ${publishedDockerImageName}</code></li>
 </ul>"""
 
 			publishJacocoReports(scmVars.GIT_COMMIT, 'codacy_project_token_for_metasfresh-webui-api_repo')
@@ -134,18 +133,22 @@ if(params.MF_TRIGGER_DOWNSTREAM_BUILDS)
 {
 	stage('Invoke downstream job')
 	{
-   def misc = new de.metas.jenkins.Misc();
-   final String jobName = misc.getEffectiveDownStreamJobName('metasfresh', MF_UPSTREAM_BRANCH);
+		final def misc = new de.metas.jenkins.Misc();
+		final String jobName = misc.getEffectiveDownStreamJobName('metasfresh', MF_UPSTREAM_BRANCH);
 
-   build job: jobName,
-     parameters: [
-       string(name: 'MF_UPSTREAM_BRANCH', value: MF_UPSTREAM_BRANCH),
-       string(name: 'MF_UPSTREAM_BUILDNO', value: env.BUILD_NUMBER),
-       string(name: 'MF_UPSTREAM_VERSION', value: MF_VERSION),
-       string(name: 'MF_UPSTREAM_JOBNAME', value: 'metasfresh-webui'),
-       booleanParam(name: 'MF_TRIGGER_DOWNSTREAM_BUILDS', value: true), // metasfresh shall trigger the "-dist" jobs
-       booleanParam(name: 'MF_SKIP_TO_DIST', value: true) // this param is only recognised by metasfresh
-     ], wait: false
+		final def metasfreshDownStreamBuildResult = build job: jobName,
+			parameters: [
+			string(name: 'MF_UPSTREAM_BRANCH', value: MF_UPSTREAM_BRANCH),
+			string(name: 'MF_UPSTREAM_BUILDNO', value: env.BUILD_NUMBER),
+			string(name: 'MF_UPSTREAM_VERSION', value: MF_VERSION),
+			string(name: 'MF_UPSTREAM_JOBNAME', value: 'metasfresh-webui'),
+			booleanParam(name: 'MF_TRIGGER_DOWNSTREAM_BUILDS', value: true), // metasfresh shall trigger the "-dist" jobs
+			booleanParam(name: 'MF_SKIP_TO_DIST', value: true) // this param is only recognised by metasfresh
+			], wait: true
+
+		currentBuild.description="""${currentBuild.description}<p/>
+This build triggered the <b>metasfresh</b> jenkins job <a href="${metasfreshDownStreamBuildResult.absoluteUrl}">${metasfreshDownStreamBuildResult.displayName}</a>
+				"""
 	}
 }
 else

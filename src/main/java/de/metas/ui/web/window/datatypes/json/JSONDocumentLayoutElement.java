@@ -3,6 +3,8 @@ package de.metas.ui.web.window.datatypes.json;
 import java.util.List;
 import java.util.Set;
 
+import javax.annotation.Nullable;
+
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -10,19 +12,19 @@ import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableSet;
 
-import de.metas.ui.web.devices.JSONDeviceDescriptor;
+import de.metas.process.BarcodeScannerType;
 import de.metas.ui.web.process.ProcessId;
 import de.metas.ui.web.window.datatypes.MediaType;
-import de.metas.ui.web.window.datatypes.json.JSONDocumentLayoutElementField.JSONFieldType;
-import de.metas.ui.web.window.datatypes.json.JSONDocumentLayoutElementField.JSONLookupSource;
 import de.metas.ui.web.window.descriptor.ButtonFieldActionDescriptor;
 import de.metas.ui.web.window.descriptor.ButtonFieldActionDescriptor.ButtonFieldActionType;
-import de.metas.util.GuavaCollectors;
 import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
 import de.metas.ui.web.window.descriptor.DocumentLayoutElementDescriptor;
 import de.metas.ui.web.window.descriptor.ViewEditorRenderMode;
 import de.metas.ui.web.window.descriptor.WidgetSize;
+import de.metas.util.GuavaCollectors;
 import io.swagger.annotations.ApiModel;
+import io.swagger.annotations.ApiModelProperty;
+import lombok.NonNull;
 import lombok.ToString;
 
 /*
@@ -52,7 +54,9 @@ import lombok.ToString;
 @ToString
 public final class JSONDocumentLayoutElement
 {
-	public static List<JSONDocumentLayoutElement> ofList(final List<DocumentLayoutElementDescriptor> elements, final JSONOptions jsonOpts)
+	public static List<JSONDocumentLayoutElement> ofList(
+			@NonNull final List<DocumentLayoutElementDescriptor> elements,
+			@NonNull final JSONDocumentLayoutOptions jsonOpts)
 	{
 		return elements.stream()
 				.filter(jsonOpts.documentLayoutElementFilter())
@@ -61,7 +65,9 @@ public final class JSONDocumentLayoutElement
 				.collect(GuavaCollectors.toImmutableList());
 	}
 
-	static JSONDocumentLayoutElement fromNullable(final DocumentLayoutElementDescriptor element, final JSONOptions jsonOpts)
+	static JSONDocumentLayoutElement fromNullable(
+			@Nullable final DocumentLayoutElementDescriptor element,
+			@NonNull final JSONDocumentLayoutOptions jsonOpts)
 	{
 		if (element == null)
 		{
@@ -102,7 +108,11 @@ public final class JSONDocumentLayoutElement
 	@JsonInclude(JsonInclude.Include.NON_NULL)
 	private final ProcessId buttonProcessId;
 
-	/** Type: primary, secondary */
+	@JsonProperty("barcodeScannerType")
+	@JsonInclude(JsonInclude.Include.NON_NULL)
+	final BarcodeScannerType barcodeScannerType;
+
+	@ApiModelProperty(allowEmptyValue = true)
 	@JsonProperty("type")
 	@JsonInclude(JsonInclude.Include.NON_NULL)
 	private final JSONLayoutType type;
@@ -131,12 +141,14 @@ public final class JSONDocumentLayoutElement
 	@JsonInclude(Include.NON_EMPTY)
 	private final Set<JSONDocumentLayoutElementField> fields;
 
-	private JSONDocumentLayoutElement(final DocumentLayoutElementDescriptor element, final JSONOptions jsonOpts)
+	private JSONDocumentLayoutElement(
+			@NonNull final DocumentLayoutElementDescriptor element,
+			@NonNull final JSONDocumentLayoutOptions options)
 	{
-		final String adLanguage = jsonOpts.getAD_Language();
+		final String adLanguage = options.getAdLanguage();
 
 		final String caption = element.getCaption(adLanguage);
-		if (jsonOpts.isDebugShowColumnNamesForCaption())
+		if (options.isDebugShowColumnNamesForCaption())
 		{
 			this.caption = element.getCaptionAsFieldNames();
 		}
@@ -172,6 +184,8 @@ public final class JSONDocumentLayoutElement
 			buttonProcessId = null;
 		}
 
+		this.barcodeScannerType = element.getBarcodeScannerType();
+
 		type = JSONLayoutType.fromNullable(element.getLayoutType());
 		size = element.getWidgetSize();
 
@@ -181,7 +195,7 @@ public final class JSONDocumentLayoutElement
 
 		restrictToMediaTypes = ImmutableSet.copyOf(element.getRestrictToMediaTypes());
 
-		fields = JSONDocumentLayoutElementField.ofSet(element.getFields(), jsonOpts);
+		fields = JSONDocumentLayoutElementField.ofSet(element.getFields(), options);
 	}
 
 	/** Debugging field constructor */
@@ -195,6 +209,7 @@ public final class JSONDocumentLayoutElement
 		multilineText = null;
 		multilineTextLines = null;
 		buttonProcessId = null;
+		barcodeScannerType = null;
 
 		type = null;
 		size = null;
@@ -204,21 +219,26 @@ public final class JSONDocumentLayoutElement
 
 		restrictToMediaTypes = null;
 
-		fields = ImmutableSet.of(new JSONDocumentLayoutElementField( //
-				fieldName,
-				(JSONFieldType)null,
-				(String)null, // tooltipIconName
-				(JSONLookupSource)null,
-				"no " + fieldName, // emptyText
-				(List<JSONDeviceDescriptor>)null,
-				(String)null, // newRecordWindowId
-				(String)null, // newRecordCaption
-				widgetType.isSupportZoomInto()
-		));
+		fields = ImmutableSet.of(
+				JSONDocumentLayoutElementField.builder()
+						.field(fieldName)
+						.emptyText("no " + fieldName)
+						.supportZoomInto(widgetType.isSupportZoomInto())
+						.build());
 	}
 
 	private boolean hasFields()
 	{
 		return !fields.isEmpty();
+	}
+
+	public boolean hasField(@NonNull final String fieldName)
+	{
+		return fields.stream().anyMatch(field -> fieldName.equals(field.getField()));
+	}
+
+	public static boolean hasField(@NonNull final List<JSONDocumentLayoutElement> elements, @NonNull final String fieldName)
+	{
+		return elements.stream().anyMatch(element -> element.hasField(fieldName));
 	}
 }

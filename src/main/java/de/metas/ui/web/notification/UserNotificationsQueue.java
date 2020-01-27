@@ -16,6 +16,8 @@ import de.metas.ui.web.notification.json.JSONNotification;
 import de.metas.ui.web.notification.json.JSONNotificationEvent;
 import de.metas.ui.web.websocket.WebSocketConfig;
 import de.metas.ui.web.websocket.WebsocketSender;
+import de.metas.ui.web.window.datatypes.json.JSONOptions;
+import de.metas.user.UserId;
 import de.metas.util.Check;
 import lombok.Builder;
 import lombok.NonNull;
@@ -46,8 +48,8 @@ public class UserNotificationsQueue
 {
 	private static final Logger logger = LogManager.getLogger(UserNotificationsQueue.class);
 
-	private final int adUserId;
-	private String adLanguage;
+	private final UserId userId;
+	private JSONOptions jsonOptions;
 
 	private final Set<String> activeSessions = ConcurrentHashMap.newKeySet();
 
@@ -58,19 +60,17 @@ public class UserNotificationsQueue
 
 	@Builder
 	private UserNotificationsQueue(
-			final int adUserId,
-			@NonNull final String adLanguage,
+			@NonNull final UserId userId,
+			@NonNull final JSONOptions jsonOptions,
 			@NonNull final INotificationRepository notificationsRepo,
 			@NonNull final WebsocketSender websocketSender)
 	{
-		Check.assumeGreaterOrEqualToZero(adUserId, "adUserId");
-
-		this.adUserId = adUserId;
-		this.adLanguage = adLanguage;
+		this.userId = userId;
+		this.jsonOptions = jsonOptions;
 		this.notificationsRepo = notificationsRepo;
 
 		this.websocketSender = websocketSender;
-		websocketEndpoint = WebSocketConfig.buildNotificationsTopicName(adUserId);
+		websocketEndpoint = WebSocketConfig.buildNotificationsTopicName(userId);
 
 		logger.trace("Created notifications queue: {}", this); // keep it last
 	}
@@ -83,9 +83,9 @@ public class UserNotificationsQueue
 				.toString();
 	}
 
-	public int getAD_User_ID()
+	public UserId getUserId()
 	{
-		return adUserId;
+		return userId;
 	}
 
 	public String getWebsocketEndpoint()
@@ -101,7 +101,7 @@ public class UserNotificationsQueue
 
 	public UserNotificationsList getNotificationsAsList(final int limit)
 	{
-		final List<UserNotification> notifications = notificationsRepo.getByUserId(adUserId, limit);
+		final List<UserNotification> notifications = notificationsRepo.getByUserId(userId, limit);
 		final boolean fullyLoaded = limit <= 0 || notifications.size() <= limit;
 
 		final int totalCount;
@@ -113,8 +113,8 @@ public class UserNotificationsQueue
 		}
 		else
 		{
-			totalCount = notificationsRepo.getTotalCountByUserId(adUserId);
-			unreadCount = notificationsRepo.getUnreadCountByUserId(adUserId);
+			totalCount = notificationsRepo.getTotalCountByUserId(userId);
+			unreadCount = notificationsRepo.getUnreadCountByUserId(userId);
 		}
 
 		return UserNotificationsList.of(notifications, totalCount, unreadCount);
@@ -140,10 +140,10 @@ public class UserNotificationsQueue
 
 	/* package */void addNotification(@NonNull final UserNotification notification)
 	{
-		final int adUserId = getAD_User_ID();
-		Check.assume(notification.getRecipientUserId() == adUserId, "notification's recipient user ID shall be {}: {}", adUserId, notification);
+		final UserId adUserId = getUserId();
+		Check.assume(notification.getRecipientUserId() == adUserId.getRepoId(), "notification's recipient user ID shall be {}: {}", adUserId, notification);
 
-		final JSONNotification jsonNotification = JSONNotification.of(notification, adLanguage);
+		final JSONNotification jsonNotification = JSONNotification.of(notification, jsonOptions);
 		fireEventOnWebsocket(JSONNotificationEvent.eventNew(jsonNotification, getUnreadCount()));
 	}
 
@@ -156,18 +156,18 @@ public class UserNotificationsQueue
 	public void markAllAsRead()
 	{
 		logger.trace("Marking all notifications as read (if any) for {}...", this);
-		notificationsRepo.markAllAsReadByUserId(getAD_User_ID());
+		notificationsRepo.markAllAsReadByUserId(getUserId());
 		fireEventOnWebsocket(JSONNotificationEvent.eventReadAll());
 	}
 
 	public int getUnreadCount()
 	{
-		return notificationsRepo.getUnreadCountByUserId(getAD_User_ID());
+		return notificationsRepo.getUnreadCountByUserId(getUserId());
 	}
 
 	public void setLanguage(@NonNull final String adLanguage)
 	{
-		this.adLanguage = adLanguage;
+		this.jsonOptions = jsonOptions.withAdLanguage(adLanguage);
 	}
 
 	public void delete(final String notificationId)
@@ -175,10 +175,10 @@ public class UserNotificationsQueue
 		notificationsRepo.deleteById(Integer.parseInt(notificationId));
 		fireEventOnWebsocket(JSONNotificationEvent.eventDeleted(notificationId, getUnreadCount()));
 	}
-	
+
 	public void deleteAll()
 	{
-		notificationsRepo.deleteAllByUserId(getAD_User_ID());
+		notificationsRepo.deleteAllByUserId(getUserId());
 		fireEventOnWebsocket(JSONNotificationEvent.eventDeletedAll());
 	}
 

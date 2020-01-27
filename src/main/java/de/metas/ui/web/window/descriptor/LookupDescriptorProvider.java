@@ -1,10 +1,8 @@
 package de.metas.ui.web.window.descriptor;
 
 import java.util.Optional;
-import java.util.function.Function;
 
-import de.metas.util.Check;
-import de.metas.util.Functions;
+import de.metas.ui.web.window.descriptor.DocumentLayoutElementFieldDescriptor.LookupSource;
 
 /*
  * #%L
@@ -30,30 +28,13 @@ import de.metas.util.Functions;
 
 /**
  * Provides {@link LookupDescriptor} for a given {@link LookupScope}.
- * 
+ *
  * @author metas-dev <dev@metasfresh.com>
  *
  */
 @FunctionalInterface
 public interface LookupDescriptorProvider
 {
-	/** @return provider which returns given {@link LookupDescriptor} for any scope */
-	static LookupDescriptorProvider singleton(final LookupDescriptor lookupDescriptor)
-	{
-		Check.assumeNotNull(lookupDescriptor, "Parameter lookupDescriptor is not null");
-		return (scope) -> lookupDescriptor;
-	}
-
-	/** @return provider which calls the given function (memoized) */
-	static LookupDescriptorProvider fromMemoizingFunction(final Function<LookupScope, LookupDescriptor> providerFunction)
-	{
-		final Function<LookupScope, LookupDescriptor> providerFunctionMemoized = Functions.memoizing(providerFunction);
-		return (scope) -> providerFunctionMemoized.apply(scope);
-	}
-
-	/** Provider which returns <code>null</code> for any scope) */
-	LookupDescriptorProvider NULL = (scope) -> null;
-
 	public static enum LookupScope
 	{
 		DocumentField, DocumentFilter
@@ -62,16 +43,35 @@ public interface LookupDescriptorProvider
 	/**
 	 * @return lookup descriptor or null
 	 */
-	LookupDescriptor provideForScope(LookupScope scope);
+	Optional<LookupDescriptor> provideForScope(LookupScope scope);
+
+	default Optional<LookupDescriptor> provide()
+	{
+		return provideForScope(LookupScope.DocumentField);
+	}
+
+	default Optional<LookupDescriptor> provideForFilter()
+	{
+		return provideForScope(LookupScope.DocumentFilter);
+	}
 
 	default boolean isNumericKey()
 	{
-		return provideForScope(LookupScope.DocumentField).isNumericKey();
+		return provide()
+				.map(LookupDescriptor::isNumericKey)
+				.orElse(false);
 	}
 
 	default Optional<String> getTableName()
 	{
-		final LookupDescriptor lookupDescriptor = provideForScope(LookupScope.DocumentField);
-		return lookupDescriptor != null ? lookupDescriptor.getTableName() : Optional.empty();
+		return provide()
+				.flatMap(LookupDescriptor::getTableName);
 	}
+
+	default Optional<LookupSource> getLookupSourceType()
+	{
+		return provide()
+				.map(LookupDescriptor::getLookupSourceType);
+	}
+
 }

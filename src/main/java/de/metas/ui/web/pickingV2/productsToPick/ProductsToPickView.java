@@ -1,20 +1,24 @@
 package de.metas.ui.web.pickingV2.productsToPick;
 
 import java.util.List;
-import java.util.function.UnaryOperator;
 
 import com.google.common.collect.ImmutableList;
 
+import de.metas.handlingunits.picking.PickingCandidate;
 import de.metas.i18n.ITranslatableString;
 import de.metas.process.RelatedProcessDescriptor;
-import de.metas.ui.web.document.filter.NullDocumentFilterDescriptorsProvider;
-import de.metas.ui.web.view.AbstractCustomView;
+import de.metas.ui.web.document.filter.provider.NullDocumentFilterDescriptorsProvider;
+import de.metas.ui.web.pickingV2.productsToPick.rows.ProductsToPickRow;
+import de.metas.ui.web.pickingV2.productsToPick.rows.ProductsToPickRowsData;
 import de.metas.ui.web.view.IEditableView;
 import de.metas.ui.web.view.IView;
+import de.metas.ui.web.view.ViewHeaderProperties;
 import de.metas.ui.web.view.ViewId;
+import de.metas.ui.web.view.template.AbstractCustomView;
 import de.metas.ui.web.window.datatypes.DocumentId;
 import de.metas.ui.web.window.datatypes.DocumentIdsSelection;
 import de.metas.ui.web.window.datatypes.LookupValuesList;
+import de.metas.ui.web.window.model.DocumentQueryOrderBy;
 import lombok.Builder;
 import lombok.NonNull;
 import lombok.Singular;
@@ -50,11 +54,13 @@ public class ProductsToPickView extends AbstractCustomView<ProductsToPickRow> im
 
 	private final ImmutableList<RelatedProcessDescriptor> relatedProcessDescriptors;
 	private final ProductsToPickRowsData rowsData;
+	private final ViewHeaderProperties headerProperties;
 
 	@Builder
 	private ProductsToPickView(
 			@NonNull final ViewId viewId,
 			final ITranslatableString description,
+			final ViewHeaderProperties headerProperties,
 			@NonNull final ProductsToPickRowsData rowsData,
 			@NonNull @Singular final ImmutableList<RelatedProcessDescriptor> relatedProcessDescriptors)
 	{
@@ -62,6 +68,20 @@ public class ProductsToPickView extends AbstractCustomView<ProductsToPickRow> im
 
 		this.rowsData = rowsData;
 		this.relatedProcessDescriptors = relatedProcessDescriptors;
+
+		this.headerProperties = headerProperties;
+	}
+
+	@Override
+	public ViewHeaderProperties getHeaderProperties()
+	{
+		return headerProperties;
+	}
+
+	@Override
+	public List<DocumentQueryOrderBy> getDefaultOrderBys()
+	{
+		return rowsData.getOrderBys();
 	}
 
 	@Override
@@ -92,13 +112,19 @@ public class ProductsToPickView extends AbstractCustomView<ProductsToPickRow> im
 			return false;
 		}
 
+		final boolean allApproved = streamByIds(DocumentIdsSelection.ALL).allMatch(ProductsToPickRow::isApproved);
+		if (allApproved)
+		{
+			return false;
+		}
+
 		return streamByIds(DocumentIdsSelection.ALL)
 				.allMatch(ProductsToPickRow::isEligibleForReview);
 	}
 
-	public void changeRow(@NonNull final DocumentId rowId, @NonNull final UnaryOperator<ProductsToPickRow> mapper)
+	public void updateViewRowFromPickingCandidate(@NonNull final DocumentId rowId, @NonNull final PickingCandidate pickingCandidate)
 	{
-		rowsData.changeRow(rowId, mapper);
+		rowsData.updateViewRowFromPickingCandidate(rowId, pickingCandidate);
 	}
 
 	public boolean isApproved()
@@ -116,7 +142,7 @@ public class ProductsToPickView extends AbstractCustomView<ProductsToPickRow> im
 	public LookupValuesList getFieldTypeahead(RowEditingContext ctx, String fieldName, String query)
 	{
 		throw new UnsupportedOperationException();
-}
+	}
 
 	@Override
 	public LookupValuesList getFieldDropdown(RowEditingContext ctx, String fieldName)

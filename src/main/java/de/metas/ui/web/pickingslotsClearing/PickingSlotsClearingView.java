@@ -15,10 +15,11 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
 import de.metas.i18n.ITranslatableString;
+import de.metas.i18n.TranslatableStrings;
 import de.metas.picking.model.I_M_PickingSlot;
 import de.metas.process.RelatedProcessDescriptor;
 import de.metas.ui.web.document.filter.DocumentFilter;
-import de.metas.ui.web.document.filter.DocumentFilterDescriptorsProvider;
+import de.metas.ui.web.document.filter.provider.DocumentFilterDescriptorsProvider;
 import de.metas.ui.web.exceptions.EntityNotFoundException;
 import de.metas.ui.web.handlingunits.HUEditorView;
 import de.metas.ui.web.picking.pickingslot.PickingSlotRow;
@@ -29,9 +30,10 @@ import de.metas.ui.web.pickingslotsClearing.process.HUExtractedFromPickingSlotEv
 import de.metas.ui.web.view.IView;
 import de.metas.ui.web.view.IViewRow;
 import de.metas.ui.web.view.IViewRowOverrides;
-import de.metas.ui.web.view.ViewCloseReason;
+import de.metas.ui.web.view.ViewCloseAction;
 import de.metas.ui.web.view.ViewId;
 import de.metas.ui.web.view.ViewResult;
+import de.metas.ui.web.view.ViewRowsOrderBy;
 import de.metas.ui.web.view.event.ViewChangesCollector;
 import de.metas.ui.web.view.json.JSONViewDataType;
 import de.metas.ui.web.window.datatypes.DocumentId;
@@ -89,7 +91,7 @@ public class PickingSlotsClearingView implements IView, IViewRowOverrides
 			@NonNull @Singular final ImmutableList<DocumentFilter> filters)
 	{
 		this.viewId = viewId;
-		this.description = ITranslatableString.nullToEmpty(description);
+		this.description = TranslatableStrings.nullToEmpty(description);
 		this.rows = PickingSlotRowsCollection.ofSupplier(rows);
 
 		this.additionalRelatedProcessDescriptors = additionalRelatedProcessDescriptors != null ? ImmutableList.copyOf(additionalRelatedProcessDescriptors) : ImmutableList.of();
@@ -172,11 +174,14 @@ public class PickingSlotsClearingView implements IView, IViewRowOverrides
 	}
 
 	@Override
-	public ViewResult getPage(final int firstRow, final int pageLength, final List<DocumentQueryOrderBy> orderBys)
+	public ViewResult getPage(
+			final int firstRow, 
+			final int pageLength, 
+			@NonNull final ViewRowsOrderBy orderBys)
 	{
 		final List<PickingSlotRow> pageRows = rows.getPage(firstRow, pageLength);
 
-		return ViewResult.ofViewAndPage(this, firstRow, pageLength, orderBys, pageRows);
+		return ViewResult.ofViewAndPage(this, firstRow, pageLength, orderBys.toDocumentQueryOrderByList(), pageRows);
 	}
 
 	@Override
@@ -206,6 +211,7 @@ public class PickingSlotsClearingView implements IView, IViewRowOverrides
 		return filterDescriptors.getByFilterId(filterId)
 				.getParameterByName(filterParameterName)
 				.getLookupDataSource()
+				.get()
 				.findEntities(ctx);
 	}
 
@@ -215,6 +221,7 @@ public class PickingSlotsClearingView implements IView, IViewRowOverrides
 		return filterDescriptors.getByFilterId(filterId)
 				.getParameterByName(filterParameterName)
 				.getLookupDataSource()
+				.get()
 				.findEntities(ctx, query);
 	}
 
@@ -297,11 +304,11 @@ public class PickingSlotsClearingView implements IView, IViewRowOverrides
 		return packingHUsViewsCollection.computeIfAbsent(PackingHUsViewKey.ofPackingHUsViewId(packingHUsViewId), packingHUsViewFactory::createPackingHUsView);
 	}
 
-	public void closePackingHUsView(final ViewId packingHUsViewId)
+	void closePackingHUsView(final ViewId packingHUsViewId, final ViewCloseAction closeAction)
 	{
 		final PackingHUsViewKey key = PackingHUsViewKey.ofPackingHUsViewId(packingHUsViewId);
 		packingHUsViewsCollection.removeIfExists(key)
-				.ifPresent(packingHUsView -> packingHUsView.close(ViewCloseReason.USER_REQUEST));
+				.ifPresent(packingHUsView -> packingHUsView.close(closeAction));
 	}
 
 	public void handleEvent(final HUExtractedFromPickingSlotEvent event)

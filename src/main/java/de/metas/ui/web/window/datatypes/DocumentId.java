@@ -170,16 +170,13 @@ public abstract class DocumentId implements Serializable
 		}
 	}
 
-	public static final Supplier<DocumentId> supplier(final IntSupplier intSupplier)
+	public static final Supplier<DocumentId> supplier(@NonNull final IntSupplier intSupplier)
 	{
-		Check.assumeNotNull(intSupplier, "Parameter intSupplier is not null");
 		return () -> of(intSupplier.getAsInt());
 	}
 
-	public static final Supplier<DocumentId> supplier(final String prefix, final int firstId)
+	public static final Supplier<DocumentId> supplier(@NonNull final String prefix, final int firstId)
 	{
-		Check.assumeNotNull(prefix, "Parameter prefix is not null");
-
 		final AtomicInteger nextId = new AtomicInteger(firstId);
 		return () -> ofString(prefix + nextId.getAndIncrement());
 	}
@@ -242,6 +239,8 @@ public abstract class DocumentId implements Serializable
 
 	public abstract int toInt();
 
+	public abstract boolean isComposedKey();
+
 	public abstract List<Object> toComposedKeyParts();
 
 	public DocumentId toIncludedRowId()
@@ -283,7 +282,7 @@ public abstract class DocumentId implements Serializable
 			throw exceptionSupplier.get();
 		}
 	}
-	
+
 	public <T extends RepoIdAware> T toId(@NonNull final IntFunction<T> mapper)
 	{
 		return mapper.apply(toInt());
@@ -351,6 +350,12 @@ public abstract class DocumentId implements Serializable
 		}
 
 		@Override
+		public boolean isComposedKey()
+		{
+			return false;
+		}
+
+		@Override
 		public List<Object> toComposedKeyParts()
 		{
 			return ImmutableList.of(idInt);
@@ -405,13 +410,26 @@ public abstract class DocumentId implements Serializable
 		@Override
 		public int toInt()
 		{
-			throw new AdempiereException("String document IDs cannot be converted to int: " + this);
+			if (isComposedKey())
+			{
+				throw new AdempiereException("Composed keys cannot be converted to int: " + this);
+			}
+			else
+			{
+				throw new AdempiereException("String document IDs cannot be converted to int: " + this);
+			}
 		}
 
 		@Override
 		public boolean isNew()
 		{
 			return false;
+		}
+
+		@Override
+		public boolean isComposedKey()
+		{
+			return idStr.indexOf(COMPOSED_KEY_SEPARATOR) >= 0;
 		}
 
 		@Override

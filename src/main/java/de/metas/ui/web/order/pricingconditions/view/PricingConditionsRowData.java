@@ -19,11 +19,12 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 
+import de.metas.money.CurrencyId;
 import de.metas.order.OrderLineId;
 import de.metas.ui.web.document.filter.DocumentFiltersList;
 import de.metas.ui.web.exceptions.EntityNotFoundException;
-import de.metas.ui.web.view.AbstractCustomView.IEditableRowsData;
 import de.metas.ui.web.view.IEditableView.RowEditingContext;
+import de.metas.ui.web.view.template.IEditableRowsData;
 import de.metas.ui.web.window.datatypes.DocumentId;
 import de.metas.ui.web.window.datatypes.DocumentIdsSelection;
 import de.metas.ui.web.window.datatypes.json.JSONDocumentChangedEvent;
@@ -60,50 +61,60 @@ class PricingConditionsRowData implements IEditableRowsData<PricingConditionsRow
 	@Getter
 	private final OrderLineId orderLineId;
 	private final DocumentFiltersList filters;
+
+	/** Sortof parent-instance that represents the superset of all pricing conditions rows. */
 	private final PricingConditionsRowData allRowsData;
 
 	private final ImmutableList<DocumentId> rowIds; // used to preserve the order
 	private final ConcurrentMap<DocumentId, PricingConditionsRow> rowsById;
 	private final DocumentId editableRowId;
 
+	@Getter
+	private final CurrencyId defaultCurrencyId;
+
 	@Builder
 	private PricingConditionsRowData(
-			final OrderLineId orderLineId,
+			@Nullable final OrderLineId orderLineId, // OK to not be set if called from material cockpit
 			@Nullable final PricingConditionsRow editableRow,
-			@NonNull final List<PricingConditionsRow> rows)
+			@NonNull final List<PricingConditionsRow> rows,
+			@Nullable final CurrencyId defaultCurrencyId)
 	{
-		// Check.assumeGreaterThanZero(salesOrderLineId, "salesOrderLineId"); // OK to not be set
-
 		this.orderLineId = orderLineId;
 		this.allRowsData = null;
 		this.filters = DocumentFiltersList.EMPTY;
 
-		rowIds = stream(editableRow, rows)
+		this.rowIds = stream(editableRow, rows)
 				.map(PricingConditionsRow::getId)
 				.collect(ImmutableList.toImmutableList());
-		rowsById = stream(editableRow, rows)
+		this.rowsById = stream(editableRow, rows)
 				.collect(Collectors.toConcurrentMap(PricingConditionsRow::getId, Function.identity()));
 
 		this.editableRowId = editableRow != null ? editableRow.getId() : null;
+		
+		this.defaultCurrencyId = defaultCurrencyId;
 	}
 
-	private PricingConditionsRowData(final PricingConditionsRowData from, final DocumentFiltersList filters)
+	private PricingConditionsRowData(
+			@NonNull final PricingConditionsRowData from,
+			@NonNull final DocumentFiltersList filters)
 	{
 		this.allRowsData = from.getAllRowsData();
 		this.filters = filters;
 		this.orderLineId = allRowsData.getOrderLineId();
 
-		rowsById = allRowsData.rowsById;
+		this.rowsById = allRowsData.rowsById;
 		final ImmutableSet<DocumentId> rowIdsNotOrdered = allRowsData.rowsById.values()
 				.stream()
 				.filter(PricingConditionsViewFilters.isEditableRowOrMatching(filters))
 				.map(PricingConditionsRow::getId)
 				.collect(ImmutableSet.toImmutableSet());
-		rowIds = allRowsData.rowIds.stream()
+		this.rowIds = allRowsData.rowIds.stream()
 				.filter(rowIdsNotOrdered::contains)
 				.collect(ImmutableList.toImmutableList());
 
 		this.editableRowId = from.editableRowId;
+		
+		this.defaultCurrencyId = from.defaultCurrencyId;
 	}
 
 	private PricingConditionsRowData getAllRowsData()
@@ -181,7 +192,7 @@ class PricingConditionsRowData implements IEditableRowsData<PricingConditionsRow
 	@Override
 	public void patchRow(final RowEditingContext ctx, final List<JSONDocumentChangedEvent> fieldChangeRequests)
 	{
-		final PricingConditionsRowChangeRequest request = PricingConditionsRowActions.toChangeRequest(fieldChangeRequests);
+		final PricingConditionsRowChangeRequest request = PricingConditionsRowActions.toChangeRequest(fieldChangeRequests, getDefaultCurrencyId());
 		changeRow(ctx.getRowId(), row -> PricingConditionsRowReducers.copyAndChange(request, row));
 	}
 

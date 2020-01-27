@@ -1,12 +1,16 @@
 package de.metas.ui.web.session;
 
+import java.time.Duration;
+import java.time.ZoneId;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Properties;
+import java.util.function.Supplier;
 
-import org.adempiere.ad.security.IUserRolePermissions;
-import org.adempiere.ad.security.UserRolePermissionsKey;
-import org.compiere.Adempiere;
+import org.adempiere.service.ClientId;
+import org.adempiere.service.ISysConfigBL;
+import org.compiere.SpringContextHolder;
 import org.compiere.util.Env;
 import org.compiere.util.Evaluatee;
 import org.compiere.util.Evaluatees;
@@ -18,6 +22,12 @@ import org.springframework.web.context.request.RequestContextHolder;
 
 import de.metas.i18n.Language;
 import de.metas.logging.LogManager;
+import de.metas.organization.IOrgDAO;
+import de.metas.organization.OrgId;
+import de.metas.organization.OrgInfo;
+import de.metas.security.IUserRolePermissions;
+import de.metas.security.RoleId;
+import de.metas.security.UserRolePermissionsKey;
 import de.metas.ui.web.base.session.UserPreference;
 import de.metas.ui.web.exceptions.DeprecatedRestAPINotAllowedException;
 import de.metas.ui.web.login.exceptions.AlreadyLoggedInException;
@@ -25,7 +35,10 @@ import de.metas.ui.web.login.exceptions.NotLoggedInAsSysAdminException;
 import de.metas.ui.web.login.exceptions.NotLoggedInException;
 import de.metas.ui.web.websocket.WebSocketConfig;
 import de.metas.ui.web.window.datatypes.json.JSONLookupValue;
+import de.metas.user.UserId;
 import de.metas.util.Check;
+import de.metas.util.Services;
+import de.metas.util.time.SystemTime;
 import lombok.NonNull;
 
 /*
@@ -83,21 +96,23 @@ public class UserSession
 			{
 				if (_staticUserSession == null)
 				{
-					userSession = _staticUserSession = Adempiere.getSpringApplicationContext().getBean(UserSession.class);
+					userSession = _staticUserSession = SpringContextHolder.instance.getBean(UserSession.class);
 				}
 			}
 		}
 		return userSession;
 	}
 
-	public static UserSession getCurrentIfMatchingOrNull(final int adUserId)
+	public static UserSession getCurrentIfMatchingOrNull(@NonNull final UserId adUserId)
 	{
 		final UserSession userSession = getCurrentOrNull();
 		if (userSession == null)
 		{
 			return null;
 		}
-		if (userSession.getAD_User_ID() != adUserId)
+		
+		final UserId loggedUserId = userSession.getLoggedUserIdIfExists().orElse(null);
+		if (!UserId.equals(loggedUserId, adUserId))
 		{
 			return null;
 		}
@@ -154,7 +169,7 @@ public class UserSession
 	{
 		this.eventPublisher = eventPublisher;
 	}
-	
+
 	private InternalUserSessionData getData()
 	{
 		_data.initializeIfNeeded();
@@ -226,8 +241,8 @@ public class UserSession
 	{
 		assertLoggedIn();
 
-		final int adRoleId = getData().getAD_Role_ID();
-		if (adRoleId != IUserRolePermissions.SYSTEM_ROLE_ID)
+		final RoleId adRoleId = getData().getLoggedRoleId();
+		if (!adRoleId.isSystem())
 		{
 			throw new NotLoggedInAsSysAdminException();
 		}
@@ -261,27 +276,27 @@ public class UserSession
 		// Fire event
 		if (!Objects.equals(adLanguageOld, adLanguageNew))
 		{
-			eventPublisher.publishEvent(new LanguagedChangedEvent(adLanguageNew, getAD_User_ID()));
+			eventPublisher.publishEvent(new LanguagedChangedEvent(adLanguageNew, getLoggedUserId()));
 		}
 
 		return adLanguageOld;
 	}
 
-	public int getAD_Client_ID()
+	public ClientId getClientId()
 	{
-		return getData().getAD_Client_ID();
+		return getData().getClientId();
 	}
 
-	public int getAD_Org_ID()
+	public OrgId getOrgId()
 	{
-		return getData().getAD_Org_ID();
+		return getData().getOrgId();
 	}
 
 	public String getAD_Language()
 	{
 		return getData().getAdLanguage();
 	}
-	
+
 	public Language getLanguage()
 	{
 		return getData().getLanguage();
@@ -316,9 +331,20 @@ public class UserSession
 		logSettingChanged("UseHttpAcceptLanguage", useHttpAcceptLanguage, useHttpAcceptLanguageOld);
 	}
 
-	public int getAD_User_ID()
+	public UserId getLoggedUserId()
 	{
-		return getData().getAD_User_ID();
+		return getData().getLoggedUserId();
+	}
+
+	public Optional<UserId> getLoggedUserIdIfExists()
+	{
+		return getData().getLoggedUserIdIfExists();
+	}
+
+	public boolean isLoggedInAs(@NonNull final UserId userId)
+	{
+		return isLoggedIn()
+				&& UserId.equals(getLoggedUserId(), userId);
 	}
 
 	public String getUserName()
@@ -334,7 +360,7 @@ public class UserSession
 	public UserRolePermissionsKey getUserRolePermissionsKey()
 	{
 		// TODO: cache the permissions key
-		return UserRolePermissionsKey.of(getData().getCtx());
+		return UserRolePermissionsKey.fromContext(getData().getCtx());
 	}
 
 	public IUserRolePermissions getUserRolePermissions()
@@ -384,7 +410,7 @@ public class UserSession
 	/** @return websocket notifications endpoint on which the frontend shall listen */
 	public String getWebsocketEndpoint()
 	{
-		return WebSocketConfig.buildUserSessionTopicName(getAD_User_ID());
+		return WebSocketConfig.buildUserSessionTopicName(getLoggedUserId());
 	}
 
 	public void assertDeprecatedRestAPIAllowed()
@@ -441,6 +467,40 @@ public class UserSession
 		return getData().getHttpCacheMaxAge();
 	}
 
+	private static final String SYSCONFIG_DefaultLookupSearchStartDelayMillis = "de.metas.ui.web.window.descriptor.LookupDescriptor.DefaultLookupSearchStartDelayMillis";
+
+	public Supplier<Duration> getDefaultLookupSearchStartDelay()
+	{
+		return () -> {
+			final int defaultLookupSearchStartDelayMillis = Services.get(ISysConfigBL.class).getIntValue(SYSCONFIG_DefaultLookupSearchStartDelayMillis, 0);
+			return defaultLookupSearchStartDelayMillis > 0 ? Duration.ofMillis(defaultLookupSearchStartDelayMillis) : Duration.ZERO;
+		};
+	}
+
+	@NonNull
+	public ZoneId getTimeZone()
+	{
+		final OrgId orgId = getOrgId();
+		final OrgInfo orgInfo = Services.get(IOrgDAO.class).getOrgInfoById(orgId);
+		if (orgInfo.getTimeZone() != null)
+		{
+			return orgInfo.getTimeZone();
+		}
+
+		return SystemTime.zoneId();
+	}
+
+	/**
+	 * 
+	 * @deprecated avoid using this method; usually it's workaround-ish / quick and dirty fix
+	 */
+	@Deprecated
+	public static ZoneId getTimeZoneOrSystemDefault()
+	{
+		final UserSession userSession = getCurrentOrNull();
+		return userSession != null ? userSession.getTimeZone() : SystemTime.zoneId();
+	}
+
 	/**
 	 * Event fired when the user language was changed.
 	 * Usually it is user triggered.
@@ -453,6 +513,6 @@ public class UserSession
 	{
 		@NonNull
 		private final String adLanguage;
-		private final int adUserId;
+		private final UserId adUserId;
 	}
 }

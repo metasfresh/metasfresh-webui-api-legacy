@@ -39,7 +39,6 @@ import de.metas.ui.web.process.ProcessId;
 import de.metas.ui.web.session.WebRestApiContextProvider;
 import de.metas.ui.web.window.WindowConstants;
 import de.metas.ui.web.window.datatypes.DataTypes;
-import de.metas.ui.web.window.datatypes.DocumentType;
 import de.metas.ui.web.window.descriptor.ButtonFieldActionDescriptor;
 import de.metas.ui.web.window.descriptor.ButtonFieldActionDescriptor.ButtonFieldActionType;
 import de.metas.ui.web.window.descriptor.DetailId;
@@ -52,6 +51,7 @@ import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
 import de.metas.ui.web.window.descriptor.FullTextSearchLookupDescriptorProvider;
 import de.metas.ui.web.window.descriptor.LookupDescriptor;
 import de.metas.ui.web.window.descriptor.LookupDescriptorProvider;
+import de.metas.ui.web.window.descriptor.LookupDescriptorProviders;
 import de.metas.ui.web.window.descriptor.sql.SqlDocumentEntityDataBindingDescriptor;
 import de.metas.ui.web.window.descriptor.sql.SqlDocumentFieldDataBindingDescriptor;
 import de.metas.ui.web.window.descriptor.sql.SqlLookupDescriptor;
@@ -59,6 +59,7 @@ import de.metas.ui.web.window.model.DocumentsRepository;
 import de.metas.ui.web.window.model.IDocumentFieldValueProvider;
 import de.metas.ui.web.window.model.lookup.LabelsLookup;
 import de.metas.ui.web.window.model.lookup.LookupValueByIdSupplier;
+import de.metas.ui.web.window.model.lookup.TimeZoneLookupDescriptor;
 import de.metas.ui.web.window.model.sql.SqlDocumentsRepository;
 import de.metas.util.Check;
 import de.metas.util.Services;
@@ -99,7 +100,7 @@ import lombok.NonNull;
 
 	//
 	// State
-	private final DocumentEntityDescriptor.Builder _documentEntryBuilder;
+	private final DocumentEntityDescriptor.Builder _documentEntityBuilder;
 
 	public GridTabVOBasedDocumentEntityDescriptorFactory(
 			@NonNull final GridTabVO gridTabVO,
@@ -121,13 +122,13 @@ import lombok.NonNull;
 
 		//
 		// Create initial document entity & field builders
-		_documentEntryBuilder = createDocumentEntityBuilder(gridTabVO, parentTabVO, isSOTrx, labelsUIElements);
+		_documentEntityBuilder = createDocumentEntityBuilder(gridTabVO, parentTabVO, isSOTrx, labelsUIElements);
 
 		//
 		// Document summary
 		if (rootEntity)
 		{
-			final IDocumentFieldValueProvider summaryValueProvider = GenericDocumentSummaryValueProvider.of(_documentEntryBuilder);
+			final IDocumentFieldValueProvider summaryValueProvider = GenericDocumentSummaryValueProvider.of(_documentEntityBuilder);
 			if (summaryValueProvider != null)
 			{
 				addInternalVirtualField(WindowConstants.FIELDNAME_DocumentSummary, DocumentFieldWidgetType.Text, summaryValueProvider);
@@ -170,7 +171,7 @@ import lombok.NonNull;
 
 	public DocumentEntityDescriptor.Builder documentEntity()
 	{
-		return _documentEntryBuilder;
+		return _documentEntityBuilder;
 	}
 
 	private DocumentEntityDescriptor.Builder createDocumentEntityBuilder(
@@ -210,7 +211,7 @@ import lombok.NonNull;
 		//
 		// Entity descriptor
 		final DocumentEntityDescriptor.Builder entityDescriptorBuilder = DocumentEntityDescriptor.builder()
-				.setDocumentType(DocumentType.Window, gridTabVO.getAD_Window_ID())
+				.setDocumentType(gridTabVO.getAdWindowId())
 				.setDetailId(detailId)
 				.setInternalName(gridTabVO.getInternalName())
 				//
@@ -221,6 +222,7 @@ import lombok.NonNull;
 				.setAllowCreateNewLogic(allowCreateNewLogic)
 				.setAllowDeleteLogic(allowDeleteLogic)
 				.setDisplayLogic(displayLogic)
+				.setAllowQuickInput(gridTabVO.isAllowQuickInput())
 				//
 				.setDataBinding(dataBinding)
 				.setHighVolume(gridTabVO.IsHighVolume)
@@ -229,7 +231,9 @@ import lombok.NonNull;
 				.setTableName(tableName) // legacy
 				.setIsSOTrx(isSOTrx) // legacy
 				//
-				.setPrintAD_Process_ID(gridTabVO.getPrint_Process_ID());
+				.setPrintProcessId(gridTabVO.getPrintProcessId())
+				//
+				.setRefreshViewOnChangeEvents(gridTabVO.isRefreshViewOnChangeEvents());
 
 		// Fields descriptor
 		gridTabVO
@@ -304,8 +308,8 @@ import lombok.NonNull;
 		final Class<?> valueClass;
 		final Optional<IExpression<?>> defaultValueExpression;
 		final boolean alwaysUpdateable;
-		LookupDescriptorProvider lookupDescriptorProvider;
-		final LookupDescriptor lookupDescriptor;
+		final LookupDescriptorProvider lookupDescriptorProvider;
+		final Optional<LookupDescriptor> lookupDescriptor;
 		ILogicExpression readonlyLogic;
 
 		final boolean isParentLinkColumn = isCurrentlyUsedParentLinkField(gridFieldVO, entityDescriptorBuilder);
@@ -317,8 +321,8 @@ import lombok.NonNull;
 			valueClass = widgetType.getValueClass();
 			alwaysUpdateable = false;
 
-			lookupDescriptorProvider = LookupDescriptorProvider.NULL;
-			lookupDescriptor = null;
+			lookupDescriptorProvider = LookupDescriptorProviders.NULL;
+			lookupDescriptor = Optional.empty();
 
 			defaultValueExpression = Optional.empty();
 			readonlyLogic = ConstantLogicExpression.TRUE;
@@ -329,32 +333,36 @@ import lombok.NonNull;
 			valueClass = widgetType.getValueClass();
 			alwaysUpdateable = false;
 
-			lookupDescriptorProvider = LookupDescriptorProvider.NULL;
-			lookupDescriptor = null;
+			lookupDescriptorProvider = LookupDescriptorProviders.NULL;
+			lookupDescriptor = Optional.empty();
 
 			defaultValueExpression = Optional.empty();
 			readonlyLogic = ConstantLogicExpression.TRUE;
 		}
 		else
 		{
-			final int displayType = gridFieldVO.getDisplayType();
-			widgetType = DescriptorsFactoryHelper.extractWidgetType(sqlColumnName, displayType);
+			if (WindowConstants.FIELDNAME_TimeZone.contentEquals(sqlColumnName))
+			{
+				lookupDescriptorProvider = TimeZoneLookupDescriptor.provider;
+				widgetType = DocumentFieldWidgetType.Lookup;
+			}
+			else
+			{
+				final int displayType = gridFieldVO.getDisplayType();
+				widgetType = DescriptorsFactoryHelper.extractWidgetType(sqlColumnName, displayType);
+				final String ctxTableName = Services.get(IADTableDAO.class).retrieveTableName(gridFieldVO.getAD_Table_ID());
+				lookupDescriptorProvider = wrapFullTextSeachFilterDescriptorProvider(
+						SqlLookupDescriptor.builder()
+								.setCtxTableName(ctxTableName)
+								.setCtxColumnName(sqlColumnName)
+								.setWidgetType(widgetType)
+								.setDisplayType(displayType)
+								.setAD_Reference_Value_ID(gridFieldVO.getAD_Reference_Value_ID())
+								.setAD_Val_Rule_ID(gridFieldVO.getAD_Val_Rule_ID())
+								.buildProvider());
+			}
 
-			alwaysUpdateable = extractAlwaysUpdateable(gridFieldVO);
-
-			final String ctxTableName = Services.get(IADTableDAO.class).retrieveTableName(gridFieldVO.getAD_Table_ID());
-
-			lookupDescriptorProvider = SqlLookupDescriptor.builder()
-					.setCtxTableName(ctxTableName)
-					.setCtxColumnName(sqlColumnName)
-					.setWidgetType(widgetType)
-					.setDisplayType(displayType)
-					.setAD_Reference_Value_ID(gridFieldVO.getAD_Reference_Value_ID())
-					.setAD_Val_Rule_ID(gridFieldVO.getAD_Val_Rule_ID())
-					.buildProvider();
-			lookupDescriptorProvider = wrapFullTextSeachFilterDescriptorProvider(lookupDescriptorProvider);
-
-			lookupDescriptor = lookupDescriptorProvider.provideForScope(LookupDescriptorProvider.LookupScope.DocumentField);
+			lookupDescriptor = lookupDescriptorProvider.provide();
 			valueClass = DescriptorsFactoryHelper.getValueClass(widgetType, lookupDescriptor);
 
 			defaultValueExpression = defaultValueExpressionsFactory.extractDefaultValueExpression(
@@ -366,6 +374,7 @@ import lombok.NonNull;
 					gridFieldVO.isUseDocSequence());
 
 			readonlyLogic = extractReadOnlyLogic(gridFieldVO, keyColumn, isParentLinkColumn);
+			alwaysUpdateable = extractAlwaysUpdateable(gridFieldVO);
 		}
 
 		//
@@ -417,7 +426,7 @@ import lombok.NonNull;
 				.setWidgetType(widgetType)
 				.setValueClass(valueClass)
 				.setSqlValueClass(entityBindings.getPOInfo().getColumnClass(sqlColumnName))
-				.setLookupDescriptor(lookupDescriptor)
+				.setLookupDescriptor(lookupDescriptor.orElse(null))
 				.setKeyColumn(keyColumn)
 				.setEncrypted(gridFieldVO.isEncryptedColumn())
 				.setDefaultOrderBy(orderBySortNo)
@@ -859,7 +868,19 @@ import lombok.NonNull;
 
 	private static ILogicExpression extractMandatoryLogic(@NonNull final GridFieldVO gridFieldVO)
 	{
-		return gridFieldVO.isMandatoryLogicExpression() ? gridFieldVO.getMandatoryLogic() : ConstantLogicExpression.of(gridFieldVO.isMandatory());
+		if (gridFieldVO.isMandatoryLogicExpression())
+		{
+			return gridFieldVO.getMandatoryLogic();
+		}
+		else if (gridFieldVO.isMandatory())
+		{
+			// consider it mandatory only if is displayed
+			return gridFieldVO.getDisplayLogic();
+		}
+		else
+		{
+			return ConstantLogicExpression.FALSE;
+		}
 	}
 
 	private final void collectSpecialField(final DocumentFieldDescriptor.Builder field)

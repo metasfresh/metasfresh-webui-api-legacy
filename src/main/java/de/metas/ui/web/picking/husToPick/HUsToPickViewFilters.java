@@ -17,6 +17,7 @@ import de.metas.handlingunits.picking.IHUPickingSlotBL;
 import de.metas.handlingunits.picking.IHUPickingSlotBL.PickingHUsQuery;
 import de.metas.i18n.IMsgBL;
 import de.metas.inoutcandidate.model.I_M_ShipmentSchedule;
+import de.metas.process.BarcodeScannerType;
 import de.metas.ui.web.document.filter.DocumentFilter;
 import de.metas.ui.web.document.filter.DocumentFilterDescriptor;
 import de.metas.ui.web.document.filter.DocumentFilterParam.Operator;
@@ -29,7 +30,6 @@ import de.metas.ui.web.window.datatypes.PanelLayoutType;
 import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
 import de.metas.ui.web.window.model.sql.SqlOptions;
 import de.metas.util.Services;
-
 import lombok.experimental.UtilityClass;
 
 /*
@@ -61,9 +61,10 @@ class HUsToPickViewFilters
 	private static final String PARAM_Barcode = "Barcode";
 
 	private static final String HU_IDS_FilterId = "HU_IDS_Filter";
-	private static final String PARAM_ConsiderAttributes = "de.metas.ui.web.picking.HUsToPickViewFilters.ConsiderAttributes";
+	private static final String PARAM_ConsiderAttributes = "IsConsiderAttributes";
 
 	static final String PARAM_CurrentShipmentScheduleId = "CurrentShipmentScheduleId";
+	static final String PARAM_BestBeforePolicy = "BestBeforePolicy";
 
 	public static ImmutableList<DocumentFilterDescriptor> createFilterDescriptors()
 	{
@@ -90,7 +91,8 @@ class HUsToPickViewFilters
 						.setFieldName(PARAM_Barcode)
 						.setDisplayName(Services.get(IMsgBL.class).getTranslatableMsgText("webui.view.husToPick.filters.locatorBarcodeFilter"))
 						.setMandatory(true)
-						.setWidgetType(DocumentFieldWidgetType.Text))
+						.setWidgetType(DocumentFieldWidgetType.Text)
+						.barcodeScannerType(BarcodeScannerType.QRCode))
 				.build();
 	}
 
@@ -124,7 +126,7 @@ class HUsToPickViewFilters
 				.setFrequentUsed(true)
 				.addParameter(DocumentFilterParamDescriptor.builder()
 						.setFieldName(PARAM_ConsiderAttributes)
-						.setDisplayName(Services.get(IMsgBL.class).getTranslatableMsgText(PARAM_ConsiderAttributes))
+						.setDisplayName(Services.get(IMsgBL.class).translatable(PARAM_ConsiderAttributes))
 						.setMandatory(false)
 						.setDefaultValue(true)
 						.setWidgetType(DocumentFieldWidgetType.YesNo))

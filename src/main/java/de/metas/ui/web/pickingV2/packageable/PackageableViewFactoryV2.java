@@ -6,10 +6,14 @@ import org.adempiere.exceptions.AdempiereException;
 import com.google.common.collect.ImmutableList;
 
 import de.metas.money.MoneyService;
+import de.metas.process.AdProcessId;
 import de.metas.process.IADProcessDAO;
 import de.metas.process.RelatedProcessDescriptor;
+import de.metas.process.RelatedProcessDescriptor.DisplayPlace;
+import de.metas.ui.web.document.filter.provider.DocumentFilterDescriptorsProvider;
 import de.metas.ui.web.pickingV2.PickingConstantsV2;
 import de.metas.ui.web.pickingV2.packageable.process.PackageablesView_OpenProductsToPick;
+import de.metas.ui.web.pickingV2.packageable.process.PackageablesView_PrintPicklist;
 import de.metas.ui.web.pickingV2.packageable.process.PackageablesView_UnlockAll;
 import de.metas.ui.web.pickingV2.packageable.process.PackageablesView_UnlockFromLoggedUser;
 import de.metas.ui.web.view.CreateViewRequest;
@@ -62,8 +66,14 @@ public class PackageableViewFactoryV2 implements IViewFactory
 				.setWindowId(PickingConstantsV2.WINDOWID_PackageableView)
 				.setCaption("Picking") // TODO: trl
 				.setAllowOpeningRowDetails(false)
+				.setFilters(getFilterDescriptorsProvider().getAll())
 				.addElementsFromViewRowClass(PackageableRow.class, viewDataType)
 				.build();
+	}
+
+	private DocumentFilterDescriptorsProvider getFilterDescriptorsProvider()
+	{
+		return PackageableViewFilters.getDescriptors();
 	}
 
 	@Override
@@ -72,12 +82,18 @@ public class PackageableViewFactoryV2 implements IViewFactory
 		final ViewId viewId = request.getViewId();
 		viewId.assertWindowId(PickingConstantsV2.WINDOWID_PackageableView);
 
-		final PackageableRowsData rowsData = rowsRepo.getPackageableRowsData();
+		final DocumentFilterDescriptorsProvider filterDescriptors = getFilterDescriptorsProvider();
+
+		final PackageableRowsData rowsData = rowsRepo.newPackageableRowsData()
+				.filters(request.getOrUnwrapFilters(filterDescriptors))
+				.stickyFilters(request.getStickyFilters())
+				.build();
 
 		return PackageableView.builder()
 				.viewId(viewId)
 				.rowsData(rowsData)
 				.relatedProcessDescriptors(getRelatedProcessDescriptors())
+				.viewFilterDescriptors(filterDescriptors)
 				.build();
 	}
 
@@ -86,14 +102,15 @@ public class PackageableViewFactoryV2 implements IViewFactory
 		return ImmutableList.of(
 				createProcessDescriptor(PackageablesView_OpenProductsToPick.class),
 				createProcessDescriptor(PackageablesView_UnlockFromLoggedUser.class),
-				createProcessDescriptor(PackageablesView_UnlockAll.class));
+				createProcessDescriptor(PackageablesView_UnlockAll.class),
+				createProcessDescriptor(PackageablesView_PrintPicklist.class));
 	}
 
 	private final RelatedProcessDescriptor createProcessDescriptor(@NonNull final Class<?> processClass)
 	{
 		final IADProcessDAO adProcessDAO = Services.get(IADProcessDAO.class);
-		final int processId = adProcessDAO.retrieveProcessIdByClass(processClass);
-		if (processId <= 0)
+		final AdProcessId processId = adProcessDAO.retrieveProcessIdByClass(processClass);
+		if (processId == null)
 		{
 			throw new AdempiereException("No processId found for " + processClass);
 		}
@@ -101,7 +118,7 @@ public class PackageableViewFactoryV2 implements IViewFactory
 		return RelatedProcessDescriptor.builder()
 				.processId(processId)
 				.anyTable().anyWindow()
-				.webuiQuickAction(true)
+				.displayPlace(DisplayPlace.ViewQuickActions)
 				.build();
 	}
 

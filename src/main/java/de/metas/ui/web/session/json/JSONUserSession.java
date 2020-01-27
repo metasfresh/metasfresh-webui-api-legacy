@@ -9,7 +9,7 @@ import de.metas.i18n.Language;
 import de.metas.ui.web.session.UserSession;
 import de.metas.ui.web.window.WindowConstants;
 import de.metas.ui.web.window.datatypes.WindowId;
-import de.metas.ui.web.window.datatypes.json.JSONDate;
+import de.metas.ui.web.window.datatypes.json.DateTimeConverters;
 import de.metas.ui.web.window.datatypes.json.JSONLookupValue;
 
 /*
@@ -87,8 +87,6 @@ public class JSONUserSession
 
 	private JSONUserSession(final UserSession userSession)
 	{
-		super();
-
 		loggedIn = userSession.isLoggedIn();
 		if (loggedIn)
 		{
@@ -100,7 +98,7 @@ public class JSONUserSession
 			avatarId = userSession.getAvatarId();
 
 			userProfileWindowId = WindowConstants.WINDOWID_UserProfile;
-			userProfileId = userSession.getAD_User_ID();
+			userProfileId = userSession.getLoggedUserId().getRepoId();
 			
 			websocketEndpoint = userSession.getWebsocketEndpoint();
 		}
@@ -120,6 +118,6 @@ public class JSONUserSession
 		this.language = JSONLookupValue.of(language.getAD_Language(), language.getName());
 		this.locale = JSONUserSessionLocale.of(userSession.getUserSessionLocale());
 
-		timeZone = JSONDate.getCurrentTimeZoneAsJson();
+		timeZone = DateTimeConverters.toJson(userSession.getTimeZone());
 	}
 }

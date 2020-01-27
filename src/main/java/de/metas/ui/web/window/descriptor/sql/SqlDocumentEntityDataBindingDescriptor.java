@@ -12,22 +12,26 @@ import org.adempiere.ad.expression.api.ICachedStringExpression;
 import org.adempiere.ad.expression.api.IExpressionFactory;
 import org.adempiere.ad.expression.api.IStringExpression;
 import org.adempiere.ad.expression.api.impl.CompositeStringExpression;
-import org.adempiere.ad.security.IUserRolePermissions;
-import org.adempiere.ad.security.impl.AccessSqlStringExpression;
 import org.adempiere.exceptions.AdempiereException;
 import org.adempiere.util.lang.IPair;
 import org.compiere.model.POInfo;
+import org.compiere.util.DB;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
+import de.metas.security.IUserRolePermissions;
+import de.metas.security.impl.AccessSqlStringExpression;
+import de.metas.security.permissions.Access;
+import de.metas.ui.web.window.datatypes.DocumentId;
 import de.metas.ui.web.window.descriptor.DetailId;
 import de.metas.ui.web.window.descriptor.DocumentEntityDataBindingDescriptor;
 import de.metas.ui.web.window.descriptor.DocumentFieldDataBindingDescriptor;
 import de.metas.ui.web.window.model.DocumentQueryOrderBy;
 import de.metas.ui.web.window.model.DocumentsRepository;
+import de.metas.ui.web.window.model.sql.SqlDocumentQueryBuilder;
 import de.metas.util.Check;
 import de.metas.util.GuavaCollectors;
 import de.metas.util.Services;
@@ -58,12 +62,12 @@ import lombok.ToString;
 
 public final class SqlDocumentEntityDataBindingDescriptor implements DocumentEntityDataBindingDescriptor, SqlEntityBinding
 {
-	public static final Builder builder()
+	public static Builder builder()
 	{
 		return new Builder();
 	}
 
-	public static final SqlDocumentEntityDataBindingDescriptor cast(final DocumentEntityDataBindingDescriptor descriptor)
+	public static SqlDocumentEntityDataBindingDescriptor cast(final DocumentEntityDataBindingDescriptor descriptor)
 	{
 		return (SqlDocumentEntityDataBindingDescriptor)descriptor;
 	}
@@ -201,6 +205,32 @@ public final class SqlDocumentEntityDataBindingDescriptor implements DocumentEnt
 		return sqlTableName + "." + getSingleKeyColumnName() + " = " + recordId;
 	}
 
+	public String getSqlWhereClauseById(@NonNull final DocumentId documentId)
+	{
+		if (documentId.isInt())
+		{
+			return getSqlWhereClauseById(documentId.toInt());
+		}
+		else
+		{
+			final Map<String, Object> idPartsByFieldName = SqlDocumentQueryBuilder.extractComposedKey(documentId, getKeyFields());
+			final StringBuilder sql = new StringBuilder();
+			for (final Map.Entry<String, Object> keyFieldNameAndValue : idPartsByFieldName.entrySet())
+			{
+				String keyFieldName = keyFieldNameAndValue.getKey();
+				final Object idPart = keyFieldNameAndValue.getValue();
+
+				if (sql.length() > 0)
+				{
+					sql.append(" AND ");
+				}
+				sql.append(sqlTableName).append(".").append(keyFieldName).append("=").append(DB.TO_SQL(idPart));
+			}
+			return sql.toString();
+		}
+
+	}
+
 	public List<DocumentQueryOrderBy> getDefaultOrderBys()
 	{
 		return defaultOrderBys;
@@ -265,7 +295,7 @@ public final class SqlDocumentEntityDataBindingDescriptor implements DocumentEnt
 			return _built;
 		}
 
-		private final void assertNotBuilt()
+		private void assertNotBuilt()
 		{
 			if (_built != null)
 			{
@@ -315,7 +345,7 @@ public final class SqlDocumentEntityDataBindingDescriptor implements DocumentEnt
 			_sqlSelectAll = buildSqlSelect(sqlSelectValuesList, sqlSelectDisplayNamesList);
 		}
 
-		private final IStringExpression buildSqlSelect(final List<String> sqlSelectValuesList, final List<IStringExpression> sqlSelectDisplayNamesList)
+		private IStringExpression buildSqlSelect(final List<String> sqlSelectValuesList, final List<IStringExpression> sqlSelectDisplayNamesList)
 		{
 			final String sqlTableName = getTableName();
 			final String sqlTableAlias = getTableAlias();
@@ -324,7 +354,7 @@ public final class SqlDocumentEntityDataBindingDescriptor implements DocumentEnt
 					.append("SELECT ")
 					.append("\n ").append(Joiner.on("\n, ").join(sqlSelectValuesList))
 					.append("\n FROM ").append(sqlTableName)
-					.wrap(AccessSqlStringExpression.wrapper(sqlTableName, IUserRolePermissions.SQL_FULLYQUALIFIED, IUserRolePermissions.SQL_RO)) // security
+					.wrap(AccessSqlStringExpression.wrapper(sqlTableName, IUserRolePermissions.SQL_FULLYQUALIFIED, Access.READ)) // security
 					.build();
 
 			final CompositeStringExpression.Builder sqlBuilder = IStringExpression.composer()

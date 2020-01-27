@@ -18,6 +18,7 @@ import de.metas.ui.web.document.filter.DocumentFilter;
 import de.metas.ui.web.document.filter.json.JSONDocumentFilter;
 import de.metas.ui.web.window.datatypes.WindowId;
 import de.metas.ui.web.window.model.DocumentReference;
+import lombok.NonNull;
 
 /*
  * #%L
@@ -44,7 +45,7 @@ import de.metas.ui.web.window.model.DocumentReference;
 @JsonAutoDetect(fieldVisibility = Visibility.ANY, getterVisibility = Visibility.NONE, isGetterVisibility = Visibility.NONE, setterVisibility = Visibility.NONE)
 public final class JSONDocumentReference
 {
-	static final JSONDocumentReference of(final DocumentReference documentReference, final JSONOptions jsonOpts)
+	static JSONDocumentReference of(final DocumentReference documentReference, final JSONOptions jsonOpts)
 	{
 		try
 		{
@@ -57,7 +58,7 @@ public final class JSONDocumentReference
 		}
 	}
 
-	public static final List<JSONDocumentReference> ofList(final Collection<DocumentReference> documentReferences, final JSONOptions jsonOpts)
+	public static List<JSONDocumentReference> ofList(final Collection<DocumentReference> documentReferences, final JSONOptions jsonOpts)
 	{
 		if (documentReferences.isEmpty())
 		{
@@ -74,6 +75,8 @@ public final class JSONDocumentReference
 
 	@JsonProperty("id")
 	private final String id;
+	@JsonProperty("internalName")
+	private final String internalName;
 	@JsonProperty("caption")
 	private final String caption;
 	@JsonProperty("documentType")
@@ -87,23 +90,26 @@ public final class JSONDocumentReference
 	@JsonInclude(JsonInclude.Include.NON_EMPTY)
 	private final String loadDurationStr;
 
-	private JSONDocumentReference(final DocumentReference documentReference, final JSONOptions jsonOpts)
+	private JSONDocumentReference(
+			@NonNull final DocumentReference documentReference, 
+			@NonNull final JSONOptions jsonOpts)
 	{
-		final String adLanguage = jsonOpts.getAD_Language();
+		final String adLanguage = jsonOpts.getAdLanguage();
 
 		id = documentReference.getId();
+		internalName = documentReference.getInternalName();
 		caption = documentReference.getCaption(adLanguage);
 		windowId = documentReference.getWindowId();
 		documentsCount = documentReference.getDocumentsCount();
 
 		final DocumentFilter filter = documentReference.getFilter();
-		this.filter = JSONDocumentFilter.of(filter, adLanguage);
+		this.filter = JSONDocumentFilter.of(filter, jsonOpts);
 
 		final Duration loadDuration = documentReference.getLoadDuration();
 		this.loadDurationStr = loadDuration != null ? formatDuration(loadDuration) : null;
 	}
 
-	private static final String formatDuration(final Duration loadDuration)
+	private static String formatDuration(final Duration loadDuration)
 	{
 		return TimeUtil.formatElapsed(loadDuration);
 	}

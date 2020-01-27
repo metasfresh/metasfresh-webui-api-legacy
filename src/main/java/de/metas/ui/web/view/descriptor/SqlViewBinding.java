@@ -13,29 +13,32 @@ import javax.annotation.Nullable;
 import org.adempiere.ad.expression.api.IExpressionEvaluator.OnVariableNotFound;
 import org.adempiere.ad.expression.api.IStringExpression;
 import org.adempiere.ad.expression.api.impl.ConstantStringExpression;
+import org.adempiere.exceptions.AdempiereException;
 
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 
-import de.metas.ui.web.document.filter.DocumentFilterDescriptorsProvider;
-import de.metas.ui.web.document.filter.NullDocumentFilterDescriptorsProvider;
+import de.metas.ui.web.document.filter.provider.DocumentFilterDescriptorsProvider;
+import de.metas.ui.web.document.filter.provider.NullDocumentFilterDescriptorsProvider;
+import de.metas.ui.web.document.filter.provider.fullTextSearch.FullTextSearchSqlDocumentFilterConverter;
 import de.metas.ui.web.document.filter.sql.SqlDocumentFilterConverter;
 import de.metas.ui.web.document.filter.sql.SqlDocumentFilterConverterDecorator;
 import de.metas.ui.web.document.filter.sql.SqlDocumentFilterConverters;
 import de.metas.ui.web.document.filter.sql.SqlDocumentFilterConvertersList;
+import de.metas.ui.web.document.geo_location.GeoLocationFilterConverter;
 import de.metas.ui.web.view.DefaultViewInvalidationAdvisor;
 import de.metas.ui.web.view.IViewInvalidationAdvisor;
 import de.metas.ui.web.view.ViewEvaluationCtx;
 import de.metas.ui.web.view.ViewRowCustomizer;
 import de.metas.ui.web.view.descriptor.SqlViewRowFieldBinding.SqlViewRowFieldLoader;
 import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
-import de.metas.ui.web.window.descriptor.FullTextSearchSqlDocumentFilterConverter;
 import de.metas.ui.web.window.descriptor.sql.SqlEntityBinding;
 import de.metas.ui.web.window.model.DocumentQueryOrderBy;
 import de.metas.util.Check;
 import de.metas.util.GuavaCollectors;
+import lombok.Getter;
 import lombok.NonNull;
 import lombok.Singular;
 
@@ -81,6 +84,8 @@ public class SqlViewBinding implements SqlEntityBinding
 
 	private final DocumentFilterDescriptorsProvider filterDescriptors;
 	private final SqlDocumentFilterConvertersList filterConverters;
+	@Getter
+	private final boolean refreshViewOnChangeEvents;
 
 	private final SqlViewRowIdsConverter rowIdsConverter;
 
@@ -145,6 +150,8 @@ public class SqlViewBinding implements SqlEntityBinding
 		filterConverters = builder.buildViewFilterConverters();
 
 		filterConverterDecorator = builder.sqlDocumentFilterConverterDecorator;
+
+		refreshViewOnChangeEvents = builder.refreshViewOnChangeEvents;
 
 		rowIdsConverter = builder.getRowIdsConverter();
 
@@ -363,6 +370,7 @@ public class SqlViewBinding implements SqlEntityBinding
 		private OrderByFieldNameAliasMap.OrderByFieldNameAliasMapBuilder orderByFieldNameAliasMap = OrderByFieldNameAliasMap.builder();
 		private DocumentFilterDescriptorsProvider filterDescriptors = NullDocumentFilterDescriptorsProvider.instance;
 		private SqlDocumentFilterConvertersList.Builder filterConverters = null;
+		private boolean refreshViewOnChangeEvents;
 
 		private SqlViewRowIdsConverter rowIdsConverter = null;
 
@@ -374,6 +382,7 @@ public class SqlViewBinding implements SqlEntityBinding
 		private Builder()
 		{
 			filterConverter(FullTextSearchSqlDocumentFilterConverter.FILTER_ID, FullTextSearchSqlDocumentFilterConverter.instance);
+			filterConverter(GeoLocationFilterConverter.FILTER_ID, GeoLocationFilterConverter.instance);
 		}
 
 		@Override
@@ -435,7 +444,12 @@ public class SqlViewBinding implements SqlEntityBinding
 
 		private SqlViewKeyColumnNamesMap getSqlViewKeyColumnNamesMap()
 		{
-			return SqlViewKeyColumnNamesMap.ofKeyFields(getKeyFields());
+			final ImmutableList<SqlViewRowFieldBinding> keyFields = getKeyFields();
+			if (keyFields.isEmpty())
+			{
+				throw new AdempiereException("No key columns defined for " + getTableName());
+			}
+			return SqlViewKeyColumnNamesMap.ofKeyFields(keyFields);
 		}
 
 		private ImmutableList<SqlViewRowFieldBinding> getKeyFields()
@@ -601,6 +615,12 @@ public class SqlViewBinding implements SqlEntityBinding
 		private IViewInvalidationAdvisor getViewInvalidationAdvisor()
 		{
 			return viewInvalidationAdvisor;
+		}
+
+		public Builder refreshViewOnChangeEvents(boolean refreshViewOnChangeEvents)
+		{
+			this.refreshViewOnChangeEvents = refreshViewOnChangeEvents;
+			return this;
 		}
 	}
 }

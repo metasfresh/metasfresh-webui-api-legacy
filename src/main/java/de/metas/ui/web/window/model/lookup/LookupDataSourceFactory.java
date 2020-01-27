@@ -10,6 +10,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.adempiere.ad.table.api.IADTableDAO;
 import org.compiere.model.I_AD_Column;
+import org.compiere.model.I_M_AttributeSetInstance;
 import org.slf4j.Logger;
 
 import com.google.common.base.Predicates;
@@ -18,7 +19,6 @@ import de.metas.cache.CCache;
 import de.metas.cache.CCache.CCacheStats;
 import de.metas.logging.LogManager;
 import de.metas.ui.web.window.descriptor.LookupDescriptor;
-import de.metas.ui.web.window.descriptor.LookupDescriptorProvider.LookupScope;
 import de.metas.ui.web.window.descriptor.sql.SqlLookupDescriptor;
 import de.metas.util.GuavaCollectors;
 import de.metas.util.Services;
@@ -62,8 +62,24 @@ public final class LookupDataSourceFactory
 
 	public LookupDataSource searchInTableLookup(final String tableName)
 	{
-		final LookupDescriptor lookupDescriptor = SqlLookupDescriptor.searchInTable(tableName)
-				.provideForScope(LookupScope.DocumentField);
+		if (I_M_AttributeSetInstance.Table_Name.equals(tableName))
+		{
+			return productAttributes();
+		}
+		else
+		{
+			final LookupDescriptor lookupDescriptor = SqlLookupDescriptor.searchInTable(tableName)
+					.provide()
+					.get();
+			return getLookupDataSource(lookupDescriptor);
+		}
+	}
+
+	public LookupDataSource productAttributes()
+	{
+		final LookupDescriptor lookupDescriptor = SqlLookupDescriptor.productAttributes()
+				.provide()
+				.get();
 		return getLookupDataSource(lookupDescriptor);
 	}
 
@@ -71,7 +87,8 @@ public final class LookupDataSourceFactory
 	{
 		final LookupDescriptor lookupDescriptor = SqlLookupDescriptor
 				.listByAD_Reference_Value_ID(AD_Reference_Value_ID)
-				.provideForScope(LookupScope.DocumentField);
+				.provide()
+				.get();
 		return getLookupDataSource(lookupDescriptor);
 	}
 
@@ -79,7 +96,8 @@ public final class LookupDataSourceFactory
 	{
 		final LookupDescriptor lookupDescriptor = SqlLookupDescriptor
 				.searchByAD_Val_Rule_ID(AD_Reference_Value_ID, AD_Val_Rule_ID)
-				.provideForScope(LookupScope.DocumentField);
+				.provide()
+				.get();
 		return getLookupDataSource(lookupDescriptor);
 	}
 
@@ -90,14 +108,15 @@ public final class LookupDataSourceFactory
 
 		final LookupDescriptor lookupDescriptor = SqlLookupDescriptor
 				.searchByAD_Val_Rule_ID(column.getAD_Reference_Value_ID(), column.getAD_Val_Rule_ID())
-				.provideForScope(LookupScope.DocumentField);
+				.provide()
+				.get();
 
 		return getLookupDataSource(lookupDescriptor);
 	}
 
 	public LookupDataSource getLookupDataSource(final LookupDescriptor lookupDescriptor)
 	{
-		return lookupDataSourcesCache.getOrLoad(lookupDescriptor, () -> createLookupDataSource(lookupDescriptor));
+		return lookupDataSourcesCache.getOrLoad(lookupDescriptor, this::createLookupDataSource);
 	}
 
 	public LookupDataSource createLookupDataSource(@NonNull final LookupDescriptor lookupDescriptor)

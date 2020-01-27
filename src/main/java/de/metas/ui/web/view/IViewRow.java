@@ -8,19 +8,16 @@ import java.util.stream.Stream;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 
 import de.metas.i18n.ITranslatableString;
+import de.metas.i18n.TranslatableStrings;
 import de.metas.ui.web.exceptions.EntityNotFoundException;
 import de.metas.ui.web.view.ViewRow.DefaultRowType;
 import de.metas.ui.web.window.datatypes.DocumentId;
 import de.metas.ui.web.window.datatypes.DocumentPath;
-import de.metas.ui.web.window.datatypes.json.JSONLookupValue;
-import de.metas.ui.web.window.datatypes.json.JSONNullValue;
+import de.metas.ui.web.window.datatypes.json.JSONOptions;
 import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
 import de.metas.ui.web.window.descriptor.ViewEditorRenderMode;
-import de.metas.util.NumberUtils;
-
 import lombok.NonNull;
 
 /*
@@ -69,51 +66,32 @@ public interface IViewRow
 
 	//
 	// Fields
-	default Set<String> getFieldNames()
-	{
-		return ImmutableSet.<String> builder()
-				.addAll(getFieldNameAndJsonValues().keySet())
-				.addAll(getViewEditorRenderModeByFieldName().keySet())
-				.addAll(getWidgetTypesByFieldName().keySet())
-				.build();
-	}
+	Set<String> getFieldNames();
 
 	/**
 	 * @return a map with an entry for each of this row's fields.<br>
 	 *         Where the row has <code>null</code> values, the respective entry's value is {@link #NULL_JSON_VALUE}.
 	 */
-	Map<String, Object> getFieldNameAndJsonValues();
+	ViewRowFieldNameAndJsonValues getFieldNameAndJsonValues();
 
-	default int getFieldJsonValueAsInt(@NonNull final String fieldName, final int defaultValueIfNotFound)
+	default BigDecimal getFieldValueAsBigDecimal(@NonNull final String fieldName, final BigDecimal defaultValueIfNotFoundOrError)
 	{
-		final Object jsonValueObj = getFieldNameAndJsonValues().get(fieldName);
-		if (JSONNullValue.toNullIfInstance(jsonValueObj) == null)
-		{
-			return defaultValueIfNotFound;
-		}
-		else if (jsonValueObj instanceof Number)
-		{
-			return ((Number)jsonValueObj).intValue();
-		}
-		else if (jsonValueObj instanceof JSONLookupValue)
-		{
-			return ((JSONLookupValue)jsonValueObj).getKeyAsInt();
-		}
-		else
-		{
-			return Integer.parseInt(jsonValueObj.toString());
-		}
+		return getFieldNameAndJsonValues().getAsBigDecimal(fieldName, defaultValueIfNotFoundOrError);
 	}
 
-	default BigDecimal getFieldJsonValueAsBigDecimal(
-			@NonNull final String fieldName,
-			final BigDecimal defaultValueIfNotFoundOrError)
+	default int getFieldValueAsInt(@NonNull final String fieldName, final int defaultValueIfNotFoundOrError)
 	{
-		final Object jsonValueObj = getFieldNameAndJsonValues().get(fieldName);
+		return getFieldNameAndJsonValues().getAsInt(fieldName, defaultValueIfNotFoundOrError);
+	}
 
-		return NumberUtils.asBigDecimal(
-				JSONNullValue.toNullIfInstance(jsonValueObj),
-				defaultValueIfNotFoundOrError);
+	default boolean getFieldValueAsBoolean(@NonNull final String fieldName, final boolean defaultValueIfNotFoundOrError)
+	{
+		return getFieldNameAndJsonValues().getAsBoolean(fieldName, defaultValueIfNotFoundOrError);
+	}
+
+	default Object getFieldValueAsJsonObject(@NonNull final String fieldName, final JSONOptions jsonOpts)
+	{
+		return getFieldNameAndJsonValues().getAsJsonObject(fieldName, jsonOpts);
 	}
 
 	default Map<String, DocumentFieldWidgetType> getWidgetTypesByFieldName()
@@ -129,14 +107,14 @@ public interface IViewRow
 	//
 	// Included documents (children)
 	// @formatter:off
-	default Collection<? extends IViewRow> getIncludedRows() { return ImmutableList.of(); };
+	default Collection<? extends IViewRow> getIncludedRows() { return ImmutableList.of(); }
 	// @formatter:on
 
 	//
 	// Attributes
 	// @formatter:off
 	default boolean hasAttributes() { return false; }
-	default IViewRowAttributes getAttributes() { throw new EntityNotFoundException("Row does not support attributes"); };
+	default IViewRowAttributes getAttributes() { throw new EntityNotFoundException("Row does not support attributes"); }
 	// @formatter:on
 
 	//
@@ -151,11 +129,11 @@ public interface IViewRow
 	/** @return true if frontend shall display one single column */
 	default boolean isSingleColumn() { return false; }
 	/** @return text to be displayed if {@link #isSingleColumn()} */
-	default ITranslatableString getSingleColumnCaption() { return ITranslatableString.empty(); }
+	default ITranslatableString getSingleColumnCaption() { return TranslatableStrings.empty(); }
 	// @formatter:on
 
 	/** @return a stream of given row and all it's included rows recursively */
-	public default Stream<IViewRow> streamRecursive()
+	default Stream<IViewRow> streamRecursive()
 	{
 		return this.getIncludedRows()
 				.stream()

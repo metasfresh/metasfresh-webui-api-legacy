@@ -11,6 +11,7 @@ import org.adempiere.ad.service.ILookupDAO.ITableRefInfo;
 import org.compiere.model.ILookupDisplayColumn;
 import org.compiere.util.DisplayType;
 import org.compiere.util.Env;
+import org.compiere.util.TimeUtil;
 import org.slf4j.Logger;
 
 import com.google.common.base.MoreObjects;
@@ -22,6 +23,7 @@ import de.metas.logging.LogManager;
 import de.metas.printing.esb.base.util.Check;
 import de.metas.ui.web.window.WindowConstants;
 import de.metas.ui.web.window.datatypes.LookupValue;
+import de.metas.ui.web.window.datatypes.json.DateTimeConverters;
 import de.metas.ui.web.window.descriptor.DocumentEntityDescriptor;
 import de.metas.ui.web.window.descriptor.DocumentFieldDescriptor;
 import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
@@ -101,7 +103,7 @@ public class GenericDocumentSummaryValueProvider implements IDocumentFieldValueP
 		}
 		catch (final Exception ex)
 		{
-			logger.warn("Failed extracting summary field names for record's lookup for {}", entityDescriptor, ex);
+			logger.warn("Failed extracting summary field names for record's lookup for {}. Ignored.", entityDescriptor, ex);
 			return ImmutableList.of();
 		}
 	}
@@ -201,7 +203,7 @@ public class GenericDocumentSummaryValueProvider implements IDocumentFieldValueP
 		// return " / " + summary; // don't prefix with "/". That shall be done by frontend if and when needed
 	}
 
-	private static interface FieldValueExtractor
+	private interface FieldValueExtractor
 	{
 		String getFieldName();
 
@@ -249,12 +251,13 @@ public class GenericDocumentSummaryValueProvider implements IDocumentFieldValueP
 
 			try
 			{
+				final java.util.Date date = TimeUtil.asDate(DateTimeConverters.fromObject(fieldValue, widgetType));
 				return DisplayType.getDateFormat(widgetType.getDisplayType())
-						.format(fieldValue);
+						.format(date);
 			}
 			catch (final Exception ex)
 			{
-				logger.warn("Failed formatting date field value '{}' using {}. Returning toString().", fieldValue, this, ex);
+				logger.warn("Failed formatting date field value '{}' ({}) using {}. Returning toString().", fieldValue, fieldValue.getClass(), this, ex);
 				return fieldValue.toString();
 			}
 		}

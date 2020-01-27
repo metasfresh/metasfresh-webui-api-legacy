@@ -9,13 +9,10 @@ import java.math.BigDecimal;
 import java.util.List;
 
 import org.adempiere.mm.attributes.AttributeSetInstanceId;
-import org.adempiere.service.OrgId;
 import org.adempiere.test.AdempiereTestHelper;
-import org.adempiere.user.UserRepository;
 import org.adempiere.warehouse.WarehouseId;
 import org.compiere.model.I_AD_Org;
 import org.compiere.model.I_C_BPartner;
-import org.compiere.model.I_C_Currency;
 import org.compiere.model.I_C_Order;
 import org.compiere.model.I_C_OrderLine;
 import org.compiere.model.I_C_UOM;
@@ -35,11 +32,15 @@ import de.metas.ShutdownListener;
 import de.metas.StartupListener;
 import de.metas.bpartner.BPartnerId;
 import de.metas.bpartner.service.impl.BPartnerBL;
+import de.metas.currency.CurrencyCode;
+import de.metas.currency.impl.PlainCurrencyDAO;
 import de.metas.material.dispo.commons.repository.atp.AvailableToPromiseRepository;
 import de.metas.money.CurrencyId;
 import de.metas.order.OrderAndLineId;
 import de.metas.order.OrderLineRepository;
+import de.metas.organization.OrgId;
 import de.metas.pricing.conditions.PricingConditions;
+import de.metas.product.IProductBL;
 import de.metas.product.ProductAndCategoryAndManufacturerId;
 import de.metas.product.ProductId;
 import de.metas.purchasecandidate.BPPurchaseScheduleRepository;
@@ -65,6 +66,8 @@ import de.metas.purchasecandidate.grossprofit.PurchaseProfitInfo;
 import de.metas.purchasecandidate.purchaseordercreation.remotepurchaseitem.PurchaseItemRepository;
 import de.metas.quantity.Quantity;
 import de.metas.ui.web.order.sales.purchasePlanning.view.PurchaseRowsLoader.PurchaseRowsList;
+import de.metas.user.UserRepository;
+import de.metas.util.Services;
 import de.metas.util.time.SystemTime;
 import mockit.Expectations;
 import mockit.Mocked;
@@ -102,7 +105,7 @@ public class PurchaseRowsLoaderTest
 	private I_C_Order salesOrderRecord;
 	private I_C_BPartner bPartnerVendor;
 
-	private I_C_Currency currency;
+	private CurrencyId currencyId;
 
 	private Quantity TEN;
 
@@ -134,7 +137,7 @@ public class PurchaseRowsLoaderTest
 
 		product = newInstance(I_M_Product.class);
 		product.setM_Product_Category_ID(productCategory.getM_Product_Category_ID());
-		product.setC_UOM(uom);
+		product.setC_UOM_ID(uom.getC_UOM_ID());
 		saveRecord(product);
 
 		final I_C_BPartner bPartnerCustomer = newInstance(I_C_BPartner.class);
@@ -142,7 +145,7 @@ public class PurchaseRowsLoaderTest
 		saveRecord(bPartnerCustomer);
 
 		salesOrderRecord = newInstance(I_C_Order.class);
-		salesOrderRecord.setC_BPartner(bPartnerCustomer);
+		salesOrderRecord.setC_BPartner_ID(bPartnerCustomer.getC_BPartner_ID());
 		salesOrderRecord.setPreparationDate(SystemTime.asTimestamp());
 		salesOrderRecord.setC_PaymentTerm_ID(30);
 		saveRecord(salesOrderRecord);
@@ -151,9 +154,7 @@ public class PurchaseRowsLoaderTest
 		bPartnerVendor.setName("bPartnerVendor.Name");
 		saveRecord(bPartnerVendor);
 
-		currency = newInstance(I_C_Currency.class);
-		currency.setStdPrecision(2);
-		saveRecord(currency);
+		currencyId = PlainCurrencyDAO.createCurrencyId(CurrencyCode.EUR);
 
 		// wire together a SalesOrder2PurchaseViewFactory
 		final PurchaseCandidateRepository purchaseCandidateRepository = new PurchaseCandidateRepository(
@@ -187,14 +188,14 @@ public class PurchaseRowsLoaderTest
 		//
 		// set up salesOrderLineRecord
 		final I_C_OrderLine salesOrderLineRecord = newInstance(I_C_OrderLine.class);
-		salesOrderLineRecord.setAD_Org(org);
-		salesOrderLineRecord.setM_Product(product);
-		salesOrderLineRecord.setM_Warehouse(warehouse);
-		salesOrderLineRecord.setC_Order(salesOrderRecord);
-		salesOrderLineRecord.setC_Currency(currency);
-		salesOrderLineRecord.setC_UOM_ID(TEN.getUOMId());
-		salesOrderLineRecord.setQtyEntered(TEN.getAsBigDecimal());
-		salesOrderLineRecord.setQtyOrdered(TEN.getAsBigDecimal());
+		salesOrderLineRecord.setAD_Org_ID(org.getAD_Org_ID());
+		salesOrderLineRecord.setM_Product_ID(product.getM_Product_ID());
+		salesOrderLineRecord.setM_Warehouse_ID(warehouse.getM_Warehouse_ID());
+		salesOrderLineRecord.setC_Order_ID(salesOrderRecord.getC_Order_ID());
+		salesOrderLineRecord.setC_Currency_ID(currencyId.getRepoId());
+		salesOrderLineRecord.setC_UOM_ID(TEN.getUomId().getRepoId());
+		salesOrderLineRecord.setQtyEntered(TEN.toBigDecimal());
+		salesOrderLineRecord.setQtyOrdered(TEN.toBigDecimal());
 		salesOrderLineRecord.setDatePromised(SystemTime.asTimestamp());
 		save(salesOrderLineRecord);
 
@@ -243,7 +244,7 @@ public class PurchaseRowsLoaderTest
 
 		final PurchaseRow groupRow = topLevelRows.get(0);
 		assertThat(groupRow.getType()).isEqualTo(PurchaseRowType.GROUP);
-		assertThat(groupRow.getQtyToPurchase().getAsBigDecimal()).isEqualByComparingTo(TEN.getAsBigDecimal());
+		assertThat(groupRow.getQtyToPurchase().toBigDecimal()).isEqualByComparingTo(TEN.toBigDecimal());
 		assertThat(groupRow.getIncludedRows()).hasSize(1);
 
 		final PurchaseRow purchaseRow = groupRow.getIncludedRows().iterator().next();
@@ -283,13 +284,15 @@ public class PurchaseRowsLoaderTest
 
 		final PurchaseProfitInfo profitInfo = PurchaseRowTestTools.createProfitInfo(currencyId);
 
+		final ProductId productId = ProductId.ofRepoId(orderLine.getM_Product_ID());
+		final I_C_UOM productStockingUOM = Services.get(IProductBL.class).getStockUOM(productId);
 		final PurchaseCandidate purchaseCandidate = PurchaseCandidate.builder()
 				.groupReference(DemandGroupReference.EMPTY)
 				.orgId(OrgId.ofRepoId(20))
-				.purchaseDatePromised(TimeUtil.asLocalDateTime(orderLine.getDatePromised()))
-				.productId(ProductId.ofRepoId(orderLine.getM_Product_ID()))
+				.purchaseDatePromised(TimeUtil.asZonedDateTime(orderLine.getDatePromised()))
+				.productId(productId)
 				.attributeSetInstanceId(AttributeSetInstanceId.ofRepoId(orderLine.getM_AttributeSetInstance_ID()))
-				.qtyToPurchase(Quantity.of(orderLine.getQtyOrdered(), orderLine.getM_Product().getC_UOM()))
+				.qtyToPurchase(Quantity.of(orderLine.getQtyOrdered(), productStockingUOM))
 				.salesOrderAndLineIdOrNull(OrderAndLineId.ofRepoIds(orderLine.getC_Order_ID(), orderLine.getC_OrderLine_ID()))
 				.vendorId(vendorProductInfo.getVendorId())
 				.vendorProductNo(vendorProductInfo.getVendorProductNo())

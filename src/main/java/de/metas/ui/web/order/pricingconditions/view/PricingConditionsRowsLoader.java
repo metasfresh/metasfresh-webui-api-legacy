@@ -33,7 +33,7 @@ import de.metas.logging.LogManager;
 import de.metas.money.Money;
 import de.metas.order.OrderLineId;
 import de.metas.payment.paymentterm.PaymentTermId;
-import de.metas.pricing.conditions.PriceOverride;
+import de.metas.pricing.conditions.PriceSpecification;
 import de.metas.pricing.conditions.PricingConditions;
 import de.metas.pricing.conditions.PricingConditionsBreak;
 import de.metas.pricing.conditions.PricingConditionsBreakId;
@@ -46,7 +46,6 @@ import de.metas.ui.web.document.filter.DocumentFiltersList;
 import de.metas.ui.web.window.datatypes.LookupValue;
 import de.metas.util.Services;
 import de.metas.util.lang.Percent;
-
 import lombok.Builder;
 import lombok.NonNull;
 
@@ -162,13 +161,14 @@ class PricingConditionsRowsLoader
 			final Stream<PricingConditionsInfo> vendorPricingConditions = streamPricingConditionsInfos(BPartnerType.VENDOR);
 			final Stream<PricingConditionsInfo> customerPricingConditions = streamPricingConditionsInfos(BPartnerType.CUSTOMER);
 
-			pricingConditionsInfoById = Stream.concat(vendorPricingConditions, customerPricingConditions)
+			pricingConditionsInfoById = Stream
+					.concat(vendorPricingConditions, customerPricingConditions)
 					.collect(ImmutableSetMultimap.toImmutableSetMultimap(PricingConditionsInfo::getPricingConditionsId, Function.identity()));
 		}
 		return pricingConditionsInfoById;
 	}
 
-	private Stream<PricingConditionsInfo> streamPricingConditionsInfos(final BPartnerType bpartnerType)
+	private Stream<PricingConditionsInfo> streamPricingConditionsInfos(@NonNull final BPartnerType bpartnerType)
 	{
 		final Map<BPartnerId, Integer> discountSchemaIdsByBPartnerId = bpartnersRepo.retrieveAllDiscountSchemaIdsIndexedByBPartnerId(bpartnerType);
 
@@ -192,7 +192,7 @@ class PricingConditionsRowsLoader
 			return null;
 		}
 
-		return PricingConditionsId.ofDiscountSchemaId(discountSchemaId);
+		return PricingConditionsId.ofRepoId(discountSchemaId);
 	}
 
 	private Stream<PricingConditionsRow> createPricingConditionsRows(final PricingConditionsBreak pricingConditionsBreak)
@@ -237,6 +237,9 @@ class PricingConditionsRowsLoader
 		}
 	}
 
+	/**
+	 * On-the-fly create a PricingConditionsRow using this instance's {@link #sourceDocumentLine}.
+	 */
 	private PricingConditionsRow createEditablePricingConditionsRowOrNull()
 	{
 		if (sourceDocumentLine == null)
@@ -245,7 +248,9 @@ class PricingConditionsRowsLoader
 		}
 
 		final int discountSchemaId = bpartnerBL.getDiscountSchemaId(sourceDocumentLine.getBpartnerId(), sourceDocumentLine.getSoTrx());
-		final PricingConditionsId pricingConditionsId = PricingConditionsId.ofDiscountSchemaIdOrNull(discountSchemaId);
+		final PricingConditionsId pricingConditionsId = PricingConditionsId.ofRepoIdOrNull(discountSchemaId);
+
+		final Money priceEntered = sourceDocumentLine.getPriceEntered();
 
 		final PricingConditionsBreak pricingConditionsBreak = PricingConditionsBreak.builder()
 				.id(null) // N/A
@@ -254,11 +259,12 @@ class PricingConditionsRowsLoader
 						.productId(sourceDocumentLine.getProductId())
 						.productCategoryId(sourceDocumentLine.getProductCategoryId())
 						.build())
-				.priceOverride(PriceOverride.fixedPrice(sourceDocumentLine.getPriceEntered()))
-				// TODO: if we added those columns to C_OrderLine, then load them now
+				.priceSpecification(PriceSpecification.fixedPrice(priceEntered))
+
 				.paymentTermIdOrNull(sourceDocumentLine.getPaymentTermId())
 				.discount(sourceDocumentLine.getDiscount())
-				.dateCreated(null) // N/A
+				.dateCreated(null) // N/A; the PricingConditionsBreak hasn't been created (i.e. persisted on DB) yet
+				.createdById(null)
 				.build();
 
 		return PricingConditionsRow.builder()
@@ -277,7 +283,10 @@ class PricingConditionsRowsLoader
 				.build();
 	}
 
-	private LocalDate getLastInOutDate(final BPartnerId bpartnerId, final SOTrx soTrx, final PricingConditionsBreak pricingConditionsBreak)
+	private LocalDate getLastInOutDate(
+			@NonNull final BPartnerId bpartnerId,
+			@NonNull final SOTrx soTrx,
+			@NonNull final PricingConditionsBreak pricingConditionsBreak)
 	{
 		final ProductId productId = pricingConditionsBreak.getMatchCriteria().getProductId();
 		if (productId == null)
@@ -329,21 +338,30 @@ class PricingConditionsRowsLoader
 	@lombok.Builder
 	public static final class SourceDocumentLine
 	{
+		@Nullable
 		OrderLineId orderLineId;
+		@NonNull
 		SOTrx soTrx;
 
+		@NonNull
 		BPartnerId bpartnerId;
 
+		@NonNull
 		ProductId productId;
+		@NonNull
 		ProductCategoryId productCategoryId;
 
+		@NonNull
 		Money priceEntered;
 
 		@lombok.Builder.Default
+		@NonNull
 		Percent discount = Percent.ZERO;
 
+		@Nullable
 		PaymentTermId paymentTermId;
 
+		@Nullable
 		PricingConditionsBreakId pricingConditionsBreakId;
 	}
 

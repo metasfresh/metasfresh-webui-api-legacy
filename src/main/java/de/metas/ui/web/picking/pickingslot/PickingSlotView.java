@@ -13,9 +13,8 @@ import org.compiere.util.Evaluatee;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
-import de.metas.handlingunits.model.I_M_ShipmentSchedule;
 import de.metas.i18n.ITranslatableString;
-import de.metas.inoutcandidate.api.IShipmentSchedulePA;
+import de.metas.i18n.TranslatableStrings;
 import de.metas.inoutcandidate.api.ShipmentScheduleId;
 import de.metas.picking.model.I_M_PickingSlot;
 import de.metas.process.RelatedProcessDescriptor;
@@ -26,6 +25,7 @@ import de.metas.ui.web.view.IView;
 import de.metas.ui.web.view.IViewRow;
 import de.metas.ui.web.view.ViewId;
 import de.metas.ui.web.view.ViewResult;
+import de.metas.ui.web.view.ViewRowsOrderBy;
 import de.metas.ui.web.view.json.JSONViewDataType;
 import de.metas.ui.web.window.datatypes.DocumentId;
 import de.metas.ui.web.window.datatypes.DocumentIdsSelection;
@@ -33,7 +33,6 @@ import de.metas.ui.web.window.datatypes.DocumentPath;
 import de.metas.ui.web.window.datatypes.LookupValuesList;
 import de.metas.ui.web.window.model.DocumentQueryOrderBy;
 import de.metas.ui.web.window.model.sql.SqlOptions;
-import de.metas.util.Services;
 import lombok.Builder;
 import lombok.NonNull;
 
@@ -97,7 +96,7 @@ public class PickingSlotView implements IView
 		this.viewId = viewId;
 		this.parentViewId = parentViewId;
 		this.parentRowId = parentRowId;
-		this.description = ITranslatableString.nullToEmpty(description);
+		this.description = TranslatableStrings.nullToEmpty(description);
 		this.currentShipmentScheduleId = currentShipmentScheduleId;
 		this.rows = PickingSlotRowsCollection.ofSupplier(rowsSupplier);
 		this.additionalRelatedProcessDescriptors = additionalRelatedProcessDescriptors != null ? ImmutableList.copyOf(additionalRelatedProcessDescriptors) : ImmutableList.of();
@@ -168,10 +167,13 @@ public class PickingSlotView implements IView
 	}
 
 	@Override
-	public ViewResult getPage(final int firstRow, final int pageLength, final List<DocumentQueryOrderBy> orderBys)
+	public ViewResult getPage(
+			final int firstRow, 
+			final int pageLength, 
+			@NonNull final ViewRowsOrderBy orderBys)
 	{
 		final List<PickingSlotRow> pageRows = rows.getPage(firstRow, pageLength);
-		return ViewResult.ofViewAndPage(this, firstRow, pageLength, orderBys, pageRows);
+		return ViewResult.ofViewAndPage(this, firstRow, pageLength, orderBys.toDocumentQueryOrderByList(), pageRows);
 	}
 
 	@Override
@@ -243,24 +245,12 @@ public class PickingSlotView implements IView
 	}
 
 	/**
-	 * Returns the {@code M_ShipmentSchedule_ID} of the packageable line that is currently selected within the {@link PackageableView}.
-	 *
-	 * @return never returns a value {@code <= 0} (see constructor code).
+	 * @return the {@code M_ShipmentSchedule_ID} of the packageable line that is currently selected within the {@link PackageableView}.
 	 */
+	@NonNull
 	public ShipmentScheduleId getCurrentShipmentScheduleId()
 	{
 		return currentShipmentScheduleId;
-	}
-
-	/**
-	 * Convenience method. See {@link #getCurrentShipmentScheduleId()}.
-	 *
-	 * @return never returns {@code null} (see constructor code).
-	 */
-	public I_M_ShipmentSchedule getCurrentShipmentSchedule()
-	{
-		final I_M_ShipmentSchedule shipmentSchedule = Services.get(IShipmentSchedulePA.class).getById(getCurrentShipmentScheduleId(), I_M_ShipmentSchedule.class);
-		return shipmentSchedule;
 	}
 
 	@Override

@@ -11,8 +11,10 @@ import de.metas.material.cockpit.model.I_MD_Stock;
 import de.metas.ui.web.view.DefaultViewsRepositoryStorage;
 import de.metas.ui.web.view.IView;
 import de.metas.ui.web.view.IViewsIndexStorage;
+import de.metas.ui.web.view.ViewCloseAction;
 import de.metas.ui.web.view.ViewId;
 import de.metas.ui.web.window.datatypes.WindowId;
+import lombok.NonNull;
 
 /*
  * #%L
@@ -46,8 +48,7 @@ import de.metas.ui.web.window.datatypes.WindowId;
 @Service
 public class MaterialCockpitViewsIndexStorage implements IViewsIndexStorage
 {
-
-	private final IViewsIndexStorage defaultViewsRepositoryStorage = new DefaultViewsRepositoryStorage();;
+	private final DefaultViewsRepositoryStorage defaultViewsRepositoryStorage = new DefaultViewsRepositoryStorage();
 
 	public MaterialCockpitViewsIndexStorage()
 	{
@@ -75,22 +76,22 @@ public class MaterialCockpitViewsIndexStorage implements IViewsIndexStorage
 	}
 
 	@Override
-	public void put(IView view)
+	public void put(final IView view)
 	{
 		defaultViewsRepositoryStorage.put(view);
 
 	}
 
 	@Override
-	public IView getByIdOrNull(ViewId viewId)
+	public IView getByIdOrNull(final ViewId viewId)
 	{
 		return defaultViewsRepositoryStorage.getByIdOrNull(viewId);
 	}
 
 	@Override
-	public void removeById(ViewId viewId)
+	public void closeById(@NonNull final ViewId viewId, @NonNull final ViewCloseAction closeAction)
 	{
-		defaultViewsRepositoryStorage.removeById(viewId);
+		defaultViewsRepositoryStorage.closeById(viewId, closeAction);
 	}
 
 	@Override
@@ -100,7 +101,7 @@ public class MaterialCockpitViewsIndexStorage implements IViewsIndexStorage
 	}
 
 	@Override
-	public void invalidateView(ViewId viewId)
+	public void invalidateView(final ViewId viewId)
 	{
 		defaultViewsRepositoryStorage.invalidateView(viewId);
 	}
