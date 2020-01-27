@@ -41,9 +41,17 @@ public interface HUEditorViewRepository
 {
 	void invalidateCache();
 
-	ViewRowIdsOrderedSelection createSelection(ViewEvaluationCtx viewEvalCtx, ViewId viewId, DocumentFilterList filters, DocumentQueryOrderByList orderBys, SqlDocumentFilterConverterContext context);
+	ViewRowIdsOrderedSelection createSelection(
+			ViewEvaluationCtx viewEvalCtx,
+			ViewId viewId,
+			DocumentFilterList filters,
+			DocumentQueryOrderByList orderBys,
+			SqlDocumentFilterConverterContext filterConverterCtx);
 
-	ViewRowIdsOrderedSelection createSelectionFromSelection(ViewEvaluationCtx viewEvalCtx, ViewRowIdsOrderedSelection fromSelection, DocumentQueryOrderByList orderBys);
+	ViewRowIdsOrderedSelection createSelectionFromSelection(
+			ViewEvaluationCtx viewEvalCtx,
+			ViewRowIdsOrderedSelection fromSelection,
+			DocumentQueryOrderByList orderBys);
 
 	void deleteSelection(ViewRowIdsOrderedSelection selection);
 

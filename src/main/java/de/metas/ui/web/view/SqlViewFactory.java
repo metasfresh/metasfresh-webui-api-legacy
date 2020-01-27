@@ -2,6 +2,7 @@ package de.metas.ui.web.view;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.function.Supplier;
 
 import javax.annotation.Nullable;
 
@@ -26,6 +27,7 @@ import de.metas.ui.web.view.descriptor.SqlViewBindingFactory;
 import de.metas.ui.web.view.descriptor.SqlViewCustomizerMap;
 import de.metas.ui.web.view.descriptor.ViewLayout;
 import de.metas.ui.web.view.descriptor.ViewLayoutFactory;
+import de.metas.ui.web.view.json.JSONFilterViewRequest;
 import de.metas.ui.web.view.json.JSONViewDataType;
 import de.metas.ui.web.window.datatypes.DocumentPath;
 import de.metas.ui.web.window.datatypes.WindowId;
@@ -250,5 +252,12 @@ public class SqlViewFactory implements IViewFactory
 				.setOperator(Operator.EQUAL)
 				.setValue(value)
 				.build();
+	}
+
+	@Override
+	public DefaultView filterView(IView view, JSONFilterViewRequest filterViewRequest, Supplier<IViewsRepository> viewsRepo)
+	{
+		final CreateViewRequest createViewRequest = CreateViewRequest.filterViewBuilder(view, filterViewRequest).build();
+		return createView(createViewRequest);
 	}
 }

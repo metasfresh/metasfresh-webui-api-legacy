@@ -5,6 +5,7 @@ import java.util.Objects;
 import de.metas.util.Check;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.NonNull;
 import lombok.ToString;
 
@@ -40,6 +41,8 @@ public class SqlSelectValue
 	private final String tableNameOrAlias;
 	private final String columnName;
 	private final String virtualColumnSql;
+
+	@Getter
 	private final String columnNameAlias;
 
 	@Builder(toBuilder = true)
@@ -91,9 +94,16 @@ public class SqlSelectValue
 
 	public SqlSelectValue withJoinOnTableNameOrAlias(final String tableNameOrAlias)
 	{
-		final String tableNameOrAliasEffective = virtualColumnSql != null ? tableNameOrAlias : null;
+		final String tableNameOrAliasEffective = virtualColumnSql != null ? null : tableNameOrAlias;
 		return !Objects.equals(this.tableNameOrAlias, tableNameOrAliasEffective)
 				? toBuilder().tableNameOrAlias(tableNameOrAliasEffective).build()
+				: this;
+	}
+
+	public SqlSelectValue withColumnNameAlias(@NonNull final String columnNameAlias)
+	{
+		return !Objects.equals(this.columnNameAlias, columnNameAlias)
+				? toBuilder().columnNameAlias(columnNameAlias).build()
 				: this;
 	}
 }

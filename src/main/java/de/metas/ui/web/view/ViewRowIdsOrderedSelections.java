@@ -7,6 +7,7 @@ import com.google.common.collect.ImmutableSet;
 
 import de.metas.ui.web.window.model.DocumentQueryOrderByList;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.NonNull;
 import lombok.ToString;
 
@@ -36,33 +37,45 @@ import lombok.ToString;
 @ToString
 final class ViewRowIdsOrderedSelections
 {
-	public static ViewRowIdsOrderedSelections ofDefaultSelection(@NonNull final ViewRowIdsOrderedSelection defaultSelection)
+	public static ViewRowIdsOrderedSelections ofDefaultSelection(
+			@NonNull final ViewRowIdsOrderedSelection defaultSelectionBeforeFacetsFiltering,
+			@NonNull final ViewRowIdsOrderedSelection defaultSelection)
 	{
 		final ImmutableMap<DocumentQueryOrderByList, ViewRowIdsOrderedSelection> selectionsByOrderBys = ImmutableMap.of();
-		return new ViewRowIdsOrderedSelections(defaultSelection, selectionsByOrderBys);
+		return new ViewRowIdsOrderedSelections(defaultSelectionBeforeFacetsFiltering, defaultSelection, selectionsByOrderBys);
 	}
 
+	@Getter
+	private final ViewRowIdsOrderedSelection defaultSelectionBeforeFacetsFiltering;
+
+	@Getter
 	private final ViewRowIdsOrderedSelection defaultSelection;
+
 	private final ImmutableMap<DocumentQueryOrderByList, ViewRowIdsOrderedSelection> selectionsByOrderBys;
 
 	private ViewRowIdsOrderedSelections(
+			@NonNull final ViewRowIdsOrderedSelection defaultSelectionBeforeFacetsFiltering,
 			@NonNull final ViewRowIdsOrderedSelection defaultSelection,
 			@NonNull final ImmutableMap<DocumentQueryOrderByList, ViewRowIdsOrderedSelection> selectionsByOrderBys)
 	{
+		this.defaultSelectionBeforeFacetsFiltering = defaultSelectionBeforeFacetsFiltering;
 		this.defaultSelection = defaultSelection;
 		this.selectionsByOrderBys = selectionsByOrderBys;
 	}
 
-	public synchronized ViewRowIdsOrderedSelection getDefaultSelection()
+	public ViewRowIdsOrderedSelections withDefaultSelection(
+			@NonNull final ViewRowIdsOrderedSelection defaultSelectionBeforeFacetsFiltering,
+			@NonNull final ViewRowIdsOrderedSelection defaultSelection)
 	{
-		return defaultSelection;
-	}
-
-	public ViewRowIdsOrderedSelections withDefaultSelection(@NonNull final ViewRowIdsOrderedSelection defaultSelection)
-	{
-		return !ViewRowIdsOrderedSelection.equals(this.defaultSelection, defaultSelection)
-				? ofDefaultSelection(defaultSelection)
-				: this;
+		if (ViewRowIdsOrderedSelection.equals(this.defaultSelectionBeforeFacetsFiltering, defaultSelectionBeforeFacetsFiltering)
+				&& ViewRowIdsOrderedSelection.equals(this.defaultSelection, defaultSelection))
+		{
+			return this;
+		}
+		else
+		{
+			return ofDefaultSelection(defaultSelectionBeforeFacetsFiltering, defaultSelection);
+		}
 	}
 
 	@FunctionalInterface
@@ -85,7 +98,7 @@ final class ViewRowIdsOrderedSelections
 				.putAll(selectionsByOrderBys)
 				.put(orderBys, factory.create(defaultSelection, orderBys))
 				.build();
-		return new ViewRowIdsOrderedSelections(defaultSelection, selectionsByOrderBysNew);
+		return new ViewRowIdsOrderedSelections(defaultSelectionBeforeFacetsFiltering, defaultSelection, selectionsByOrderBysNew);
 	}
 
 	public ViewRowIdsOrderedSelection getSelection(final DocumentQueryOrderByList orderBys)

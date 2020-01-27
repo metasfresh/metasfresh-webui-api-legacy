@@ -44,7 +44,7 @@ import lombok.NonNull;
  */
 
 @EqualsAndHashCode // required for (ETag) caching
-public class DocumentFilterParam
+public final class DocumentFilterParam
 {
 	public enum Operator
 	{
@@ -78,19 +78,19 @@ public class DocumentFilterParam
 	private final String sqlWhereClause;
 	private final List<Object> sqlWhereClauseParams;
 
-	public static final Builder builder()
+	public static Builder builder()
 	{
 		return new Builder();
 	}
 
-	public static final DocumentFilterParam ofSqlWhereClause(final boolean joinAnd, final String sqlWhereClause)
+	public static DocumentFilterParam ofSqlWhereClause(final boolean joinAnd, final String sqlWhereClause)
 	{
 		// NOTE: avoid having sqlWhereClauseParams because they might introduce issues when we have to convert to SQL code without params.
 		final List<Object> sqlWhereClauseParams = ImmutableList.of();
 		return new DocumentFilterParam(joinAnd, sqlWhereClause, sqlWhereClauseParams);
 	}
 
-	public static final DocumentFilterParam ofNameEqualsValue(
+	public static DocumentFilterParam ofNameEqualsValue(
 			@NonNull final String fieldName,
 			@NonNull final Object value)
 	{
@@ -100,7 +100,7 @@ public class DocumentFilterParam
 	/**
 	 * Shortcut to create an often-used kind of parameters.
 	 */
-	public static final DocumentFilterParam ofNameOperatorValue(
+	public static DocumentFilterParam ofNameOperatorValue(
 			@NonNull final String fieldName,
 			@NonNull final Operator operator,
 			@NonNull final Object value)
@@ -263,7 +263,7 @@ public class DocumentFilterParam
 		return getValueAsList(itemObj -> convertToInt(itemObj));
 	}
 
-	private static final Integer convertToInt(final Object itemObj)
+	private static Integer convertToInt(final Object itemObj)
 	{
 		if (itemObj == null)
 		{

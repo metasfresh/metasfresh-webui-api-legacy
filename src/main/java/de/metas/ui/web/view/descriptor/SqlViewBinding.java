@@ -34,6 +34,7 @@ import de.metas.ui.web.view.ViewRowCustomizer;
 import de.metas.ui.web.view.descriptor.SqlViewRowFieldBinding.SqlViewRowFieldLoader;
 import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
 import de.metas.ui.web.window.descriptor.sql.SqlEntityBinding;
+import de.metas.ui.web.window.descriptor.sql.SqlSelectValue;
 import de.metas.ui.web.window.model.DocumentQueryOrderBy;
 import de.metas.ui.web.window.model.DocumentQueryOrderByList;
 import de.metas.util.Check;
@@ -268,7 +269,7 @@ public class SqlViewBinding implements SqlEntityBinding
 		final ImmutableMap.Builder<String, String> sqlOrderBysIndexedByFieldName = ImmutableMap.builder();
 		for (final SqlViewRowFieldBinding fieldBinding : getFields())
 		{
-			final String fieldOrderBy = fieldBinding.getSqlOrderBy().evaluate(viewEvalCtx.toEvaluatee());
+			final String fieldOrderBy = fieldBinding.getSqlOrderBy().toSqlString(viewEvalCtx.toEvaluatee());
 			if (Check.isEmpty(fieldOrderBy, true))
 			{
 				continue;
@@ -301,7 +302,7 @@ public class SqlViewBinding implements SqlEntityBinding
 	}
 
 	@Nullable
-	public String getSqlAggregatedColumn(final String fieldName)
+	public SqlSelectValue getSqlAggregatedColumn(final String fieldName)
 	{
 		if (groupingBinding == null)
 		{

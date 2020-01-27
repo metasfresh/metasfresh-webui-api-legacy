@@ -26,7 +26,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
 
 import de.metas.logging.LogManager;
-import de.metas.ui.web.document.filter.DocumentFilter;
 import de.metas.ui.web.document.filter.DocumentFilterList;
 import de.metas.ui.web.document.filter.provider.DocumentFilterDescriptorsProvider;
 import de.metas.ui.web.document.filter.sql.SqlDocumentFilterConverter;
@@ -201,9 +200,11 @@ class SqlViewDataRepository implements IViewDataRepository
 	public ViewRowIdsOrderedSelection createOrderedSelectionFromSelection(
 			final ViewEvaluationCtx viewEvalCtx,
 			final ViewRowIdsOrderedSelection fromSelection,
-			final DocumentQueryOrderByList orderBys)
+			final DocumentFilterList filters,
+			final DocumentQueryOrderByList orderBys,
+			final SqlDocumentFilterConverterContext filterConverterCtx)
 	{
-		return viewRowIdsOrderedSelectionFactory.createOrderedSelectionFromSelection(viewEvalCtx, fromSelection, orderBys);
+		return viewRowIdsOrderedSelectionFactory.createOrderedSelectionFromSelection(viewEvalCtx, fromSelection, filters, orderBys, filterConverterCtx);
 	}
 
 	@Override
@@ -699,5 +700,22 @@ class SqlViewDataRepository implements IViewDataRepository
 		{
 			DB.close(rs, pstmt);
 		}
+	}
+
+	@Override
+	public List<Object> retrieveFieldValues(
+			@NonNull final ViewEvaluationCtx viewEvalCtx,
+			@NonNull final String selectionId,
+			@NonNull final String fieldName,
+			final int limit)
+	{
+		final SqlViewRowFieldLoader fieldLoader = rowFieldLoaders.get(fieldName);
+		final SqlAndParams sql = sqlViewSelect.selectFieldValues(viewEvalCtx, selectionId, fieldName, limit);
+
+		final String adLanguage = viewEvalCtx.getAdLanguage();
+		return DB.retrieveRows(
+				sql.getSql(),
+				sql.getSqlParams(),
+				rs -> fieldLoader.retrieveValue(rs, adLanguage));
 	}
 }

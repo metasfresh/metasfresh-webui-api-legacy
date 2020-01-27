@@ -39,7 +39,7 @@ public interface SqlEntityBinding
 	String getTableAlias();
 
 	IStringExpression getSqlWhereClause();
-	
+
 	/** @return field binding or throws exception in case it was not found */
 	SqlEntityFieldBinding getFieldByFieldName(String fieldName);
 
@@ -67,18 +67,24 @@ public interface SqlEntityBinding
 
 	default String replaceTableNameWithTableAlias(final String sql)
 	{
+		final String tableName = getTableName();
 		final String tableAlias = getTableAlias();
-		return replaceTableNameWithTableAlias(sql, tableAlias);
+		return replaceTableNameWithTableAlias(sql, tableName, tableAlias);
 	}
 
 	default String replaceTableNameWithTableAlias(final String sql, @NonNull final String tableAlias)
+	{
+		final String tableName = getTableName();
+		return replaceTableNameWithTableAlias(sql, tableName, tableAlias);
+	}
+
+	static String replaceTableNameWithTableAlias(final String sql, @NonNull final String tableName, @NonNull final String tableAlias)
 	{
 		if (sql == null || sql.isEmpty())
 		{
 			return sql;
 		}
 
-		final String tableName = getTableName();
 		final String matchTableNameIgnoringCase = "(?i)" + Pattern.quote(tableName + ".");
 		final String sqlFixed = sql.replaceAll(matchTableNameIgnoringCase, tableAlias + ".");
 		return sqlFixed;

@@ -44,7 +44,9 @@ public interface ViewRowIdsOrderedSelectionFactory
 	ViewRowIdsOrderedSelection createOrderedSelectionFromSelection(
 			ViewEvaluationCtx viewEvalCtx,
 			ViewRowIdsOrderedSelection fromSelection,
-			DocumentQueryOrderByList orderBys);
+			DocumentFilterList filters,
+			DocumentQueryOrderByList orderBys,
+			final SqlDocumentFilterConverterContext filterConverterCtx);
 
 	String getSqlWhereClause(ViewId viewId, DocumentIdsSelection rowIds);
 

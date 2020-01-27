@@ -257,13 +257,16 @@ public class SqlViewSelectData
 			}
 			else
 			{
-				String sqlSelectValueAgg = groupingBinding.getColumnSqlByFieldName(fieldName);
+				SqlSelectValue sqlSelectValueAgg = groupingBinding.getColumnSqlByFieldName(fieldName);
 				if (sqlSelectValueAgg == null)
 				{
-					sqlSelectValueAgg = "NULL";
+					sqlSelectValueAgg = SqlSelectValue.builder()
+							.virtualColumnSql("NULL")
+							.columnNameAlias(field.getColumnName())
+							.build();
 				}
 
-				sqlSelectValuesList.add(sqlSelectValueAgg + " AS " + field.getColumnName());
+				sqlSelectValuesList.add(sqlSelectValueAgg.withColumnNameAlias(field.getColumnName()).toSqlStringWithColumnNameAlias());
 
 				// FIXME: NOT supported atm
 				// if (usingDisplayColumn)
@@ -450,4 +453,50 @@ public class SqlViewSelectData
 		return SqlAndParams.of(sql, sqlParams);
 	}
 
+	public SqlAndParams selectFieldValues(
+			@NonNull final ViewEvaluationCtx viewEvalCtx,
+			@NonNull final String selectionId,
+			@NonNull final String fieldName,
+			final int limit)
+	{
+		Check.assumeGreaterThanZero(limit, "limit");
+
+		final SqlViewRowFieldBinding field = fieldsByFieldName.get(fieldName);
+		if (field == null)
+		{
+			throw new AdempiereException("Field `" + fieldName + "` not found. Available fields are: " + fieldsByFieldName.keySet());
+		}
+
+		final SqlSelectValue sqlValue = field.getSqlSelectValue();
+
+		final SqlSelectDisplayValue sqlDisplayValue;
+		if (field.getSqlSelectDisplayValue() != null && displayFieldNames.contains(fieldName))
+		{
+			sqlDisplayValue = field.getSqlSelectDisplayValue();
+		}
+		else
+		{
+			sqlDisplayValue = null;
+		}
+
+		final CompositeStringExpression.Builder sqlExpression = IStringExpression.composer()
+				.append("SELECT DISTINCT ")
+				.append("\n ").append(sqlValue.withJoinOnTableNameOrAlias(sqlTableName).toSqlStringWithColumnNameAlias());
+
+		if (sqlDisplayValue != null)
+		{
+			sqlExpression.append("\n, ").append(sqlDisplayValue.withJoinOnTableNameOrAlias(sqlTableName).toStringExpressionWithColumnNameAlias());
+		}
+
+		sqlExpression.append("\n FROM " + I_T_WEBUI_ViewSelection.Table_Name + " sel")
+				.append("\n INNER JOIN " + sqlTableName + " ON (" + keyColumnNamesMap.getSqlJoinCondition(sqlTableName, "sel") + ")")
+				// Filter by UUID. Keep this closer to the source table, see https://github.com/metasfresh/metasfresh-webui-api/issues/437
+				.append("\n WHERE sel." + I_T_WEBUI_ViewSelection.COLUMNNAME_UUID + "=?")
+				.append("\n LIMIT ?");
+
+		final String sql = sqlExpression.build()
+				.evaluate(viewEvalCtx.toEvaluatee(), OnVariableNotFound.Fail);
+
+		return SqlAndParams.of(sql, selectionId, limit);
+	}
 }

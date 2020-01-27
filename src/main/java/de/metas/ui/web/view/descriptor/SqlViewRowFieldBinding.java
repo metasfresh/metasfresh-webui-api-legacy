@@ -48,13 +48,11 @@ public class SqlViewRowFieldBinding implements SqlEntityFieldBinding
 
 	private final String fieldName;
 	private final String columnName;
-	// private final String columnSql;
 	private final boolean keyColumn;
 	private final DocumentFieldWidgetType widgetType;
 	private final boolean virtualColumn;
 
 	private final Class<?> sqlValueClass;
-	/** i.e. columnName/columnSql AS columnName */
 	private final SqlSelectValue sqlSelectValue;
 	private final SqlSelectDisplayValue sqlSelectDisplayValue;
 
@@ -66,7 +64,6 @@ public class SqlViewRowFieldBinding implements SqlEntityFieldBinding
 	private SqlViewRowFieldBinding(
 			@NonNull final String fieldName,
 			final String columnName,
-			// final String columnSql,
 			final boolean keyColumn,
 			@NonNull final DocumentFieldWidgetType widgetType,
 			final boolean virtualColumn,
@@ -80,7 +77,6 @@ public class SqlViewRowFieldBinding implements SqlEntityFieldBinding
 	{
 		this.fieldName = fieldName;
 		this.columnName = columnName != null ? columnName : this.fieldName;
-		// this.columnSql = columnSql != null ? columnSql : this.columnName;
 		this.keyColumn = keyColumn;
 		this.widgetType = widgetType;
 		this.virtualColumn = virtualColumn;
@@ -91,7 +87,7 @@ public class SqlViewRowFieldBinding implements SqlEntityFieldBinding
 
 		this.sqlOrderBy = sqlOrderBy != null
 				? sqlOrderBy
-				: SqlOrderByValue.builder().sqlSelectValue(sqlSelectValue).build();
+				: SqlOrderByValue.builder().sqlSelectDisplayValue(sqlSelectDisplayValue).sqlSelectValue(sqlSelectValue).columnName(columnName).build();
 		this.fieldLoader = fieldLoader;
 	}
 }

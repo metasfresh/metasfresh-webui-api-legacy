@@ -1,6 +1,9 @@
 package de.metas.ui.web.window.model.sql;
 
+import java.util.Optional;
+
 import org.adempiere.ad.expression.api.IStringExpression;
+import org.adempiere.ad.expression.api.impl.CompositeStringExpression;
 
 import de.metas.ui.web.window.descriptor.sql.SqlEntityBinding;
 import de.metas.ui.web.window.descriptor.sql.SqlOrderByValue;
@@ -50,6 +53,7 @@ public class SqlDocumentOrderByBuilder
 
 	private final SqlOrderByBindings bindings;
 	private String joinOnTableNameOrAlias;
+	private boolean useColumnNameAlias;
 
 	private SqlDocumentOrderByBuilder(@NonNull final SqlOrderByBindings bindings)
 	{
@@ -62,21 +66,31 @@ public class SqlDocumentOrderByBuilder
 		return this;
 	}
 
+	public SqlDocumentOrderByBuilder useColumnNameAlias(final boolean useColumnNameAlias)
+	{
+		this.useColumnNameAlias = useColumnNameAlias;
+		return this;
+	}
+
 	/**
 	 * @return SQL order by (e.g. Column1 ASC, Column2 DESC)
 	 */
-	public IStringExpression buildSqlOrderBy(final DocumentQueryOrderByList orderBys)
+	public Optional<IStringExpression> buildSqlOrderBy(final DocumentQueryOrderByList orderBys)
 	{
 		if (orderBys.isEmpty())
 		{
-			return null;
+			return Optional.empty();
 		}
 
-		return orderBys
+		final IStringExpression result = orderBys
 				.stream()
 				.map(this::buildSqlOrderBy)
 				.filter(sql -> sql != null && !sql.isNullExpression())
 				.collect(IStringExpression.collectJoining(", "));
+
+		return result != null && !result.isNullExpression()
+				? Optional.of(result)
+				: Optional.empty();
 	}
 
 	private final IStringExpression buildSqlOrderBy(final DocumentQueryOrderBy orderBy)
@@ -96,9 +110,18 @@ public class SqlDocumentOrderByBuilder
 			return IStringExpression.NULL;
 		}
 
-		return IStringExpression.composer()
-				.append("(").append(orderBy.withJoinOnTableNameOrAlias(joinOnTableNameOrAlias).toStringExpression()).append(")")
-				.append(ascending ? " ASC" : " DESC")
+		final CompositeStringExpression.Builder sql = IStringExpression.composer();
+		if (useColumnNameAlias)
+		{
+			sql.append(orderBy.withJoinOnTableNameOrAlias(joinOnTableNameOrAlias).toSqlStringUsingColumnAlias());
+		}
+		else
+		{
+			sql.append("(").append(orderBy.withJoinOnTableNameOrAlias(joinOnTableNameOrAlias).toStringExpression()).append(")");
+
+		}
+
+		return sql.append(ascending ? " ASC" : " DESC")
 				.append(nullsLast ? " NULLS LAST" : " NULLS FIRST")
 				.build();
 	}

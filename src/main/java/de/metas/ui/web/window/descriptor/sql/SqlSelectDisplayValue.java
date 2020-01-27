@@ -4,8 +4,10 @@ import java.util.Objects;
 
 import javax.annotation.Nullable;
 
+import org.adempiere.ad.expression.api.IExpressionEvaluator.OnVariableNotFound;
 import org.adempiere.ad.expression.api.IStringExpression;
 import org.adempiere.ad.expression.api.impl.ConstantStringExpression;
+import org.compiere.util.Evaluatee;
 
 import de.metas.printing.esb.base.util.Check;
 import lombok.Builder;
@@ -62,6 +64,11 @@ public class SqlSelectDisplayValue
 		this.joinOnColumnName = joinOnColumnName;
 		this.sqlExpression = sqlExpression;
 		this.columnNameAlias = columnNameAlias;
+	}
+
+	public String toSqlStringWithColumnNameAlias(@NonNull final Evaluatee ctx)
+	{
+		return toStringExpressionWithColumnNameAlias().evaluate(ctx, OnVariableNotFound.Fail);
 	}
 
 	public IStringExpression toStringExpressionWithColumnNameAlias()

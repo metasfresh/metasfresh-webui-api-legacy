@@ -62,7 +62,12 @@ public interface IViewDataRepository
 
 	<T> List<T> retrieveModelsByIds(ViewId viewId, DocumentIdsSelection rowIds, Class<T> modelClass);
 
-	ViewRowIdsOrderedSelection createOrderedSelectionFromSelection(final ViewEvaluationCtx viewEvalCtx, ViewRowIdsOrderedSelection fromSelection, DocumentQueryOrderByList orderBys);
+	ViewRowIdsOrderedSelection createOrderedSelectionFromSelection(
+			final ViewEvaluationCtx viewEvalCtx,
+			ViewRowIdsOrderedSelection fromSelection,
+			DocumentFilterList filters,
+			DocumentQueryOrderByList orderBys,
+			SqlDocumentFilterConverterContext filterConverterCtx);
 
 	void deleteSelection(ViewId viewId);
 
@@ -71,4 +76,6 @@ public interface IViewDataRepository
 	ViewRowIdsOrderedSelection createOrderedSelection(ViewEvaluationCtx viewEvalCtx, ViewId viewId, DocumentFilterList filters, boolean applySecurityRestrictions, SqlDocumentFilterConverterContext context);
 
 	ViewRowIdsOrderedSelection removeRowIdsNotMatchingFilters(ViewRowIdsOrderedSelection selection, DocumentFilterList filters, Set<DocumentId> rowIds);
+
+	List<Object> retrieveFieldValues(ViewEvaluationCtx viewEvalCtx, String selectionId, String fieldName, int limit);
 }

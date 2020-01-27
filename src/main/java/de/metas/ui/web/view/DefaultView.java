@@ -30,6 +30,7 @@ import de.metas.logging.LogManager;
 import de.metas.ui.web.document.filter.DocumentFilter;
 import de.metas.ui.web.document.filter.DocumentFilterList;
 import de.metas.ui.web.document.filter.provider.DocumentFilterDescriptorsProvider;
+import de.metas.ui.web.document.filter.provider.facets.FacetFilterViewCacheMap;
 import de.metas.ui.web.exceptions.EntityNotFoundException;
 import de.metas.ui.web.view.event.ViewChangesCollector;
 import de.metas.ui.web.view.json.JSONViewDataType;
@@ -125,6 +126,8 @@ public final class DefaultView implements IEditableView
 	@Getter
 	private final DocumentFilterList filters;
 	private transient DocumentFilterList _allFilters; // lazy
+	@Getter
+	private final FacetFilterViewCacheMap facetFiltersCacheMap = new FacetFilterViewCacheMap();
 
 	//
 	// Misc
@@ -221,29 +224,30 @@ public final class DefaultView implements IEditableView
 	@Override
 	public long size()
 	{
-		final ViewRowIdsOrderedSelection defaultSelection = selectionsRef.getDefaultSelection();
-		return defaultSelection.getSize();
+		return selectionsRef.getSize();
 	}
 
 	@Override
 	public DocumentQueryOrderByList getDefaultOrderBys()
 	{
-		final ViewRowIdsOrderedSelection defaultSelection = selectionsRef.getDefaultSelection();
-		return defaultSelection.getOrderBys();
+		return selectionsRef.getDefaultOrderBys();
 	}
 
 	@Override
 	public int getQueryLimit()
 	{
-		final ViewRowIdsOrderedSelection defaultSelection = selectionsRef.getDefaultSelection();
-		return defaultSelection.getQueryLimit();
+		return selectionsRef.getQueryLimit();
 	}
 
 	@Override
 	public boolean isQueryLimitHit()
 	{
-		final ViewRowIdsOrderedSelection defaultSelection = selectionsRef.getDefaultSelection();
-		return defaultSelection.isQueryLimitHit();
+		return selectionsRef.isQueryLimitHit();
+	}
+
+	public ViewRowIdsOrderedSelection getDefaultSelectionBeforeFacetsFiltering()
+	{
+		return selectionsRef.getDefaultSelectionBeforeFacetsFiltering();
 	}
 
 	public DocumentFilterDescriptorsProvider getFilterDescriptors()
@@ -419,9 +423,9 @@ public final class DefaultView implements IEditableView
 		return viewDataRepository.retrieveById(evalCtx, getViewId(), rowId);
 	}
 
-	private ViewRowIdsOrderedSelection getOrderedSelection(final DocumentQueryOrderByList orderBysParam)
+	private ViewRowIdsOrderedSelection getOrderedSelection(final DocumentQueryOrderByList orderBys)
 	{
-		return selectionsRef.getOrderedSelection(orderBysParam);
+		return selectionsRef.getOrderedSelection(orderBys);
 	}
 
 	@Override

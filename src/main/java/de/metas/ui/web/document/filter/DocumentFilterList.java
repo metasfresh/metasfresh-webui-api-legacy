@@ -2,15 +2,20 @@ package de.metas.ui.web.document.filter;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.stream.Collector;
 import java.util.stream.Stream;
 
 import javax.annotation.Nullable;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
 
 import de.metas.util.GuavaCollectors;
 import lombok.EqualsAndHashCode;
@@ -50,6 +55,11 @@ public class DocumentFilterList
 				: EMPTY;
 	}
 
+	private static final DocumentFilterList ofMap(@NonNull final Map<String, DocumentFilter> filtersById)
+	{
+		return !filtersById.isEmpty() ? new DocumentFilterList(filtersById) : EMPTY;
+	}
+
 	public static final DocumentFilterList of(@NonNull final DocumentFilter filter)
 	{
 		return ofList(ImmutableList.of(filter));
@@ -65,13 +75,18 @@ public class DocumentFilterList
 		return GuavaCollectors.collectUsingListAccumulator(DocumentFilterList::ofList);
 	}
 
-	public static final DocumentFilterList EMPTY = new DocumentFilterList(ImmutableList.of());
+	public static final DocumentFilterList EMPTY = new DocumentFilterList(ImmutableMap.of());
 
-	private final ImmutableList<DocumentFilter> list;
+	private final ImmutableMap<String, DocumentFilter> filtersById;
 
 	private DocumentFilterList(@NonNull final Collection<DocumentFilter> list)
 	{
-		this.list = ImmutableList.copyOf(list);
+		filtersById = Maps.uniqueIndex(list, DocumentFilter::getFilterId);
+	}
+
+	private DocumentFilterList(@NonNull final Map<String, DocumentFilter> map)
+	{
+		filtersById = ImmutableMap.copyOf(map);
 	}
 
 	public static boolean equals(final DocumentFilterList list1, final DocumentFilterList list2)
@@ -81,17 +96,17 @@ public class DocumentFilterList
 
 	public boolean isEmpty()
 	{
-		return list.isEmpty();
+		return filtersById.isEmpty();
 	}
 
 	public ImmutableList<DocumentFilter> toList()
 	{
-		return list;
+		return ImmutableList.copyOf(filtersById.values());
 	}
 
 	public Stream<DocumentFilter> stream()
 	{
-		return list.stream();
+		return filtersById.values().stream();
 	}
 
 	public DocumentFilterList mergeWith(@NonNull final DocumentFilterList other)
@@ -106,10 +121,10 @@ public class DocumentFilterList
 		}
 		else
 		{
-			return ofList(ImmutableList.<DocumentFilter> builder()
-					.addAll(this.list)
-					.addAll(other.list)
-					.build());
+			final LinkedHashMap<String, DocumentFilter> filtersByIdNew = new LinkedHashMap<>(this.filtersById);
+			filtersByIdNew.putAll(other.filtersById);
+
+			return ofMap(filtersByIdNew);
 		}
 	}
 
@@ -121,28 +136,66 @@ public class DocumentFilterList
 		}
 		else
 		{
-			return ofList(ImmutableList.<DocumentFilter> builder()
-					.addAll(this.list)
-					.add(filter)
-					.build());
+			final LinkedHashMap<String, DocumentFilter> filtersByIdNew = new LinkedHashMap<>(this.filtersById);
+			filtersByIdNew.put(filter.getFilterId(), filter);
+
+			return ofMap(filtersByIdNew);
 		}
+	}
+
+	public DocumentFilterList retainingOnly(@NonNull final Predicate<DocumentFilter> predicate)
+	{
+		if (isEmpty())
+		{
+			return this;
+		}
+
+		final LinkedHashMap<String, DocumentFilter> filtersByIdNew = new LinkedHashMap<>(this.filtersById.size());
+		for (final Map.Entry<String, DocumentFilter> e : this.filtersById.entrySet())
+		{
+			final String filterId = e.getKey();
+			final DocumentFilter filter = e.getValue();
+
+			if (predicate.test(filter))
+			{
+				filtersByIdNew.put(filterId, filter);
+			}
+		}
+
+		return this.filtersById.size() != filtersByIdNew.size()
+				? ofMap(filtersByIdNew)
+				: this;
+	}
+
+	public DocumentFilterList subtract(@NonNull final DocumentFilterList other)
+	{
+		return retainingOnly(filter -> !other.containsFilterById(filter.getFilterId()));
 	}
 
 	public Optional<DocumentFilter> getFilterById(@NonNull final String filterId)
 	{
-		return stream()
-				.filter(filter -> filterId.equals(filter.getFilterId()))
-				.findFirst();
+		final DocumentFilter filter = getFilterByIdOrNull(filterId);
+		return Optional.ofNullable(filter);
+	}
+
+	public boolean containsFilterById(final String filterId)
+	{
+		return getFilterByIdOrNull(filterId) != null;
+	}
+
+	private DocumentFilter getFilterByIdOrNull(@NonNull final String filterId)
+	{
+		return filtersById.get(filterId);
 	}
 
 	public void forEach(@NonNull final Consumer<DocumentFilter> consumer)
 	{
-		list.forEach(consumer);
+		filtersById.values().forEach(consumer);
 	}
 
 	public String getParamValueAsString(final String filterId, final String parameterName)
 	{
-		final DocumentFilter filter = getFilterById(filterId).orElse(null);
+		final DocumentFilter filter = getFilterByIdOrNull(filterId);
 		if (filter == null)
 		{
 			return null;
@@ -153,7 +206,7 @@ public class DocumentFilterList
 
 	public int getParamValueAsInt(final String filterId, final String parameterName, final int defaultValue)
 	{
-		final DocumentFilter filter = getFilterById(filterId).orElse(null);
+		final DocumentFilter filter = getFilterByIdOrNull(filterId);
 		if (filter == null)
 		{
 			return defaultValue;
@@ -164,7 +217,7 @@ public class DocumentFilterList
 
 	public boolean getParamValueAsBoolean(final String filterId, final String parameterName, final boolean defaultValue)
 	{
-		final DocumentFilter filter = getFilterById(filterId).orElse(null);
+		final DocumentFilter filter = getFilterByIdOrNull(filterId);
 		if (filter == null)
 		{
 			return defaultValue;

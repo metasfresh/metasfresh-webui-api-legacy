@@ -610,10 +610,10 @@ public class SqlHUEditorViewRepository implements HUEditorViewRepository
 			final ViewId viewId,
 			final DocumentFilterList filters,
 			final DocumentQueryOrderByList orderBys,
-			final SqlDocumentFilterConverterContext context)
+			@NonNull final SqlDocumentFilterConverterContext filterConverterCtx)
 	{
 		final boolean applySecurityRestrictions = true;
-		return viewSelectionFactory.createOrderedSelection(viewEvalCtx, viewId, filters, orderBys, applySecurityRestrictions, context);
+		return viewSelectionFactory.createOrderedSelection(viewEvalCtx, viewId, filters, orderBys, applySecurityRestrictions, filterConverterCtx);
 	}
 
 	@Override
@@ -622,7 +622,7 @@ public class SqlHUEditorViewRepository implements HUEditorViewRepository
 			final ViewRowIdsOrderedSelection fromSelection,
 			final DocumentQueryOrderByList orderBys)
 	{
-		return viewSelectionFactory.createOrderedSelectionFromSelection(viewEvalCtx, fromSelection, orderBys);
+		return viewSelectionFactory.createOrderedSelectionFromSelection(viewEvalCtx, fromSelection, DocumentFilterList.EMPTY, orderBys, SqlDocumentFilterConverterContext.EMPTY);
 	}
 
 	@Override

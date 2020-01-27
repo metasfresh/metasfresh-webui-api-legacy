@@ -6,6 +6,7 @@ import java.sql.SQLException;
 import java.util.Set;
 
 import org.adempiere.ad.trx.api.ITrx;
+import org.adempiere.exceptions.AdempiereException;
 import org.adempiere.exceptions.DBException;
 import org.compiere.util.DB;
 import org.slf4j.Logger;
@@ -62,6 +63,7 @@ public class SqlViewRowIdsOrderedSelectionFactory implements ViewRowIdsOrderedSe
 	}
 
 	private static final Logger logger = LogManager.getLogger(SqlViewRowIdsOrderedSelectionFactory.class);
+	private final IUserRolePermissionsDAO userRolePermissionsRepo = Services.get(IUserRolePermissionsDAO.class);
 
 	private final SqlViewBinding viewBinding;
 
@@ -90,11 +92,7 @@ public class SqlViewRowIdsOrderedSelectionFactory implements ViewRowIdsOrderedSe
 			final boolean applySecurityRestrictions,
 			final SqlDocumentFilterConverterContext context)
 	{
-		final UserRolePermissionsKey permissionsKey = viewEvalCtx.getPermissionsKey();
-		final IUserRolePermissions permissions = Services.get(IUserRolePermissionsDAO.class).getUserRolePermissions(permissionsKey);
-		final int queryLimit = permissions.getConstraint(WindowMaxQueryRecordsConstraint.class)
-				.or(WindowMaxQueryRecordsConstraint.DEFAULT)
-				.getMaxQueryRecordsPerRole();
+		final int queryLimit = extractQueryLimit(viewEvalCtx);
 
 		//
 		//
@@ -131,11 +129,22 @@ public class SqlViewRowIdsOrderedSelectionFactory implements ViewRowIdsOrderedSe
 				.build();
 	}
 
+	private int extractQueryLimit(final ViewEvaluationCtx viewEvalCtx)
+	{
+		final UserRolePermissionsKey permissionsKey = viewEvalCtx.getPermissionsKey();
+		final IUserRolePermissions permissions = userRolePermissionsRepo.getUserRolePermissions(permissionsKey);
+		return permissions.getConstraint(WindowMaxQueryRecordsConstraint.class)
+				.or(WindowMaxQueryRecordsConstraint.DEFAULT)
+				.getMaxQueryRecordsPerRole();
+	}
+
 	@Override
 	public ViewRowIdsOrderedSelection createOrderedSelectionFromSelection(
-			final ViewEvaluationCtx viewEvalCtx,
-			final ViewRowIdsOrderedSelection fromSelection,
-			final DocumentQueryOrderByList orderBys)
+			@NonNull final ViewEvaluationCtx viewEvalCtx,
+			@NonNull final ViewRowIdsOrderedSelection fromSelection,
+			@NonNull final DocumentFilterList filters,
+			@NonNull final DocumentQueryOrderByList orderBys,
+			@NonNull final SqlDocumentFilterConverterContext filterConverterCtx)
 	{
 		final WindowId windowId = fromSelection.getWindowId();
 		final String fromSelectionId = fromSelection.getSelectionId();
@@ -145,6 +154,14 @@ public class SqlViewRowIdsOrderedSelectionFactory implements ViewRowIdsOrderedSe
 		final SqlViewSelectionQueryBuilder viewQueryBuilder = newSqlViewSelectionQueryBuilder();
 		if (viewQueryBuilder.hasGroupingFields())
 		{
+			// TODO: implement filters support when using groupping fields
+			if (!filters.isEmpty())
+			{
+				throw new AdempiereException("Filters are not yet supported when using groupping fields")
+						.appendParametersToMessage()
+						.setParameter("filters", filters);
+			}
+
 			final SqlAndParams sqlCreateSelectionLines = viewQueryBuilder.buildSqlCreateSelectionLinesFromSelectionLines(viewEvalCtx, newViewId, fromSelectionId);
 			final int linesCount = DB.executeUpdateEx(sqlCreateSelectionLines.getSql(), sqlCreateSelectionLines.getSqlParamsArray(), ITrx.TRXNAME_ThreadInherited);
 
@@ -160,7 +177,7 @@ public class SqlViewRowIdsOrderedSelectionFactory implements ViewRowIdsOrderedSe
 		}
 		else
 		{
-			final SqlAndParams sqlCreateSelection = viewQueryBuilder.buildSqlCreateSelectionFromSelection(viewEvalCtx, newViewId, fromSelectionId, orderBys);
+			final SqlAndParams sqlCreateSelection = viewQueryBuilder.buildSqlCreateSelectionFromSelection(viewEvalCtx, newViewId, fromSelectionId, filters, orderBys, filterConverterCtx);
 			rowsCount = DB.executeUpdateEx(sqlCreateSelection.getSql(), sqlCreateSelection.getSqlParamsArray(), ITrx.TRXNAME_ThreadInherited);
 		}
 

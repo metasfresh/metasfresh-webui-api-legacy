@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Properties;
 
 import org.adempiere.ad.expression.api.IExpressionEvaluator.OnVariableNotFound;
@@ -311,8 +312,8 @@ public class SqlDocumentQueryBuilder
 		// ORDER BY
 		if (isSorting())
 		{
-			final IStringExpression sqlOrderBy = getSqlOrderByEffective();
-			if (sqlOrderBy != null && !sqlOrderBy.isNullExpression())
+			final IStringExpression sqlOrderBy = getSqlOrderByEffective().orElse(null);
+			if (sqlOrderBy != null)
 			{
 				sqlBuilder.append("\n ORDER BY ").append(sqlOrderBy);
 			}
@@ -471,7 +472,7 @@ public class SqlDocumentQueryBuilder
 		return entityBinding.getDefaultOrderBys();
 	}
 
-	private IStringExpression getSqlOrderByEffective()
+	private Optional<IStringExpression> getSqlOrderByEffective()
 	{
 		final DocumentQueryOrderByList orderBys = getOrderBysEffective();
 		return SqlDocumentOrderByBuilder.newInstance(entityBinding::getFieldOrderBy)

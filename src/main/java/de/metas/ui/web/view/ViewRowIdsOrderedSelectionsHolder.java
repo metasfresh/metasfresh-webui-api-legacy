@@ -1,5 +1,6 @@
 package de.metas.ui.web.view;
 
+import java.util.ArrayList;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
@@ -11,6 +12,7 @@ import org.adempiere.util.lang.SynchronizedMutable;
 
 import com.google.common.collect.ImmutableSet;
 
+import de.metas.ui.web.document.filter.DocumentFilter;
 import de.metas.ui.web.document.filter.DocumentFilterList;
 import de.metas.ui.web.document.filter.sql.SqlDocumentFilterConverterContext;
 import de.metas.ui.web.window.datatypes.DocumentId;
@@ -46,8 +48,9 @@ final class ViewRowIdsOrderedSelectionsHolder
 
 	private final ViewId viewId;
 	private final boolean applySecurityRestrictions;
-	private final DocumentFilterList allFilters;
 	private final Supplier<ViewEvaluationCtx> viewEvaluationCtxSupplier;
+	private final DocumentFilterList filtersExcludingFacets;
+	private final DocumentFilterList facetFilters;
 
 	private final AtomicBoolean selectionDeleteBeforeCreate = new AtomicBoolean(false);
 	private final SynchronizedMutable<ViewRowIdsOrderedSelections> currentSelectionsRef = SynchronizedMutable.of(null);
@@ -64,8 +67,57 @@ final class ViewRowIdsOrderedSelectionsHolder
 		this.viewDataRepository = viewDataRepository;
 		this.viewId = viewId;
 		this.applySecurityRestrictions = applySecurityRestrictions;
-		this.allFilters = stickyFilters.mergeWith(filters);
 		this.viewEvaluationCtxSupplier = viewEvaluationCtxSupplier;
+
+		final ArrayList<DocumentFilter> filtersExcludingFacetsList = new ArrayList<>();
+		final ArrayList<DocumentFilter> facetFiltersList = new ArrayList<>();
+
+		filtersExcludingFacetsList.addAll(stickyFilters.toList()); // consider all sticky filters as non facet filters
+
+		for (final DocumentFilter filter : filters.toList())
+		{
+			if (filter.isFacetFilter())
+			{
+				facetFiltersList.add(filter);
+			}
+			else
+			{
+				filtersExcludingFacetsList.add(filter);
+			}
+		}
+
+		filtersExcludingFacets = DocumentFilterList.ofList(filtersExcludingFacetsList);
+		facetFilters = DocumentFilterList.ofList(facetFiltersList);
+	}
+
+	public long getSize()
+	{
+		return getDefaultSelection().getSize();
+	}
+
+	public DocumentQueryOrderByList getDefaultOrderBys()
+	{
+		return getDefaultSelection().getOrderBys();
+	}
+
+	public int getQueryLimit()
+	{
+		return getDefaultSelection().getQueryLimit();
+	}
+
+	public boolean isQueryLimitHit()
+	{
+		return getDefaultSelection().isQueryLimitHit();
+	}
+
+	public ViewRowIdsOrderedSelection getDefaultSelectionBeforeFacetsFiltering()
+	{
+		return getCurrentSelections().getDefaultSelectionBeforeFacetsFiltering();
+	}
+
+	public ViewRowIdsOrderedSelection getDefaultSelection()
+	{
+		return getCurrentSelections().getDefaultSelection();
 	}
 
 	private ViewRowIdsOrderedSelections getCurrentSelections()
@@ -96,14 +148,31 @@ final class ViewRowIdsOrderedSelectionsHolder
 			viewDataRepository.deleteSelection(viewId);
 		}
 
-		final ViewRowIdsOrderedSelection defaultSelection = viewDataRepository.createOrderedSelection(
-				getViewEvaluationCtx(),
+		final ViewEvaluationCtx viewEvalCtx = getViewEvaluationCtx();
+
+		final ViewRowIdsOrderedSelection selectionBeforeFacetsFiltering = viewDataRepository.createOrderedSelection(
+				viewEvalCtx,
 				viewId,
-				allFilters,
+				filtersExcludingFacets,
 				applySecurityRestrictions,
 				SqlDocumentFilterConverterContext.EMPTY);
 
-		return ViewRowIdsOrderedSelections.ofDefaultSelection(defaultSelection);
+		final ViewRowIdsOrderedSelection selection;
+		if (!facetFilters.isEmpty())
+		{
+			selection = viewDataRepository.createOrderedSelectionFromSelection(
+					viewEvalCtx,
+					selectionBeforeFacetsFiltering,
+					facetFilters,
+					/* orderBys */DocumentQueryOrderByList.EMPTY,
+					SqlDocumentFilterConverterContext.EMPTY);
+		}
+		else
+		{
+			selection = selectionBeforeFacetsFiltering;
+		}
+
+		return ViewRowIdsOrderedSelections.ofDefaultSelection(selectionBeforeFacetsFiltering, selection);
 	}
 
 	public void forgetCurrentSelections()
@@ -122,11 +191,6 @@ final class ViewRowIdsOrderedSelectionsHolder
 		return viewEvaluationCtxSupplier.get();
 	}
 
-	public ViewRowIdsOrderedSelection getDefaultSelection()
-	{
-		return getCurrentSelections().getDefaultSelection();
-	}
-
 	public void removeRowIdsNotMatchingFilters(final Set<DocumentId> rowIds)
 	{
 		if (rowIds.isEmpty())
@@ -141,11 +205,25 @@ final class ViewRowIdsOrderedSelectionsHolder
 			@NonNull final ViewRowIdsOrderedSelections selections,
 			@NonNull final Set<DocumentId> rowIds)
 	{
-		return selections.withDefaultSelection(
-				viewDataRepository.removeRowIdsNotMatchingFilters(
-						selections.getDefaultSelection(),
-						allFilters,
-						rowIds));
+		final ViewRowIdsOrderedSelection defaultSelectionBeforeFacetsFiltering = viewDataRepository.removeRowIdsNotMatchingFilters(
+				selections.getDefaultSelectionBeforeFacetsFiltering(),
+				filtersExcludingFacets,
+				rowIds);
+
+		final ViewRowIdsOrderedSelection defaultSelection;
+		if (!facetFilters.isEmpty())
+		{
+			defaultSelection = viewDataRepository.removeRowIdsNotMatchingFilters(
+					selections.getDefaultSelection(),
+					facetFilters,
+					rowIds);
+		}
+		else
+		{
+			defaultSelection = defaultSelectionBeforeFacetsFiltering;
+		}
+
+		return selections.withDefaultSelection(defaultSelectionBeforeFacetsFiltering, defaultSelection);
 	}
 
 	public ViewRowIdsOrderedSelection getOrderedSelection(final DocumentQueryOrderByList orderBys)
@@ -167,6 +245,11 @@ final class ViewRowIdsOrderedSelectionsHolder
 			@NonNull final ViewRowIdsOrderedSelection fromSelection,
 			@Nullable final DocumentQueryOrderByList orderBys)
 	{
-		return viewDataRepository.createOrderedSelectionFromSelection(getViewEvaluationCtx(), fromSelection, orderBys);
+		return viewDataRepository.createOrderedSelectionFromSelection(
+				getViewEvaluationCtx(),
+				fromSelection,
+				DocumentFilterList.EMPTY,
+				orderBys,
+				SqlDocumentFilterConverterContext.EMPTY);
 	}
 }

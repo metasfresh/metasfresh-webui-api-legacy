@@ -84,6 +84,7 @@ public final class DocumentFilterDescriptor
 	private final BarcodeScannerType barcodeScannerType;
 
 	@Getter
+	private final boolean facetFilter;
 
 	@Getter
 	private final ImmutableMap<String, Object> debugProperties;
@@ -103,6 +104,7 @@ public final class DocumentFilterDescriptor
 		parametersByName = builder.buildParameters();
 		internalParameters = ImmutableList.copyOf(builder.internalParameters);
 		autoFilter = parametersByName.values().stream().anyMatch(DocumentFilterParamDescriptor::isAutoFilter);
+		facetFilter = builder.facetFilter;
 
 		debugProperties = builder.debugProperties == null ? ImmutableMap.of() : ImmutableMap.copyOf(builder.debugProperties);
 
@@ -160,6 +162,8 @@ public final class DocumentFilterDescriptor
 		private PanelLayoutType parametersLayoutType;
 		private final List<DocumentFilterParamDescriptor.Builder> parameters = new ArrayList<>();
 		private final List<DocumentFilterParam> internalParameters = new ArrayList<>();
+
+		private boolean facetFilter;
 
 		private Map<String, Object> debugProperties = null;
 
@@ -260,6 +264,12 @@ public final class DocumentFilterDescriptor
 		private PanelLayoutType getParametersLayoutType()
 		{
 			return parametersLayoutType != null ? parametersLayoutType : PanelLayoutType.Panel;
+		}
+
+		public Builder setFacetFilter(boolean facetFilter)
+		{
+			this.facetFilter = facetFilter;
+			return this;
 		}
 
 		public boolean hasParameters()

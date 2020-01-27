@@ -20,6 +20,7 @@ import de.metas.i18n.TranslatableStrings;
 import de.metas.ui.web.document.filter.DocumentFilterParam.Operator;
 import de.metas.util.Check;
 import de.metas.util.lang.RepoIdAware;
+import lombok.Getter;
 import lombok.NonNull;
 
 /*
@@ -88,6 +89,8 @@ public final class DocumentFilter
 	@Getter
 	private final ImmutableList<DocumentFilterParam> parameters;
 	private final ImmutableSet<String> internalParameterNames;
+	@Getter
+	private final boolean facetFilter;
 
 	private DocumentFilter(final Builder builder)
 	{
@@ -95,6 +98,8 @@ public final class DocumentFilter
 		Check.assumeNotEmpty(filterId, "filterId is not empty");
 
 		caption = builder.caption;
+
+		facetFilter = builder.facetFilter;
 
 		parameters = builder.parameters != null ? ImmutableList.copyOf(builder.parameters) : ImmutableList.of();
 		internalParameterNames = builder.internalParameterNames != null ? ImmutableSet.copyOf(builder.internalParameterNames) : ImmutableSet.of();
@@ -107,6 +112,7 @@ public final class DocumentFilter
 				.omitNullValues()
 				.add("filterId", filterId)
 				.add("caption", caption)
+				.add("facetFilter", facetFilter)
 				.add("parameters", parameters.isEmpty() ? null : parameters)
 				.add("internalParameterNames", internalParameterNames.isEmpty() ? null : internalParameterNames)
 				.toString();
@@ -241,6 +247,8 @@ public final class DocumentFilter
 	{
 		private String filterId;
 		private ITranslatableString caption = TranslatableStrings.empty();
+		private boolean facetFilter;
+
 		private List<DocumentFilterParam> parameters;
 		private Set<String> internalParameterNames;
 
@@ -268,6 +276,12 @@ public final class DocumentFilter
 		public Builder setCaption(@NonNull final String caption)
 		{
 			return setCaption(TranslatableStrings.constant(caption));
+		}
+
+		public Builder setFacetFilter(final boolean facetFilter)
+		{
+			this.facetFilter = facetFilter;
+			return this;
 		}
 
 		public boolean hasParameters()
