@@ -2,8 +2,8 @@ package de.metas.ui.web.view;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -136,7 +136,7 @@ public final class CreateViewRequest
 	ViewId parentViewId;
 	DocumentId parentRowId;
 
-	Set<DocumentPath> referencingDocumentPaths;
+	ImmutableSet<DocumentPath> referencingDocumentPaths;
 
 	/**
 	 * Sticky filters can't be changed by the user.<br>
@@ -161,7 +161,7 @@ public final class CreateViewRequest
 	 * @deprecated please rather use {@link #getFilters()} {@link #getStickyFilters()}.
 	 */
 	@Deprecated
-	Set<Integer> filterOnlyIds;
+	ImmutableSet<Integer> filterOnlyIds;
 
 	boolean useAutoFilters;
 
@@ -287,7 +287,7 @@ public final class CreateViewRequest
 		 * @deprecated see {@link CreateViewRequest#filterOnlyIds}
 		 */
 		@Deprecated
-		private Set<Integer> filterOnlyIds;
+		private LinkedHashSet<Integer> filterOnlyIds;
 
 		private ArrayList<DocumentFilter> stickyFilters;
 		private WrappedDocumentFilterList filters;
@@ -368,7 +368,7 @@ public final class CreateViewRequest
 			return this;
 		}
 
-		private Set<DocumentPath> getReferencingDocumentPaths()
+		private ImmutableSet<DocumentPath> getReferencingDocumentPaths()
 		{
 			return referencingDocumentPaths == null ? ImmutableSet.of() : ImmutableSet.copyOf(referencingDocumentPaths);
 		}
@@ -415,7 +415,7 @@ public final class CreateViewRequest
 		{
 			if (this.filterOnlyIds == null)
 			{
-				this.filterOnlyIds = new HashSet<>();
+				this.filterOnlyIds = new LinkedHashSet<>();
 			}
 			this.filterOnlyIds.addAll(filterOnlyIds);
 			return this;
@@ -425,13 +425,13 @@ public final class CreateViewRequest
 		{
 			if (filterOnlyIds == null)
 			{
-				filterOnlyIds = new HashSet<>();
+				filterOnlyIds = new LinkedHashSet<>();
 			}
 			filterOnlyIds.add(filterOnlyId);
 			return this;
 		}
 
-		private Set<Integer> getFilterOnlyIds()
+		private ImmutableSet<Integer> getFilterOnlyIds()
 		{
 			return filterOnlyIds == null ? ImmutableSet.of() : ImmutableSet.copyOf(filterOnlyIds);
 		}
