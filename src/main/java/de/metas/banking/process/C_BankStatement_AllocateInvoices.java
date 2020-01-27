@@ -22,6 +22,7 @@
 
 package de.metas.banking.process;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import de.metas.banking.api.BankAccountId;
 import de.metas.banking.model.I_C_BankStatement;
@@ -57,30 +58,41 @@ import java.util.Set;
 
 public class C_BankStatement_AllocateInvoices extends JavaProcess implements IProcessPrecondition
 {
-	public static final String C_INVOICE_1_ID_PARAM_NAME = "C_Invoice_1_ID";
-	@Param(parameterName = C_INVOICE_1_ID_PARAM_NAME, mandatory = true)
+	private static final String C_INVOICE_1_ID_PARAM_NAME = "C_Invoice_1_ID";
+	@Param(parameterName = C_INVOICE_1_ID_PARAM_NAME)
 	private InvoiceId c_invoice_1_id;
 
-	public static final String C_INVOICE_2_ID_PARAM_NAME = "C_Invoice_2_ID";
+	private static final String C_INVOICE_2_ID_PARAM_NAME = "C_Invoice_2_ID";
 	@Param(parameterName = C_INVOICE_2_ID_PARAM_NAME)
 	private InvoiceId c_invoice_2_id;
 
-	public static final String C_INVOICE_3_ID_PARAM_NAME = "C_Invoice_3_ID";
+	private static final String C_INVOICE_3_ID_PARAM_NAME = "C_Invoice_3_ID";
 	@Param(parameterName = C_INVOICE_3_ID_PARAM_NAME)
 	private InvoiceId c_invoice_3_id;
 
-	public static final String C_INVOICE_4_ID_PARAM_NAME = "C_Invoice_4_ID";
+	private static final String C_INVOICE_4_ID_PARAM_NAME = "C_Invoice_4_ID";
 	@Param(parameterName = C_INVOICE_4_ID_PARAM_NAME)
 	private InvoiceId c_invoice_4_id;
 
-	public static final String C_INVOICE_5_ID_PARAM_NAME = "C_Invoice_5_ID";
+	private static final String C_INVOICE_5_ID_PARAM_NAME = "C_Invoice_5_ID";
 	@Param(parameterName = C_INVOICE_5_ID_PARAM_NAME)
 	private InvoiceId c_invoice_5_id;
 
 	private final IMsgBL iMsgBL = Services.get(IMsgBL.class);
 	private final IBankStatementDAO bankStatementDAO = Services.get(IBankStatementDAO.class);
 
-	private final BankStatement_AllocateInvoicesService bankStatement_AllocateInvoicesService = SpringContextHolder.instance.getBean(BankStatement_AllocateInvoicesService.class);
+	private final BankStatement_AllocateInvoicesService bankStatement_AllocateInvoicesService;
+
+	@VisibleForTesting
+	C_BankStatement_AllocateInvoices(final BankStatement_AllocateInvoicesService bankStatement_AllocateInvoicesService)
+	{
+		this.bankStatement_AllocateInvoicesService = bankStatement_AllocateInvoicesService;
+	}
+
+	public C_BankStatement_AllocateInvoices()
+	{
+		this(SpringContextHolder.instance.getBean(BankStatement_AllocateInvoicesService.class));
+	}
 
 	@Override
 	public ProcessPreconditionsResolution checkPreconditionsApplicable(@NonNull final IProcessPreconditionsContext context)
@@ -125,35 +137,35 @@ public class C_BankStatement_AllocateInvoices extends JavaProcess implements IPr
 	}
 
 	@ProcessParamLookupValuesProvider(parameterName = C_INVOICE_1_ID_PARAM_NAME, numericKey = true, lookupSource = DocumentLayoutElementFieldDescriptor.LookupSource.lookup, lookupTableName = I_C_Invoice.Table_Name)
-	public LookupValuesList invoice1LookupProvider()
+	private LookupValuesList invoice1LookupProvider()
 	{
 		final BPartnerId bPartnerId = BPartnerId.ofRepoId(getSelectedBankStatementLine().getC_BPartner_ID());
 		return bankStatement_AllocateInvoicesService.getInvoiceLookupProvider_UnpaidByBpartner(bPartnerId);
 	}
 
 	@ProcessParamLookupValuesProvider(parameterName = C_INVOICE_2_ID_PARAM_NAME, numericKey = true, lookupSource = DocumentLayoutElementFieldDescriptor.LookupSource.lookup, lookupTableName = I_C_Invoice.Table_Name)
-	public LookupValuesList invoice2LookupProvider()
+	private LookupValuesList invoice2LookupProvider()
 	{
 		final BPartnerId bPartnerId = BPartnerId.ofRepoId(getSelectedBankStatementLine().getC_BPartner_ID());
 		return bankStatement_AllocateInvoicesService.getInvoiceLookupProvider_UnpaidByBpartner(bPartnerId);
 	}
 
 	@ProcessParamLookupValuesProvider(parameterName = C_INVOICE_3_ID_PARAM_NAME, numericKey = true, lookupSource = DocumentLayoutElementFieldDescriptor.LookupSource.lookup, lookupTableName = I_C_Invoice.Table_Name)
-	public LookupValuesList invoice3LookupProvider()
+	private LookupValuesList invoice3LookupProvider()
 	{
 		final BPartnerId bPartnerId = BPartnerId.ofRepoId(getSelectedBankStatementLine().getC_BPartner_ID());
 		return bankStatement_AllocateInvoicesService.getInvoiceLookupProvider_UnpaidByBpartner(bPartnerId);
 	}
 
 	@ProcessParamLookupValuesProvider(parameterName = C_INVOICE_4_ID_PARAM_NAME, numericKey = true, lookupSource = DocumentLayoutElementFieldDescriptor.LookupSource.lookup, lookupTableName = I_C_Invoice.Table_Name)
-	public LookupValuesList invoice4LookupProvider()
+	private LookupValuesList invoice4LookupProvider()
 	{
 		final BPartnerId bPartnerId = BPartnerId.ofRepoId(getSelectedBankStatementLine().getC_BPartner_ID());
 		return bankStatement_AllocateInvoicesService.getInvoiceLookupProvider_UnpaidByBpartner(bPartnerId);
 	}
 
 	@ProcessParamLookupValuesProvider(parameterName = C_INVOICE_5_ID_PARAM_NAME, numericKey = true, lookupSource = DocumentLayoutElementFieldDescriptor.LookupSource.lookup, lookupTableName = I_C_Invoice.Table_Name)
-	public LookupValuesList invoice5LookupProvider()
+	private LookupValuesList invoice5LookupProvider()
 	{
 		final BPartnerId bPartnerId = BPartnerId.ofRepoId(getSelectedBankStatementLine().getC_BPartner_ID());
 		return bankStatement_AllocateInvoicesService.getInvoiceLookupProvider_UnpaidByBpartner(bPartnerId);
@@ -162,16 +174,14 @@ public class C_BankStatement_AllocateInvoices extends JavaProcess implements IPr
 	@Override
 	protected String doIt() throws Exception
 	{
-		just___DO_IT();
+		just___DO_IT(getSelectedBankStatement(), getSelectedBankStatementLine(), getSelectedInvoices());
 
 		return MSG_OK;
 	}
 
-	private void just___DO_IT()
+	@VisibleForTesting
+	void just___DO_IT(final I_C_BankStatement bankStatement, final I_C_BankStatementLine bankStatementLine, final ImmutableList<InvoiceId> invoiceIds)
 	{
-		final I_C_BankStatement bankStatement = getSelectedBankStatement();
-		final I_C_BankStatementLine bankStatementLine = getSelectedBankStatementLine();
-		final ImmutableList<InvoiceId> invoiceIds = getSelectedInvoices();
 
 		final BankAccountId bankAccountId = BankAccountId.ofRepoId(bankStatement.getC_BP_BankAccount_ID());
 		// TODO tbp @teo: not sure if stmt amount is the correct one. Help?
