@@ -255,7 +255,10 @@ public class SqlViewFactory implements IViewFactory
 	}
 
 	@Override
-	public DefaultView filterView(IView view, JSONFilterViewRequest filterViewRequest, Supplier<IViewsRepository> viewsRepo)
+	public DefaultView filterView(
+			@NonNull final IView view,
+			@NonNull final JSONFilterViewRequest filterViewRequest,
+			@NonNull final Supplier<IViewsRepository> viewsRepo_NOTUSED)
 	{
 		final CreateViewRequest createViewRequest = CreateViewRequest.filterViewBuilder(view, filterViewRequest).build();
 		return createView(createViewRequest);
