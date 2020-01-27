@@ -59,9 +59,9 @@ public class BankStatement_AllocateInvoicesService
 	/**
 	 * Link the single Payment to the BankStatementLine directly.
 	 */
-	public void handleSinglePaymentAllocation(final I_C_BankStatementLine bankStatementLine, final ImmutableList<PaymentId> paymentIds)
+	public void handleSinglePaymentAllocation(final I_C_BankStatementLine bankStatementLine, final PaymentId paymentId)
 	{
-		final I_C_Payment payment = paymentDAO.getById(paymentIds.iterator().next());
+		final I_C_Payment payment = paymentDAO.getById(paymentId);
 		bankStatmentPaymentBL.setC_Payment(bankStatementLine, payment);
 		InterfaceWrapperHelper.save(bankStatementLine);
 		// interceptors will update the bank statement and line

@@ -192,7 +192,7 @@ public class C_BankStatement_AllocateInvoices extends JavaProcess implements IPr
 
 		if (paymentIds.size() == 1)
 		{
-			bankStatement_AllocateInvoicesService.handleSinglePaymentAllocation(bankStatementLine, paymentIds);
+			bankStatement_AllocateInvoicesService.handleSinglePaymentAllocation(bankStatementLine, paymentIds.get(0));
 		}
 		else
 		{
