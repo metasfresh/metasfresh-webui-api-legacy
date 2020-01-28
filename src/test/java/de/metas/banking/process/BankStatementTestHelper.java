@@ -26,6 +26,7 @@ import de.metas.banking.api.BankAccountId;
 import de.metas.banking.model.BankStatementId;
 import de.metas.banking.model.I_C_BankStatement;
 import de.metas.banking.model.I_C_BankStatementLine;
+import de.metas.bpartner.BPartnerId;
 import de.metas.money.CurrencyId;
 
 import java.math.BigDecimal;
@@ -40,13 +41,12 @@ public class BankStatementTestHelper
 	{
 	}
 
-	static I_C_BankStatement createBankStatement(final BankAccountId bankAccountId, final String name, final Timestamp statementDate, final BigDecimal beginningBalance)
+	static I_C_BankStatement createBankStatement(final BankAccountId bankAccountId, final String name, final Timestamp statementDate)
 	{
 		final I_C_BankStatement bankStatement = newInstanceOutOfTrx(I_C_BankStatement.class);
 		bankStatement.setC_BP_BankAccount_ID(bankAccountId.getRepoId());
 		bankStatement.setName(name);
 		bankStatement.setStatementDate(statementDate);
-		bankStatement.setBeginningBalance(beginningBalance);
 		save(bankStatement);
 
 		return bankStatement;
@@ -54,6 +54,7 @@ public class BankStatementTestHelper
 
 	public static I_C_BankStatementLine createBankStatementLine(final BankStatementId bankStatementId,
 			final BankAccountId bpBankAccountId,
+			final BPartnerId bPartnerId,
 			final int lineNumber,
 			final Timestamp statementLineDate,
 			final Timestamp valutaDate,
@@ -63,6 +64,7 @@ public class BankStatementTestHelper
 		final I_C_BankStatementLine bsl = newInstanceOutOfTrx(I_C_BankStatementLine.class);
 		bsl.setC_BankStatement_ID(bankStatementId.getRepoId());
 		bsl.setC_BP_BankAccountTo_ID(bpBankAccountId.getRepoId());
+		bsl.setC_BPartner_ID(bPartnerId.getRepoId());
 		bsl.setLine(lineNumber);
 		bsl.setStatementLineDate(statementLineDate);
 		bsl.setValutaDate(valutaDate);

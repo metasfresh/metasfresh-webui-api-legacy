@@ -34,6 +34,8 @@ import de.metas.bpartner.BPartnerId;
 import de.metas.document.engine.DocStatus;
 import de.metas.i18n.IMsgBL;
 import de.metas.invoice.InvoiceId;
+import de.metas.money.CurrencyId;
+import de.metas.organization.OrgId;
 import de.metas.payment.PaymentId;
 import de.metas.process.IProcessPrecondition;
 import de.metas.process.IProcessPreconditionsContext;
@@ -191,9 +193,17 @@ public class C_BankStatement_AllocateInvoices extends JavaProcess implements IPr
 		//    	- cat e nealocat este stmt amount - trx amount -> asta tre sa folosesc eu
 		final BigDecimal maxAmountForAllocation = bankStatementLine.getStmtAmt();
 		// TODO tbp: please help with above
+
 		final LocalDate paymentDateAcct = TimeUtil.asLocalDate(bankStatementLine.getStatementLineDate());
 		final ImmutableList<PaymentId> paymentIds = new PaymentsForInvoicesCreator()
-				.retrieveOrCreatePaymentsForInvoicesOldestFirst(invoiceIds, bankAccountId, maxAmountForAllocation, paymentDateAcct);
+				.retrieveOrCreatePaymentsForInvoicesOldestFirst(invoiceIds,
+						bankAccountId,
+						maxAmountForAllocation,
+						paymentDateAcct,
+						OrgId.ofRepoId(bankStatement.getAD_Org_ID()),
+						BPartnerId.ofRepoId(bankStatementLine.getC_BPartner_ID()),
+						CurrencyId.ofRepoId(bankStatementLine.getC_Currency_ID())
+				);
 
 		if (paymentIds.size() == 0)
 		{

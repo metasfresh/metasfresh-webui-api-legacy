@@ -25,11 +25,16 @@ package de.metas.banking.process.bankstatement_allocateInvoicesProcess;
 import com.google.common.collect.ImmutableList;
 import de.metas.allocation.api.IAllocationDAO;
 import de.metas.banking.api.BankAccountId;
+import de.metas.bpartner.BPartnerId;
 import de.metas.invoice.InvoiceId;
+import de.metas.money.CurrencyId;
+import de.metas.organization.OrgId;
 import de.metas.payment.PaymentId;
 import de.metas.payment.TenderType;
+import de.metas.payment.api.DefaultPaymentBuilder;
 import de.metas.payment.api.IPaymentBL;
 import de.metas.util.Services;
+import lombok.NonNull;
 import org.adempiere.invoice.service.IInvoiceDAO;
 import org.compiere.model.I_C_Invoice;
 import org.compiere.model.I_C_Payment;
@@ -48,22 +53,45 @@ public class PaymentsForInvoicesCreator
 	 * Iterate over the selected invoices and create/retrieve payments, until the grand total of the invoice or the current line amount is reached
 	 */
 	public ImmutableList<PaymentId> retrieveOrCreatePaymentsForInvoicesOldestFirst(
-			final ImmutableList<InvoiceId> invoiceIds,
-			final BankAccountId bankAccountId,
-			final BigDecimal maxAmountForAllocation,
-			final LocalDate paymentDateAcct)
+			@NonNull final ImmutableList<InvoiceId> invoiceIds,
+			@NonNull final BankAccountId bankAccountId,
+			@NonNull final BigDecimal maxAmountForAllocation,
+			@NonNull final LocalDate paymentDateAcct,
+			@NonNull final OrgId adOrgId,
+			@NonNull final BPartnerId bpartnerId,
+			@NonNull final CurrencyId currencyId
+	)
 	{
 		BigDecimal amountLeftForAllocation = maxAmountForAllocation;
-		// TODO tbp: order invoices by date, asc, since we want to try and pay the oldest invoices first. note: id order != date order
+
 		final ImmutableList.Builder<PaymentId> paymentIdsAccumulator = ImmutableList.builder();
-		for (final InvoiceId invoiceId : invoiceIds)
+
+		if (invoiceIds.isEmpty())
 		{
-			// TODO tbp: extract this into a method and replace it in 2 places
-			if (amountLeftForAllocation.compareTo(BigDecimal.ZERO) <= 0)
-			{
-				break;
-			}
-			amountLeftForAllocation = selectOrCreatePaymentsForInvoice(invoiceId, bankAccountId, amountLeftForAllocation, paymentIdsAccumulator, paymentDateAcct);
+			//
+			// case when the user has not selected any invoices
+			final boolean isReceipt = amountLeftForAllocation.signum() >= 0;
+			final BigDecimal payAmt = isReceipt ? amountLeftForAllocation : amountLeftForAllocation.negate();
+			final PaymentId paymentId = createAndCompletePaymentNoInvoice(bankAccountId, paymentDateAcct, payAmt, isReceipt, adOrgId, bpartnerId, currencyId);
+
+			paymentIdsAccumulator.add(paymentId);
+		}
+		else
+		{
+			// TODO tbp: this is disables until i clarify with mark what do we do with the invoice numbers in the description field
+			// //
+			// // case when the user has selected some invoices
+			// // TODO tbp: order invoices by date, asc, since we want to try and pay the oldest invoices first. note: id order != date order
+			// for (final InvoiceId invoiceId : invoiceIds)
+			// {
+			//
+			// 	if (amountLeftForAllocation.compareTo(BigDecimal.ZERO) <= 0)
+			// 	{
+			// 		break;
+			// 	}
+			// TODO tbp: handle negative amount (for outbound payments)
+			// 	amountLeftForAllocation = selectOrCreatePaymentsForInvoice(invoiceId, bankAccountId, amountLeftForAllocation, paymentIdsAccumulator, paymentDateAcct);
+			// }
 		}
 		return paymentIdsAccumulator.build();
 	}
@@ -136,6 +164,33 @@ public class PaymentsForInvoicesCreator
 		return PaymentId.ofRepoId(payment.getC_Payment_ID());
 	}
 
+	private PaymentId createAndCompletePaymentNoInvoice(final BankAccountId bankAccountId, final LocalDate dateAcct, final BigDecimal payAmt, final boolean isReceipt, final OrgId adOrgId, final BPartnerId bpartnerId, final CurrencyId currencyId)
+	{
+		final DefaultPaymentBuilder paymentBuilder;
+
+		if (isReceipt)
+		{
+			paymentBuilder = paymentBL.newInboundReceiptBuilder();
+		}
+		else
+		{
+			paymentBuilder = paymentBL.newOutboundPaymentBuilder();
+		}
+
+		final I_C_Payment payment = paymentBuilder
+				.adOrgId(adOrgId)
+				.bpartnerId(bpartnerId)
+				.bpBankAccountId(bankAccountId)
+				.currencyId(currencyId)
+				.payAmt(payAmt)
+				.dateAcct(dateAcct)
+				.dateTrx(dateAcct)
+				.description("Automatically created from Invoice open amount during BankStatementLine allocation.")
+				.tenderType(TenderType.DirectDeposit)
+				.createAndProcess();
+
+		return PaymentId.ofRepoId(payment.getC_Payment_ID());
+	}
 }
 
 
