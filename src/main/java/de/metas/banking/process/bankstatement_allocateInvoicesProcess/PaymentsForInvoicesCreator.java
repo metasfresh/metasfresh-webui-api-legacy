@@ -164,7 +164,15 @@ public class PaymentsForInvoicesCreator
 		return PaymentId.ofRepoId(payment.getC_Payment_ID());
 	}
 
-	private PaymentId createAndCompletePaymentNoInvoice(final BankAccountId bankAccountId, final LocalDate dateAcct, final BigDecimal payAmt, final boolean isReceipt, final OrgId adOrgId, final BPartnerId bpartnerId, final CurrencyId currencyId)
+	private PaymentId createAndCompletePaymentNoInvoice(
+			final BankAccountId bankAccountId,
+			final LocalDate dateAcct,
+			final BigDecimal payAmt,
+			final boolean isReceipt,
+			final OrgId adOrgId,
+			final BPartnerId bpartnerId,
+			final CurrencyId currencyId
+	)
 	{
 		final DefaultPaymentBuilder paymentBuilder;
 

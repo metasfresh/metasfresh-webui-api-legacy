@@ -74,18 +74,21 @@ class C_BankStatement_AllocateInvoicesTest
 	private void paymentChecks(final BigDecimal expectedPayAmt, final int c_payment_id, final boolean expectedIsReceipt, final int c_invoice_id)
 	{
 		assertNotEquals(0, c_payment_id);
-		final I_C_Payment payment = InterfaceWrapperHelper.load(c_payment_id, I_C_Payment.class);   // TODO tbp: @teo: should i use here a service, or is InterfaceWrapperHelper okay?
+		final I_C_Payment payment = InterfaceWrapperHelper.load(c_payment_id, I_C_Payment.class);
 		assertNotNull(payment);
 		assertEquals(expectedPayAmt, payment.getPayAmt());
 		assertTrue(payment.isReconciled());
 		assertEquals(expectedIsReceipt, payment.isReceipt());
 		assertEquals(c_invoice_id, payment.getC_Invoice_ID());
 		assertEquals(DocStatus.Completed, DocStatus.ofCode(payment.getDocStatus()));
+
+		// can't test `payment.getC_DocType_ID()` as it is set by `PaymentsForInvoicesCreator`, and during test there's no DocTypes
 	}
 
 	@Nested
 	class PreconditionsTests
 	{
+
 		@Test
 		void bankStatementMustBeOpen()
 		{
@@ -102,26 +105,28 @@ class C_BankStatement_AllocateInvoicesTest
 	@Nested
 	class OneBankStatementLine_NoExistingPayment_NoInvoice
 	{
+
+		private final Timestamp statementDate = SystemTime.asTimestamp();
+		private final String metasfreshIban = "123456";
+
+		private final Timestamp valutaDate = SystemTime.asTimestamp();
+
 		@Test
 		void OneInboundBankStatementLine_NoExistingPayment_NoInvoice()
 		{
 			//
 			// create test data
-			final Timestamp statementDate = SystemTime.asTimestamp();
+			final BigDecimal lineStmtAmt = BigDecimal.valueOf(123);
 			final CurrencyId eurCurrencyId = BusinessTestHelper.getEURCurrencyId();
 
 			final I_C_BPartner metasfreshBPartner = BusinessTestHelper.createBPartner("metasfresh");
-
-			final String metasfreshIban = "123456";
 			final I_C_BP_BankAccount metasfreshBankAccount = BusinessTestHelper.createBpBankAccount(BPartnerId.ofRepoId(metasfreshBPartner.getC_BPartner_ID()), eurCurrencyId, metasfreshIban);
 
 			final I_C_BankStatement bankStatement = BankStatementTestHelper.createBankStatement(BankAccountId.ofRepoId(metasfreshBankAccount.getC_BP_BankAccount_ID()), "Bank Statement 1", statementDate);
 
 			final I_C_BPartner customerBPartner = BusinessTestHelper.createBPartner("le customer");
 			final I_C_BP_BankAccount customerBankAccount = BusinessTestHelper.createBpBankAccount(BPartnerId.ofRepoId(customerBPartner.getC_BPartner_ID()), eurCurrencyId, null);
-			final Timestamp valutaDate = SystemTime.asTimestamp();
 
-			final BigDecimal lineStmtAmt = BigDecimal.valueOf(123);
 			final I_C_BankStatementLine bsl = BankStatementTestHelper.createBankStatementLine(
 					BankStatementId.ofRepoId(bankStatement.getC_BankStatement_ID()),
 					BankAccountId.ofRepoId(customerBankAccount.getC_BP_BankAccount_ID()),
@@ -139,9 +144,11 @@ class C_BankStatement_AllocateInvoicesTest
 
 			//
 			// Call the method
-			C_BankStatement_AllocateInvoices process = new C_BankStatement_AllocateInvoices(bankStatement_allocateInvoicesService);
+			final C_BankStatement_AllocateInvoices process = new C_BankStatement_AllocateInvoices(bankStatement_allocateInvoicesService);
 			process.just___DO_IT(bankStatement, bsl, ImmutableList.of());
 
+			//
+			// Checks
 			InterfaceWrapperHelper.refresh(bsl);
 			final boolean isReceipt = true;
 			final int c_invoice_id = 0;
@@ -155,21 +162,17 @@ class C_BankStatement_AllocateInvoicesTest
 		{
 			//
 			// create test data
-			final Timestamp statementDate = SystemTime.asTimestamp();
+			final BigDecimal lineStmtAmt = BigDecimal.valueOf(-123);
 			final CurrencyId eurCurrencyId = BusinessTestHelper.getEURCurrencyId();
 
 			final I_C_BPartner metasfreshBPartner = BusinessTestHelper.createBPartner("metasfresh");
-
-			final String metasfreshIban = "123456";
 			final I_C_BP_BankAccount metasfreshBankAccount = BusinessTestHelper.createBpBankAccount(BPartnerId.ofRepoId(metasfreshBPartner.getC_BPartner_ID()), eurCurrencyId, metasfreshIban);
 
 			final I_C_BankStatement bankStatement = BankStatementTestHelper.createBankStatement(BankAccountId.ofRepoId(metasfreshBankAccount.getC_BP_BankAccount_ID()), "Bank Statement 1", statementDate);
 
 			final I_C_BPartner customerBPartner = BusinessTestHelper.createBPartner("le customer");
 			final I_C_BP_BankAccount customerBankAccount = BusinessTestHelper.createBpBankAccount(BPartnerId.ofRepoId(customerBPartner.getC_BPartner_ID()), eurCurrencyId, null);
-			final Timestamp valutaDate = SystemTime.asTimestamp();
 
-			final BigDecimal lineStmtAmt = BigDecimal.valueOf(-123);
 			final I_C_BankStatementLine bsl = BankStatementTestHelper.createBankStatementLine(
 					BankStatementId.ofRepoId(bankStatement.getC_BankStatement_ID()),
 					BankAccountId.ofRepoId(customerBankAccount.getC_BP_BankAccount_ID()),
@@ -187,9 +190,11 @@ class C_BankStatement_AllocateInvoicesTest
 
 			//
 			// Call the method
-			C_BankStatement_AllocateInvoices process = new C_BankStatement_AllocateInvoices(bankStatement_allocateInvoicesService);
+			final C_BankStatement_AllocateInvoices process = new C_BankStatement_AllocateInvoices(bankStatement_allocateInvoicesService);
 			process.just___DO_IT(bankStatement, bsl, ImmutableList.of());
 
+			//
+			// Checks
 			InterfaceWrapperHelper.refresh(bsl);
 			final boolean expectedIsReceipt = false;
 			final int c_invoice_id = 0;
