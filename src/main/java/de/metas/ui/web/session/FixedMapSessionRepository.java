@@ -1,5 +1,6 @@
 package de.metas.ui.web.session;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -60,12 +61,12 @@ import lombok.ToString;
 	private final Map<String, Session> sessions = new ConcurrentHashMap<>();
 
 	private final ApplicationEventPublisher applicationEventPublisher;
-	private final Integer defaultMaxInactiveInterval;
+	private final Duration defaultMaxInactiveInterval;
 
 	@Builder
 	private FixedMapSessionRepository(
 			@NonNull final ApplicationEventPublisher applicationEventPublisher,
-			@Nullable final Integer defaultMaxInactiveInterval)
+			@Nullable final Duration defaultMaxInactiveInterval)
 	{
 		this.applicationEventPublisher = applicationEventPublisher;
 		this.defaultMaxInactiveInterval = defaultMaxInactiveInterval;
@@ -111,11 +112,11 @@ import lombok.ToString;
 		{
 			if (expired)
 			{
-				applicationEventPublisher.publishEvent(new SessionExpiredEvent(this, id));
+				applicationEventPublisher.publishEvent(new SessionExpiredEvent(this, deletedSession));
 			}
 			else
 			{
-				applicationEventPublisher.publishEvent(new SessionDeletedEvent(this, id));
+				applicationEventPublisher.publishEvent(new SessionDeletedEvent(this, deletedSession));
 			}
 		}
 	}
@@ -126,11 +127,11 @@ import lombok.ToString;
 		final Session result = new MapSession();
 		if (defaultMaxInactiveInterval != null)
 		{
-			result.setMaxInactiveIntervalInSeconds(defaultMaxInactiveInterval);
+			result.setMaxInactiveInterval(defaultMaxInactiveInterval);
 		}
 
 		// Fire event
-		applicationEventPublisher.publishEvent(new SessionCreatedEvent(this, result.getId()));
+		applicationEventPublisher.publishEvent(new SessionCreatedEvent(this, result));
 
 		return result;
 	}

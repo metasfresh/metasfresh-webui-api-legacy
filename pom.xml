@@ -1,13 +1,12 @@
-<project
-	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
-	xmlns="http://maven.apache.org/POM/4.0.0"
-	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
+	xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
 	<modelVersion>4.0.0</modelVersion>
 
 	<parent>
 		<artifactId>de.metas.parent.general</artifactId>
 		<groupId>de.metas</groupId>
 		<version>[1,10.0.0]</version> <!-- we need the range during the jenkins build -->
+		<relativePath>../metasfresh-parent/pom.xml</relativePath>
 	</parent>
 
 	<!-- FRESH-271: we need an explicit version here, otherwise versions-maven-plugin 
@@ -19,9 +18,7 @@
 
 	<properties>
 
-		<spring-boot.version>2.0.6.RELEASE</spring-boot.version>
-		<!-- <spring-boot.version>1.5.3.RELEASE</spring-boot.version> -->
-		<springfox-swagger.version>2.6.1</springfox-swagger.version>
+		<spring-boot.version>2.2.4.RELEASE</spring-boot.version>
 
 		<!-- See http://www.mojohaus.org/versions-maven-plugin/examples/update-properties.html 
 			and http://stackoverflow.com/questions/3628471/maven-versions-plugin-not-picking-up-properties-from-parent -->
