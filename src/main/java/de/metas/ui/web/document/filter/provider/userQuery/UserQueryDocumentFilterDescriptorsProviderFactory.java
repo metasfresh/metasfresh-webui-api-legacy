@@ -53,6 +53,12 @@ final public class UserQueryDocumentFilterDescriptorsProviderFactory implements 
 	}
 
 	@Override
+	public int getOrder()
+	{
+		return 10;
+	}
+
+	@Override
 	public DocumentFilterDescriptorsProvider createFiltersProvider(
 			@Nullable final AdTabId adTabId,
 			@Nullable final String tableName,

@@ -66,6 +66,12 @@ public class StandardDocumentFilterDescriptorsProviderFactory implements Documen
 	{
 	}
 
+	@Override
+	public int getOrder()
+	{
+		return HIGHEST_PRECEDENCE;
+	}
+
 	/**
 	 * Creates standard filters, i.e. from document fields which are flagged with {@link Characteristic#AllowFiltering}.
 	 */

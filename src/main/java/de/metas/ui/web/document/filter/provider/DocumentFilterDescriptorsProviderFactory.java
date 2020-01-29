@@ -5,6 +5,7 @@ import java.util.Collection;
 import javax.annotation.Nullable;
 
 import org.adempiere.ad.element.api.AdTabId;
+import org.springframework.core.Ordered;
 
 import de.metas.ui.web.window.descriptor.DocumentFieldDescriptor;
 
@@ -30,7 +31,7 @@ import de.metas.ui.web.window.descriptor.DocumentFieldDescriptor;
  * #L%
  */
 
-public interface DocumentFilterDescriptorsProviderFactory
+public interface DocumentFilterDescriptorsProviderFactory extends Ordered
 {
 	@Nullable
 	DocumentFilterDescriptorsProvider createFiltersProvider(AdTabId adTabId, String tableName, Collection<DocumentFieldDescriptor> fields);

@@ -63,6 +63,12 @@ public class FullTextSearchDocumentFilterDescriptorsProviderFactory implements D
 	}
 
 	@Override
+	public int getOrder()
+	{
+		return 20;
+	}
+
+	@Override
 	public DocumentFilterDescriptorsProvider createFiltersProvider(
 			@Nullable final AdTabId adTabId_NOTUSED,
 			@Nullable final String tableName,

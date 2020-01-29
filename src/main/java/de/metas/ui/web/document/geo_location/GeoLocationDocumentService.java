@@ -80,6 +80,12 @@ public class GeoLocationDocumentService implements DocumentFilterDescriptorsProv
 	}
 
 	@Override
+	public int getOrder()
+	{
+		return 30;
+	}
+
+	@Override
 	@Nullable
 	public DocumentFilterDescriptorsProvider createFiltersProvider(
 			@Nullable final AdTabId adTabId_NOTUSED,

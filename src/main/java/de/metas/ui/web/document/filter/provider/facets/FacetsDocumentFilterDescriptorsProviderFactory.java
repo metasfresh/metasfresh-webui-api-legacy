@@ -57,6 +57,13 @@ public class FacetsDocumentFilterDescriptorsProviderFactory implements DocumentF
 	}
 
 	@Override
+	public int getOrder()
+	{
+		// IMPORTANT: facet filters shall be displayed last
+		return LOWEST_PRECEDENCE;
+	}
+
+	@Override
 	public DocumentFilterDescriptorsProvider createFiltersProvider(
 			@Nullable final AdTabId adTabId,
 			@Nullable final String tableName,
