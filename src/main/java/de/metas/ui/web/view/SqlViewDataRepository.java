@@ -208,9 +208,9 @@ class SqlViewDataRepository implements IViewDataRepository
 	}
 
 	@Override
-	public void deleteSelection(final ViewId viewId)
+	public void deleteSelection(@NonNull final String selectionId)
 	{
-		viewRowIdsOrderedSelectionFactory.deleteSelection(viewId);
+		viewRowIdsOrderedSelectionFactory.deleteSelection(selectionId);
 	}
 
 	@Override

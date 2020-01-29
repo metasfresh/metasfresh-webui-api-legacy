@@ -20,6 +20,7 @@ import de.metas.ui.web.document.filter.DocumentFilterList;
 import de.metas.ui.web.document.filter.DocumentFilterParam;
 import de.metas.ui.web.document.filter.DocumentFilterParam.Operator;
 import de.metas.ui.web.document.filter.DocumentFilterParamDescriptor;
+import de.metas.ui.web.document.filter.provider.DocumentFilterDescriptorsProvider;
 import de.metas.ui.web.document.filter.sql.SqlDocumentFilterConverterDecorator;
 import de.metas.ui.web.document.geo_location.GeoLocationDocumentService;
 import de.metas.ui.web.view.descriptor.SqlViewBinding;
@@ -260,7 +261,30 @@ public class SqlViewFactory implements IViewFactory
 			@NonNull final JSONFilterViewRequest filterViewRequest,
 			@NonNull final Supplier<IViewsRepository> viewsRepo_NOTUSED)
 	{
-		final CreateViewRequest createViewRequest = CreateViewRequest.filterViewBuilder(view, filterViewRequest).build();
-		return createView(createViewRequest);
+		return filterView(DefaultView.cast(view), filterViewRequest);
 	}
+
+	private DefaultView filterView(
+			@NonNull final DefaultView view,
+			@NonNull final JSONFilterViewRequest filterViewRequest)
+	{
+		final DocumentFilterDescriptorsProvider filterDescriptors = view.getViewDataRepository().getViewFilterDescriptors();
+		final DocumentFilterList newFilters = filterViewRequest.getFiltersUnwrapped(filterDescriptors);
+//		final DocumentFilterList newFiltersExcludingFacets = newFilters.retainOnlyNonFacetFilters();
+//
+//		final DocumentFilterList currentFiltersExcludingFacets = view.getFilters().retainOnlyNonFacetFilters();
+//
+//		if (DocumentFilterList.equals(currentFiltersExcludingFacets, newFiltersExcludingFacets))
+//		{
+//			// TODO
+//			throw new AdempiereException("TODO");
+//		}
+//		else
+		{
+			return createView(CreateViewRequest.filterViewBuilder(view)
+					.setFilters(newFilters)
+					.build());
+		}
+	}
+
 }

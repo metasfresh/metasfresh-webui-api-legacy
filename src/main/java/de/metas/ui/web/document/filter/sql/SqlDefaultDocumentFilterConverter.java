@@ -117,13 +117,13 @@ import lombok.NonNull;
 		// SQL filter
 		if (filterParam.isSqlFilter())
 		{
-			String sqlWhereClause = filterParam.getSqlWhereClause();
+			String sqlWhereClause = filterParam.getSqlWhereClause().getSql();
 			if (sqlOpts.isUseTableAlias())
 			{
 				sqlWhereClause = replaceTableNameWithTableAlias(sqlWhereClause, sqlOpts.getTableAlias());
 			}
 
-			final List<Object> sqlWhereClauseParams = filterParam.getSqlWhereClauseParams();
+			final List<Object> sqlWhereClauseParams = filterParam.getSqlWhereClause().getSqlParams();
 			sqlParams.collectAll(sqlWhereClauseParams);
 			return sqlWhereClause;
 		}

@@ -282,30 +282,34 @@ public class SqlViewRowIdsOrderedSelectionFactory implements ViewRowIdsOrderedSe
 	}
 
 	@Override
-	public void deleteSelection(@NonNull final ViewId viewId)
+	public void deleteSelections(@NonNull final Set<String> selectionIds)
 	{
-		final String selectionId = viewId.getViewId();
+		if (selectionIds.isEmpty())
+		{
+			return;
+		}
+
 		final SqlViewSelectionQueryBuilder viewQueryBuilder = newSqlViewSelectionQueryBuilder();
 
 		// Delete selection lines
 		{
-			final String sql = viewQueryBuilder.buildSqlDeleteSelectionLines(selectionId);
-			final int countDeleted = DB.executeUpdateEx(sql, ITrx.TRXNAME_ThreadInherited);
-			logger.trace("Delete {} selection lines for {}", countDeleted, selectionId);
+			final SqlAndParams sql = viewQueryBuilder.buildSqlDeleteSelectionLines(selectionIds);
+			final int countDeleted = DB.executeUpdateEx(sql.getSql(), sql.getSqlParamsArray(), ITrx.TRXNAME_ThreadInherited);
+			logger.trace("Delete {} selection lines for {}", countDeleted, selectionIds);
 		}
 
 		// Delete selection rows
 		{
-			final String sql = viewQueryBuilder.buildSqlDeleteSelection(selectionId);
-			final int countDeleted = DB.executeUpdateEx(sql, ITrx.TRXNAME_ThreadInherited);
-			logger.trace("Delete {} selection rows for {}", countDeleted, selectionId);
+			final SqlAndParams sql = viewQueryBuilder.buildSqlDeleteSelection(selectionIds);
+			final int countDeleted = DB.executeUpdateEx(sql.getSql(), sql.getSqlParamsArray(), ITrx.TRXNAME_ThreadInherited);
+			logger.trace("Delete {} selection rows for {}", countDeleted, selectionIds);
 		}
 	}
 
 	@Override
-	public void scheduleDeleteSelections(final Set<String> viewIds)
+	public void scheduleDeleteSelections(@NonNull final Set<String> selectionIds)
 	{
-		SqlViewSelectionToDeleteHelper.scheduleDeleteSelections(viewIds);
+		SqlViewSelectionToDeleteHelper.scheduleDeleteSelections(selectionIds);
 	}
 
 	public static Set<DocumentId> retrieveRowIdsForLineIds(

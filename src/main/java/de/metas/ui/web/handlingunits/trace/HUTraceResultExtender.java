@@ -61,14 +61,17 @@ public class HUTraceResultExtender implements SqlDocumentFilterConverter
 			@NonNull final SqlOptions sqlOpts,
 			@NonNull final SqlDocumentFilterConverterContext context)
 	{
-		if (filter.getParameters() == null || filter.getParameters().isEmpty())
+		if (!filter.hasParameters())
 		{
 			return converter.getSql(sqlParamsOut, filter, sqlOpts, context); // do whatever the system usually does
 		}
-		final HUTraceEventQuery huTraceQuery = HuTraceQueryCreator.createTraceQueryFromDocumentFilter(filter);
-		final PInstanceId selectionId = huTraceRepository.queryToSelection(huTraceQuery);
+		else
+		{
+			final HUTraceEventQuery huTraceQuery = HuTraceQueryCreator.createTraceQueryFromDocumentFilter(filter);
+			final PInstanceId selectionId = huTraceRepository.queryToSelection(huTraceQuery);
 
-		final String sqlPlaceHolder = sqlParamsOut.placeholder(selectionId);
-		return String.format(WHERE_IN_T_SELECTION, sqlPlaceHolder);
+			final String sqlPlaceHolder = sqlParamsOut.placeholder(selectionId);
+			return String.format(WHERE_IN_T_SELECTION, sqlPlaceHolder);
+		}
 	}
 }

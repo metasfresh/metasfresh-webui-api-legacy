@@ -127,7 +127,7 @@ public final class DefaultView implements IEditableView
 	private final DocumentFilterList filters;
 	private transient DocumentFilterList _allFilters; // lazy
 	@Getter
-	private final FacetFilterViewCacheMap facetFiltersCacheMap = new FacetFilterViewCacheMap();
+	private final FacetFilterViewCacheMap facetFiltersCacheMap = FacetFilterViewCacheMap.newInstance();
 
 	//
 	// Misc

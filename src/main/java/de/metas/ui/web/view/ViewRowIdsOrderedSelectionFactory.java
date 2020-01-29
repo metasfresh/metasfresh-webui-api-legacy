@@ -2,10 +2,13 @@ package de.metas.ui.web.view;
 
 import java.util.Set;
 
+import com.google.common.collect.ImmutableSet;
+
 import de.metas.ui.web.document.filter.DocumentFilterList;
 import de.metas.ui.web.document.filter.sql.SqlDocumentFilterConverterContext;
 import de.metas.ui.web.window.datatypes.DocumentIdsSelection;
 import de.metas.ui.web.window.model.DocumentQueryOrderByList;
+import lombok.NonNull;
 
 /*
  * #%L
@@ -56,7 +59,12 @@ public interface ViewRowIdsOrderedSelectionFactory
 
 	boolean containsAnyOfRowIds(ViewRowIdsOrderedSelection selection, DocumentIdsSelection rowIds);
 
-	void deleteSelection(ViewId viewId);
+	default void deleteSelection(@NonNull final String selectionId)
+	{
+		deleteSelections(ImmutableSet.of(selectionId));
+	}
 
-	void scheduleDeleteSelections(Set<String> viewIds);
+	void deleteSelections(Set<String> selectionIds);
+
+	void scheduleDeleteSelections(Set<String> selectionIds);
 }

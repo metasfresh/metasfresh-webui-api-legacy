@@ -1,9 +1,9 @@
 package de.metas.ui.web.document.filter;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Set;
 import java.util.function.IntFunction;
@@ -11,17 +11,23 @@ import java.util.function.IntFunction;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.Immutable;
 
-import com.google.common.base.MoreObjects;
+import org.adempiere.exceptions.AdempiereException;
+
+import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 
 import de.metas.i18n.ITranslatableString;
 import de.metas.i18n.TranslatableStrings;
 import de.metas.ui.web.document.filter.DocumentFilterParam.Operator;
 import de.metas.util.Check;
+import de.metas.util.GuavaCollectors;
 import de.metas.util.lang.RepoIdAware;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NonNull;
+import lombok.ToString;
 
 /*
  * #%L
@@ -52,6 +58,8 @@ import lombok.NonNull;
  *
  */
 @Immutable
+@EqualsAndHashCode
+@ToString
 public final class DocumentFilter
 {
 	public static Builder builder()
@@ -86,8 +94,7 @@ public final class DocumentFilter
 	@Getter
 	private final String filterId;
 	private final ITranslatableString caption;
-	@Getter
-	private final ImmutableList<DocumentFilterParam> parameters;
+	private final ImmutableMap<String, DocumentFilterParam> parametersByName;
 	private final ImmutableSet<String> internalParameterNames;
 	@Getter
 	private final boolean facetFilter;
@@ -101,26 +108,23 @@ public final class DocumentFilter
 
 		facetFilter = builder.facetFilter;
 
-		parameters = builder.parameters != null ? ImmutableList.copyOf(builder.parameters) : ImmutableList.of();
+		parametersByName = builder.parametersByName != null ? ImmutableMap.copyOf(builder.parametersByName) : ImmutableMap.of();
 		internalParameterNames = builder.internalParameterNames != null ? ImmutableSet.copyOf(builder.internalParameterNames) : ImmutableSet.of();
-	}
-
-	@Override
-	public String toString()
-	{
-		return MoreObjects.toStringHelper(this)
-				.omitNullValues()
-				.add("filterId", filterId)
-				.add("caption", caption)
-				.add("facetFilter", facetFilter)
-				.add("parameters", parameters.isEmpty() ? null : parameters)
-				.add("internalParameterNames", internalParameterNames.isEmpty() ? null : internalParameterNames)
-				.toString();
 	}
 
 	public String getCaption(@Nullable final String adLanguage)
 	{
 		return caption != null ? caption.translate(adLanguage) : null;
+	}
+
+	public boolean hasParameters()
+	{
+		return !parametersByName.isEmpty();
+	}
+
+	public ImmutableCollection<DocumentFilterParam> getParameters()
+	{
+		return parametersByName.values();
 	}
 
 	public boolean isInternalParameter(final String parameterName)
@@ -130,20 +134,17 @@ public final class DocumentFilter
 
 	public DocumentFilterParam getParameter(@NonNull final String parameterName)
 	{
-		return getParameters()
-				.stream()
-				.filter(param -> parameterName.equals(param.getFieldName()))
-				.findFirst()
-				.orElseThrow(() -> new IllegalArgumentException("Parameter " + parameterName + " not found in " + this));
+		final DocumentFilterParam parameter = getParameterOrNull(parameterName);
+		if (parameter == null)
+		{
+			throw new AdempiereException("Parameter " + parameterName + " not found in " + this);
+		}
+		return parameter;
 	}
 
 	public DocumentFilterParam getParameterOrNull(@NonNull final String parameterName)
 	{
-		return getParameters()
-				.stream()
-				.filter(param -> parameterName.equals(param.getFieldName()))
-				.findFirst()
-				.orElse(null);
+		return parametersByName.get(parameterName);
 	}
 
 	public String getParameterValueAsString(@NonNull final String parameterName)
@@ -249,7 +250,7 @@ public final class DocumentFilter
 		private ITranslatableString caption = TranslatableStrings.empty();
 		private boolean facetFilter;
 
-		private List<DocumentFilterParam> parameters;
+		private LinkedHashMap<String, DocumentFilterParam> parametersByName;
 		private Set<String> internalParameterNames;
 
 		private Builder()
@@ -286,23 +287,29 @@ public final class DocumentFilter
 
 		public boolean hasParameters()
 		{
-			return !Check.isEmpty(parameters)
+			return !Check.isEmpty(parametersByName)
 					|| !Check.isEmpty(internalParameterNames);
 		}
 
-		public Builder setParameters(final List<DocumentFilterParam> parameters)
+		public Builder setParameters(@NonNull final List<DocumentFilterParam> parameters)
 		{
-			this.parameters = parameters;
+			if (!parameters.isEmpty())
+			{
+				this.parametersByName = parameters
+						.stream()
+						.collect(GuavaCollectors.toMapByKey(LinkedHashMap::new, DocumentFilterParam::getFieldName));
+			}
+
 			return this;
 		}
 
 		public Builder addParameter(@NonNull final DocumentFilterParam parameter)
 		{
-			if (parameters == null)
+			if (parametersByName == null)
 			{
-				parameters = new ArrayList<>();
+				parametersByName = new LinkedHashMap<>();
 			}
-			parameters.add(parameter);
+			parametersByName.put(parameter.getFieldName(), parameter);
 			return this;
 		}
 

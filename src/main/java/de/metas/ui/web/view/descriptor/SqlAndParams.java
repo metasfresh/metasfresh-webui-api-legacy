@@ -138,7 +138,29 @@ public final class SqlAndParams
 		public boolean isEmpty()
 		{
 			return (sql == null || sql.length() == 0)
-					&& (sqlParams == null || sqlParams.isEmpty());
+					&& !hasParameters();
+		}
+
+		public boolean hasParameters()
+		{
+			return sqlParams != null && !sqlParams.isEmpty();
+		}
+
+		public int getParametersCount()
+		{
+			return sqlParams != null ? sqlParams.size() : 0;
+		}
+
+		public Builder appendIfHasParameters(@NonNull final CharSequence sql)
+		{
+			if (hasParameters())
+			{
+				return append(sql);
+			}
+			else
+			{
+				return this;
+			}
 		}
 
 		public Builder append(@NonNull final CharSequence sql, final Object... sqlParams)

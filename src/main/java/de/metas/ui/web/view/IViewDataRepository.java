@@ -69,9 +69,9 @@ public interface IViewDataRepository
 			DocumentQueryOrderByList orderBys,
 			SqlDocumentFilterConverterContext filterConverterCtx);
 
-	void deleteSelection(ViewId viewId);
+	void deleteSelection(String selectionId);
 
-	void scheduleDeleteSelections(Set<String> viewIds);
+	void scheduleDeleteSelections(Set<String> selectionIds);
 
 	ViewRowIdsOrderedSelection createOrderedSelection(ViewEvaluationCtx viewEvalCtx, ViewId viewId, DocumentFilterList filters, boolean applySecurityRestrictions, SqlDocumentFilterConverterContext context);
 

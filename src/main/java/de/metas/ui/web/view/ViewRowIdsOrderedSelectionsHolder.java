@@ -145,7 +145,7 @@ final class ViewRowIdsOrderedSelectionsHolder
 	{
 		if (selectionDeleteBeforeCreate.get())
 		{
-			viewDataRepository.deleteSelection(viewId);
+			viewDataRepository.deleteSelection(viewId.getViewId());
 		}
 
 		final ViewEvaluationCtx viewEvalCtx = getViewEvaluationCtx();

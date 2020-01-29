@@ -798,16 +798,20 @@ public final class SqlViewSelectionQueryBuilder
 		}
 	}
 
-	public String buildSqlDeleteSelection(@NonNull final String selectionId)
+	public SqlAndParams buildSqlDeleteSelection(@NonNull final Set<String> selectionIds)
 	{
-		return "DELETE FROM " + I_T_WEBUI_ViewSelection.Table_Name
-				+ " WHERE " + I_T_WEBUI_ViewSelection.COLUMNNAME_UUID + "=" + DB.TO_STRING(selectionId);
+		final ArrayList<Object> sqlParams = new ArrayList<>(selectionIds.size());
+		final String sql = "DELETE FROM " + I_T_WEBUI_ViewSelection.Table_Name
+				+ " WHERE " + DB.buildSqlList(I_T_WEBUI_ViewSelection.COLUMNNAME_UUID, selectionIds, sqlParams);
+		return SqlAndParams.of(sql, sqlParams);
 	}
 
-	public String buildSqlDeleteSelectionLines(@NonNull final String selectionId)
+	public SqlAndParams buildSqlDeleteSelectionLines(@NonNull final Set<String> selectionIds)
 	{
-		return "DELETE FROM " + I_T_WEBUI_ViewSelectionLine.Table_Name
-				+ " WHERE " + I_T_WEBUI_ViewSelectionLine.COLUMNNAME_UUID + "=" + DB.TO_STRING(selectionId);
+		final ArrayList<Object> sqlParams = new ArrayList<>(selectionIds.size());
+		final String sql = "DELETE FROM " + I_T_WEBUI_ViewSelectionLine.Table_Name
+				+ " WHERE " + DB.buildSqlList(I_T_WEBUI_ViewSelectionLine.COLUMNNAME_UUID, selectionIds, sqlParams);
+		return SqlAndParams.of(sql, sqlParams);
 	}
 
 	public static SqlAndParams buildSqlSelectRowIdsForLineIds(

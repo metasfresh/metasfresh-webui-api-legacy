@@ -88,15 +88,19 @@ public final class CreateViewRequest
 			@NonNull final IView view,
 			@NonNull final JSONFilterViewRequest filterViewRequest)
 	{
-		final List<JSONDocumentFilter> jsonFilters = filterViewRequest.getFilters();
+		return filterViewBuilder(view)
+				.setFiltersFromJSON(filterViewRequest.getFilters());
+	}
 
+	public static Builder filterViewBuilder(@NonNull final IView view)
+	{
 		return builder(view.getViewId().getWindowId(), view.getViewType())
 				.setProfileId(view.getProfileId())
 				.setParentViewId(view.getParentViewId())
 				.setParentRowId(view.getParentRowId())
 				.setReferencingDocumentPaths(view.getReferencingDocumentPaths())
 				.setStickyFilters(view.getStickyFilters())
-				.setFiltersFromJSON(jsonFilters)
+				// .setFiltersFromJSON(jsonFilters)
 				// .setFilterOnlyIds(filterOnlyIds) // N/A on this level.
 				.setUseAutoFilters(false)
 				.addActions(view.getActions())

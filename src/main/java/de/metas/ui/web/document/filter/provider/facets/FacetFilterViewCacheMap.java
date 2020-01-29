@@ -31,7 +31,16 @@ import lombok.ToString;
 @ToString
 public final class FacetFilterViewCacheMap
 {
+	public static FacetFilterViewCacheMap newInstance()
+	{
+		return new FacetFilterViewCacheMap();
+	}
+
 	private final ConcurrentHashMap<String, FacetFilterViewCache> cachesById = new ConcurrentHashMap<>();
+
+	private FacetFilterViewCacheMap()
+	{
+	}
 
 	public FacetFilterViewCache computeIfAbsent(
 			@NonNull final String id,

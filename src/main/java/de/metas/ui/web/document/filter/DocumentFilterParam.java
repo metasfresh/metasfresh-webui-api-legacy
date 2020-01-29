@@ -2,24 +2,25 @@ package de.metas.ui.web.document.filter;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.function.Function;
 import java.util.function.IntFunction;
 
+import org.adempiere.exceptions.AdempiereException;
 import org.compiere.util.DisplayType;
 
-import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableList;
 
+import de.metas.ui.web.view.descriptor.SqlAndParams;
 import de.metas.ui.web.window.datatypes.LookupValue;
 import de.metas.ui.web.window.datatypes.json.DateTimeConverters;
 import de.metas.util.Check;
 import de.metas.util.lang.RepoIdAware;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.NonNull;
+import lombok.ToString;
 
 /*
  * #%L
@@ -43,7 +44,9 @@ import lombok.NonNull;
  * #L%
  */
 
+@Getter
 @EqualsAndHashCode // required for (ETag) caching
+@ToString
 public final class DocumentFilterParam
 {
 	public enum Operator
@@ -75,8 +78,7 @@ public final class DocumentFilterParam
 	private final Object value;
 	private final Object valueTo;
 	//
-	private final String sqlWhereClause;
-	private final List<Object> sqlWhereClauseParams;
+	private final SqlAndParams sqlWhereClause;
 
 	public static Builder builder()
 	{
@@ -85,9 +87,7 @@ public final class DocumentFilterParam
 
 	public static DocumentFilterParam ofSqlWhereClause(final boolean joinAnd, final String sqlWhereClause)
 	{
-		// NOTE: avoid having sqlWhereClauseParams because they might introduce issues when we have to convert to SQL code without params.
-		final List<Object> sqlWhereClauseParams = ImmutableList.of();
-		return new DocumentFilterParam(joinAnd, sqlWhereClause, sqlWhereClauseParams);
+		return new DocumentFilterParam(joinAnd, SqlAndParams.of(sqlWhereClause));
 	}
 
 	public static DocumentFilterParam ofNameEqualsValue(
@@ -122,10 +122,10 @@ public final class DocumentFilterParam
 		valueTo = builder.valueTo;
 
 		sqlWhereClause = null;
-		sqlWhereClauseParams = null;
 	}
 
-	private DocumentFilterParam(final boolean joinAnd, final String sqlWhereClause, final List<Object> sqlWhereClauseParams)
+	/** Hardcoded SQL WHERE clause builder */
+	private DocumentFilterParam(final boolean joinAnd, @NonNull final SqlAndParams sqlWhereClause)
 	{
 		this.joinAnd = joinAnd;
 
@@ -135,57 +135,11 @@ public final class DocumentFilterParam
 		valueTo = null;
 
 		this.sqlWhereClause = sqlWhereClause;
-		this.sqlWhereClauseParams = sqlWhereClauseParams != null ? Collections.unmodifiableList(new ArrayList<>(sqlWhereClauseParams)) : ImmutableList.of();
-	}
-
-	@Override
-	public String toString()
-	{
-		return MoreObjects.toStringHelper(this)
-				.omitNullValues()
-				.add("joinAnd", joinAnd)
-				.add("fieldName", fieldName)
-				.add("operator", operator)
-				.add("value", value)
-				.add("valueTo", valueTo)
-				.add("sqlWhereClause", sqlWhereClause)
-				.add("sqlWhereClauseParams", sqlWhereClauseParams)
-				.toString();
-	}
-
-	public boolean isJoinAnd()
-	{
-		return joinAnd;
 	}
 
 	public boolean isSqlFilter()
 	{
-		return sqlWhereClause != null;
-	}
-
-	public String getSqlWhereClause()
-	{
-		return sqlWhereClause;
-	}
-
-	public List<Object> getSqlWhereClauseParams()
-	{
-		return sqlWhereClauseParams;
-	}
-
-	public String getFieldName()
-	{
-		return fieldName;
-	}
-
-	public Operator getOperator()
-	{
-		return operator;
-	}
-
-	public Object getValue()
-	{
-		return value;
+		return getSqlWhereClause() != null;
 	}
 
 	public String getValueAsString()
@@ -228,7 +182,7 @@ public final class DocumentFilterParam
 	{
 		if (value == null)
 		{
-			throw new IllegalStateException("Cannot convert null value to Collection<?>");
+			throw new AdempiereException("Cannot convert null value to Collection<?>");
 		}
 		else if (value instanceof Collection)
 		{
@@ -236,7 +190,7 @@ public final class DocumentFilterParam
 		}
 		else
 		{
-			throw new IllegalStateException("Cannot convert value to Collection<?>: " + value);
+			throw new AdempiereException("Cannot convert value to Collection<?>: " + value + " (" + value.getClass() + ")");
 		}
 	}
 
@@ -245,7 +199,7 @@ public final class DocumentFilterParam
 		final Collection<?> valueAsCollection = getValueAsCollection();
 		if (valueAsCollection == null)
 		{
-			throw new IllegalStateException("Cannot convert null value to List<Integer>");
+			throw new AdempiereException("Cannot convert null value to List<Integer>");
 		}
 
 		if (valueAsCollection.isEmpty())
@@ -300,10 +254,11 @@ public final class DocumentFilterParam
 		return DateTimeConverters.fromObjectToLocalDate(value);
 	}
 
-	public Object getValueTo()
-	{
-		return valueTo;
-	}
+	//
+	//
+	// ------------------
+	//
+	//
 
 	public static final class Builder
 	{

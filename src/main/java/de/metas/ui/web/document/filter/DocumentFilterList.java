@@ -51,13 +51,15 @@ public class DocumentFilterList
 	public static final DocumentFilterList ofList(@Nullable final Collection<DocumentFilter> list)
 	{
 		return list != null && !list.isEmpty()
-				? new DocumentFilterList(list)
+				? new DocumentFilterList(Maps.uniqueIndex(list, DocumentFilter::getFilterId))
 				: EMPTY;
 	}
 
 	private static final DocumentFilterList ofMap(@NonNull final Map<String, DocumentFilter> filtersById)
 	{
-		return !filtersById.isEmpty() ? new DocumentFilterList(filtersById) : EMPTY;
+		return !filtersById.isEmpty()
+				? new DocumentFilterList(ImmutableMap.copyOf(filtersById))
+				: EMPTY;
 	}
 
 	public static final DocumentFilterList of(@NonNull final DocumentFilter filter)
@@ -79,14 +81,9 @@ public class DocumentFilterList
 
 	private final ImmutableMap<String, DocumentFilter> filtersById;
 
-	private DocumentFilterList(@NonNull final Collection<DocumentFilter> list)
+	private DocumentFilterList(@NonNull final ImmutableMap<String, DocumentFilter> filtersById)
 	{
-		filtersById = Maps.uniqueIndex(list, DocumentFilter::getFilterId);
-	}
-
-	private DocumentFilterList(@NonNull final Map<String, DocumentFilter> map)
-	{
-		filtersById = ImmutableMap.copyOf(map);
+		this.filtersById = filtersById;
 	}
 
 	public static boolean equals(final DocumentFilterList list1, final DocumentFilterList list2)
@@ -143,33 +140,41 @@ public class DocumentFilterList
 		}
 	}
 
-	public DocumentFilterList retainingOnly(@NonNull final Predicate<DocumentFilter> predicate)
+	public DocumentFilterList retainOnlyNonFacetFilters()
+	{
+		return filtering(filter -> !filter.isFacetFilter());
+	}
+
+	public DocumentFilterList retainOnlyFacetFilters()
+	{
+		return filtering(DocumentFilter::isFacetFilter);
+	}
+
+	private DocumentFilterList filtering(final Predicate<DocumentFilter> predicate)
 	{
 		if (isEmpty())
 		{
 			return this;
 		}
 
-		final LinkedHashMap<String, DocumentFilter> filtersByIdNew = new LinkedHashMap<>(this.filtersById.size());
-		for (final Map.Entry<String, DocumentFilter> e : this.filtersById.entrySet())
-		{
-			final String filterId = e.getKey();
-			final DocumentFilter filter = e.getValue();
+		final ImmutableMap<String, DocumentFilter> newFiltersById = filtersById.entrySet()
+				.stream()
+				.filter(entry -> predicate.test(entry.getValue()))
+				.collect(GuavaCollectors.toImmutableMap());
 
-			if (predicate.test(filter))
-			{
-				filtersByIdNew.put(filterId, filter);
-			}
+		if (newFiltersById.isEmpty())
+		{
+			return EMPTY;
+		}
+		else if (newFiltersById.size() == filtersById.size())
+		{
+			return this;
+		}
+		else
+		{
+			return new DocumentFilterList(newFiltersById);
 		}
 
-		return this.filtersById.size() != filtersByIdNew.size()
-				? ofMap(filtersByIdNew)
-				: this;
-	}
-
-	public DocumentFilterList subtract(@NonNull final DocumentFilterList other)
-	{
-		return retainingOnly(filter -> !other.containsFilterById(filter.getFilterId()));
 	}
 
 	public Optional<DocumentFilter> getFilterById(@NonNull final String filterId)
