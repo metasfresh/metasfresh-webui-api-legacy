@@ -121,12 +121,12 @@ public class C_BankStatement_AddBpartnerAndPayment extends JavaProcess implement
 	@Override
 	protected String doIt() throws Exception
 	{
-		just___DO_IT(getSelectedBankStatementLine(), paymentId);
+		doIt(getSelectedBankStatementLine(), paymentId);
 
 		return MSG_OK;
 	}
 
-	private void just___DO_IT(final I_C_BankStatementLine bankStatementLine, final PaymentId paymentId)
+	private void doIt(final I_C_BankStatementLine bankStatementLine, final PaymentId paymentId)
 	{
 		final IBankStatementBL bankStatementBL = Services.get(IBankStatementBL.class);
 		bankStatementBL.setOrCreateAndLinkPaymentToBankStatementLine(bankStatementLine, paymentId);
