@@ -53,6 +53,10 @@ import java.util.Set;
 
 public class C_BankStatement_AddBpartnerAndPayment extends JavaProcess implements IProcessPrecondition
 {
+	public static final String BANK_STATEMENT_MUST_BE_COMPLETED_OR_IN_PROGRESS_MSG = "de.metas.banking.process.C_BankStatement_AddBpartnerAndPayment.BankStatement_must_be_Completed_or_In_Progress";
+	public static final String A_SINGLE_LINE_SHOULD_BE_SELECTED_MSG = "de.metas.banking.process.C_BankStatement_AddBpartnerAndPayment.A_single_line_should_be_selected";
+	public static final String LINE_SHOULD_NOT_HAVE_A_PAYMENT_MSG = "de.metas.banking.process.C_BankStatement_AddBpartnerAndPayment.Line_should_not_have_a_Payment";
+
 	private static final String C_BPartner_ID_PARAM_NAME = "C_BPartner_ID";
 	@Param(parameterName = C_BPartner_ID_PARAM_NAME)
 	private BPartnerId bPartnerId;
@@ -81,26 +85,26 @@ public class C_BankStatement_AddBpartnerAndPayment extends JavaProcess implement
 		final DocStatus docStatus = DocStatus.ofCode(selectedBankStatement.getDocStatus());
 		if (!docStatus.isCompleted() && !docStatus.isDraftedOrInProgress())
 		{
-			return ProcessPreconditionsResolution.reject(iMsgBL.getTranslatableMsgText("BankStatement must be Completed or In Progress"));
+			return ProcessPreconditionsResolution.reject(iMsgBL.getTranslatableMsgText(BANK_STATEMENT_MUST_BE_COMPLETED_OR_IN_PROGRESS_MSG));
 		}
 
 		// there should be a single line selected
 		final Set<TableRecordReference> selectedLineReferences = context.getSelectedIncludedRecords();
 		if (selectedLineReferences.size() != 1)
 		{
-			return ProcessPreconditionsResolution.reject(iMsgBL.getTranslatableMsgText("A single line should be selected."));
+			return ProcessPreconditionsResolution.reject(iMsgBL.getTranslatableMsgText(A_SINGLE_LINE_SHOULD_BE_SELECTED_MSG));
 		}
 
 		final TableRecordReference reference = selectedLineReferences.iterator().next();
 		final I_C_BankStatementLine line = reference.getModel(I_C_BankStatementLine.class);
 		if (line == null)
 		{
-			return ProcessPreconditionsResolution.reject(iMsgBL.getTranslatableMsgText("A single line should be selected."));
+			return ProcessPreconditionsResolution.reject(iMsgBL.getTranslatableMsgText(A_SINGLE_LINE_SHOULD_BE_SELECTED_MSG));
 		}
 
 		if (line.getC_Payment_ID() > 0)
 		{
-			return ProcessPreconditionsResolution.reject(iMsgBL.getTranslatableMsgText("Line should not have a Payment."));
+			return ProcessPreconditionsResolution.reject(iMsgBL.getTranslatableMsgText(LINE_SHOULD_NOT_HAVE_A_PAYMENT_MSG));
 		}
 
 		return ProcessPreconditionsResolution.accept();

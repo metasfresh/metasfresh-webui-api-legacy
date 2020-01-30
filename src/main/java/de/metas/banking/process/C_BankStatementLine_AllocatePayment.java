@@ -45,6 +45,8 @@ import org.compiere.SpringContextHolder;
 
 public class C_BankStatementLine_AllocatePayment extends JavaProcess implements IProcessPrecondition
 {
+	private final static String BANK_STATEMENT_MUST_BE_COMPLETED_MSG = "de.metas.banking.process.C_BankStatementLine_AllocatePayment.Bank_Statement_has_to_be_Completed";
+
 	private final IMsgBL iMsgBL = Services.get(IMsgBL.class);
 	private final IViewsRepository viewsFactory = SpringContextHolder.instance.getBean(IViewsRepository.class);
 	private final IBankStatementDAO bankStatementDAO = Services.get(IBankStatementDAO.class);
@@ -65,7 +67,7 @@ public class C_BankStatementLine_AllocatePayment extends JavaProcess implements 
 		final DocStatus docStatus = DocStatus.ofCode(selectedBankStatement.getDocStatus());
 		if (!docStatus.isCompleted())
 		{
-			return ProcessPreconditionsResolution.reject(iMsgBL.getTranslatableMsgText("BankStatement must be Completed or In Progress"));
+			return ProcessPreconditionsResolution.reject(iMsgBL.getTranslatableMsgText(BANK_STATEMENT_MUST_BE_COMPLETED_MSG));
 		}
 
 		return ProcessPreconditionsResolution.accept();
