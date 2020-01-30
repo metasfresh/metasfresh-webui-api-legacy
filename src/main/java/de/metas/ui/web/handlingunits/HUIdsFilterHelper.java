@@ -2,6 +2,7 @@ package de.metas.ui.web.handlingunits;
 
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 
 import javax.annotation.Nullable;
@@ -175,7 +176,7 @@ public final class HUIdsFilterHelper
 		}
 	}
 
-	public static final String FILTER_ID = "huIds";
+	private static final String FILTER_ID = "huIds";
 	private static final String FILTER_PARAM_Data = "$data";
 
 	public static final transient HUIdsSqlDocumentFilterConverter SQL_DOCUMENT_FILTER_CONVERTER = new HUIdsSqlDocumentFilterConverter();
@@ -241,6 +242,12 @@ public final class HUIdsFilterHelper
 
 		private HUIdsSqlDocumentFilterConverter()
 		{
+		}
+
+		@Override
+		public boolean canConvert(final String filterId)
+		{
+			return Objects.equals(filterId, FILTER_ID);
 		}
 
 		@Override

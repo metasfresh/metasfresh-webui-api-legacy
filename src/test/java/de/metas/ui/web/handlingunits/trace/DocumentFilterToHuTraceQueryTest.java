@@ -1,4 +1,4 @@
-package de.metas.ui.web.handlingunits;
+package de.metas.ui.web.handlingunits.trace;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

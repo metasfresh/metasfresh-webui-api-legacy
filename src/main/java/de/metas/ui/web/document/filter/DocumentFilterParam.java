@@ -51,7 +51,8 @@ public final class DocumentFilterParam
 {
 	public enum Operator
 	{
-		EQUAL, NOT_EQUAL, //
+		EQUAL, //
+		NOT_EQUAL, //
 		IN_ARRAY, //
 		LIKE, //
 		/** Like (case-insensitive) */

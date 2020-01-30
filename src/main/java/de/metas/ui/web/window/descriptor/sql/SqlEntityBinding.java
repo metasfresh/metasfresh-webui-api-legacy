@@ -1,5 +1,6 @@
 package de.metas.ui.web.window.descriptor.sql;
 
+import java.util.Optional;
 import java.util.regex.Pattern;
 
 import org.adempiere.ad.expression.api.IStringExpression;
@@ -60,9 +61,9 @@ public interface SqlEntityBinding
 		return SqlDocumentFilterConverters.emptyList();
 	}
 
-	default SqlDocumentFilterConverterDecorator getFilterConverterDecoratorOrNull()
+	default Optional<SqlDocumentFilterConverterDecorator> getFilterConverterDecorator()
 	{
-		return null;
+		return Optional.empty();
 	}
 
 	default String replaceTableNameWithTableAlias(final String sql)

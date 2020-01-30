@@ -1,7 +1,6 @@
 package de.metas.ui.web.picking.husToPick;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.List;
 import java.util.function.Supplier;
 
 import org.adempiere.exceptions.AdempiereException;
@@ -120,12 +119,12 @@ public class HUsToPickViewFactory extends HUEditorViewFactoryTemplate
 	}
 
 	@Override
-	protected Map<String, SqlDocumentFilterConverter> createFilterConvertersIndexedByFilterId()
+	protected List<SqlDocumentFilterConverter> createFilterConverters()
 	{
-		final Map<String, SqlDocumentFilterConverter> converters = new HashMap<>();
-		converters.putAll(super.createFilterConvertersIndexedByFilterId());
-		converters.putAll(HUsToPickViewFilters.createFilterConvertersIndexedByFilterId());
-		return converters;
+		return ImmutableList.<SqlDocumentFilterConverter> builder()
+				.addAll(super.createFilterConverters())
+				.addAll(HUsToPickViewFilters.createFilterConverters())
+				.build();
 	}
 
 	@Override

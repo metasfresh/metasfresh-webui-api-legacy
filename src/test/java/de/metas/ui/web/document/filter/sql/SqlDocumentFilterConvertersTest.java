@@ -2,6 +2,8 @@ package de.metas.ui.web.document.filter.sql;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.Optional;
+
 import org.junit.Test;
 
 import de.metas.ui.web.document.filter.DocumentFilter;
@@ -40,6 +42,11 @@ public class SqlDocumentFilterConvertersTest
 
 	private final static SqlDocumentFilterConverter customConverter = new SqlDocumentFilterConverter()
 	{
+		public boolean canConvert(final String filterId)
+		{
+			return true;
+		};
+
 		/**
 		 * This method won't be called throughout our test
 		 */
@@ -56,7 +63,7 @@ public class SqlDocumentFilterConvertersTest
 		// @formatter:off
 		new Expectations()
 		{{
-			sqlEntityBinding.getFilterConverterDecoratorOrNull(); result = new CustomDocumentFilterConverterDecorator();
+			sqlEntityBinding.getFilterConverterDecorator(); result = Optional.of(new CustomDocumentFilterConverterDecorator());
 		}};	// @formatter:on
 
 		final SqlDocumentFilterConverter result = SqlDocumentFilterConverters.createEntityBindingEffectiveConverter(sqlEntityBinding);

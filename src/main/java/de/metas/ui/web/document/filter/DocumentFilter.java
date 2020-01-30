@@ -79,8 +79,10 @@ public final class DocumentFilter
 				.build();
 	}
 
-	public static DocumentFilter inArrayFilter(final String filterId, final String fieldName, final Collection<Integer> values)
+	public static DocumentFilter inArrayFilter(@NonNull final String filterId, @NonNull final String fieldName, @NonNull final Collection<Integer> values)
 	{
+		Check.assumeNotEmpty(values, "values is not empty");
+
 		return builder()
 				.setFilterId(filterId)
 				.addParameter(DocumentFilterParam.builder()
@@ -309,7 +311,15 @@ public final class DocumentFilter
 			{
 				parametersByName = new LinkedHashMap<>();
 			}
-			parametersByName.put(parameter.getFieldName(), parameter);
+
+			final String fieldName = parameter.getFieldName();
+			final DocumentFilterParam alreadyAddedParam = parametersByName.get(fieldName);
+			if (alreadyAddedParam != null)
+			{
+				throw new AdempiereException("Cannot add " + parameter + " because a parameter with same name was already added: " + alreadyAddedParam);
+			}
+
+			parametersByName.put(fieldName, parameter);
 			return this;
 		}
 

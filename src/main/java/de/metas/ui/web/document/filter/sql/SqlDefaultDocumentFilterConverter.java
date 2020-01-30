@@ -80,6 +80,12 @@ import lombok.NonNull;
 				.toString();
 	}
 
+	@Override
+	public boolean canConvert(final String filterId)
+	{
+		return true;
+	}
+
 	/** Build document filter where clause */
 	@Override
 	public String getSql(

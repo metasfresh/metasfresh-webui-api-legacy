@@ -9,6 +9,7 @@ import de.metas.ui.web.document.filter.sql.SqlDocumentFilterConverterDecorator;
 import de.metas.ui.web.view.descriptor.SqlViewBinding.Builder;
 import de.metas.ui.web.window.datatypes.WindowId;
 import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
+import de.metas.ui.web.window.descriptor.sql.SqlSelectValue;
 
 /*
  * #%L
@@ -40,7 +41,7 @@ public class SqlViewBindingTest
 		final SqlViewBinding sqlViewBinding = createMinimalBuilder().build();
 
 		assertThat(sqlViewBinding).isNotNull();
-		assertThat(sqlViewBinding.getFilterConverterDecoratorOrNull()).isNull();
+		assertThat(sqlViewBinding.getFilterConverterDecorator()).isNotPresent();
 	}
 
 	@Test
@@ -53,7 +54,7 @@ public class SqlViewBindingTest
 				.build();
 
 		assertThat(sqlViewBinding).isNotNull();
-		assertThat(sqlViewBinding.getFilterConverterDecoratorOrNull()).isSameAs(customDecoratorProvider);
+		assertThat(sqlViewBinding.getFilterConverterDecorator().get()).isSameAs(customDecoratorProvider);
 	}
 
 	private Builder createMinimalBuilder()
@@ -64,6 +65,10 @@ public class SqlViewBindingTest
 				.sqlValueClass(String.class)
 				.fieldLoader((rs, adLanguage) -> "dummyFieldValue")
 				.keyColumn(true)
+				.sqlSelectValue(SqlSelectValue.builder()
+						.columnName("fieldName")
+						.columnNameAlias("fieldName")
+						.build())
 				.build();
 
 		return SqlViewBinding.builder()

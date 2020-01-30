@@ -3,6 +3,8 @@ package de.metas.ui.web.view.descriptor;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
+import javax.annotation.Nullable;
+
 import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
 import de.metas.ui.web.window.descriptor.sql.SqlEntityFieldBinding;
 import de.metas.ui.web.window.descriptor.sql.SqlOrderByValue;
@@ -63,16 +65,16 @@ public class SqlViewRowFieldBinding implements SqlEntityFieldBinding
 	@Builder
 	private SqlViewRowFieldBinding(
 			@NonNull final String fieldName,
-			final String columnName,
+			@Nullable final String columnName,
 			final boolean keyColumn,
 			@NonNull final DocumentFieldWidgetType widgetType,
 			final boolean virtualColumn,
 			//
-			final Class<?> sqlValueClass,
-			final SqlSelectValue sqlSelectValue,
-			final SqlSelectDisplayValue sqlSelectDisplayValue,
+			@Nullable final Class<?> sqlValueClass,
+			@NonNull final SqlSelectValue sqlSelectValue,
+			@Nullable final SqlSelectDisplayValue sqlSelectDisplayValue,
 			//
-			final SqlOrderByValue sqlOrderBy,
+			@Nullable final SqlOrderByValue sqlOrderBy,
 			@NonNull final SqlViewRowFieldLoader fieldLoader)
 	{
 		this.fieldName = fieldName;

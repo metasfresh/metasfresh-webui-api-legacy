@@ -48,6 +48,8 @@ import lombok.NonNull;
 @Component
 public class FacetsDocumentFilterDescriptorsProviderFactory implements DocumentFilterDescriptorsProviderFactory
 {
+	static final String FILTER_ID_PREFIX = "facet-";
+
 	private final IMsgBL msgBL = Services.get(IMsgBL.class);
 	private final IViewsRepository viewsRepository;
 
@@ -97,7 +99,7 @@ public class FacetsDocumentFilterDescriptorsProviderFactory implements DocumentF
 	{
 		final String tableName = I_C_Invoice_Candidate.Table_Name;
 		final String columnName = I_C_Invoice_Candidate.COLUMNNAME_C_Order_ID;
-		final String filterId = "facet-" + tableName + "-" + columnName;
+		final String filterId = FILTER_ID_PREFIX + tableName + "-" + columnName;
 
 		final DocumentFieldDescriptor fieldDescriptor = extractFieldDescriptorByName(fields, columnName);
 		final FacetsFilterLookupDescriptor lookupDescriptor = FacetsFilterLookupDescriptor.builder()
@@ -129,7 +131,7 @@ public class FacetsDocumentFilterDescriptorsProviderFactory implements DocumentF
 	{
 		final String tableName = I_C_Invoice_Candidate.Table_Name;
 		final String columnName = I_C_Invoice_Candidate.COLUMNNAME_M_InOut_ID;
-		final String filterId = "facet-" + tableName + "-" + columnName;
+		final String filterId = FILTER_ID_PREFIX + tableName + "-" + columnName;
 
 		final DocumentFieldDescriptor fieldDescriptor = extractFieldDescriptorByName(fields, columnName);
 		final FacetsFilterLookupDescriptor lookupDescriptor = FacetsFilterLookupDescriptor.builder()
@@ -161,7 +163,7 @@ public class FacetsDocumentFilterDescriptorsProviderFactory implements DocumentF
 	{
 		final String tableName = I_C_Invoice_Candidate.Table_Name;
 		final String columnName = I_C_Invoice_Candidate.COLUMNNAME_Bill_BPartner_ID;
-		final String filterId = "facet-" + tableName + "-" + columnName;
+		final String filterId = FILTER_ID_PREFIX + tableName + "-" + columnName;
 
 		final DocumentFieldDescriptor fieldDescriptor = extractFieldDescriptorByName(fields, columnName);
 		final FacetsFilterLookupDescriptor lookupDescriptor = FacetsFilterLookupDescriptor.builder()
@@ -193,7 +195,7 @@ public class FacetsDocumentFilterDescriptorsProviderFactory implements DocumentF
 	{
 		final String tableName = I_C_Invoice_Candidate.Table_Name;
 		final String columnName = I_C_Invoice_Candidate.COLUMNNAME_DeliveryDate;
-		final String filterId = "facet-" + tableName + "-" + columnName;
+		final String filterId = FILTER_ID_PREFIX + tableName + "-" + columnName;
 
 		final FacetsFilterLookupDescriptor lookupDescriptor = FacetsFilterLookupDescriptor.builder()
 				.viewsRepository(viewsRepository)
@@ -223,7 +225,7 @@ public class FacetsDocumentFilterDescriptorsProviderFactory implements DocumentF
 	{
 		final String tableName = I_C_Invoice_Candidate.Table_Name;
 		final String columnName = I_C_Invoice_Candidate.COLUMNNAME_IsSOTrx;
-		final String filterId = "facet-" + tableName + "-" + columnName;
+		final String filterId = FILTER_ID_PREFIX + tableName + "-" + columnName;
 
 		final FacetsFilterLookupDescriptor lookupDescriptor = FacetsFilterLookupDescriptor.builder()
 				.viewsRepository(viewsRepository)

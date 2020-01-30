@@ -2,7 +2,7 @@ package de.metas.ui.web.handlingunits;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 import javax.annotation.Nullable;
@@ -197,7 +197,7 @@ public abstract class HUEditorViewFactoryTemplate implements IViewFactory
 			sqlViewBinding.field(SqlViewRowFieldBinding.builder()
 					.fieldName(HUEditorRow.FIELDNAME_BestBeforeDate)
 					.widgetType(DocumentFieldWidgetType.LocalDate)
-//					.columnSql(sqlBestBeforeDate)
+					// .columnSql(sqlBestBeforeDate)
 					.sqlSelectValue(SqlSelectValue.builder()
 							.virtualColumnSql(sqlBestBeforeDate)
 							.columnNameAlias(HUEditorRow.FIELDNAME_BestBeforeDate)
@@ -211,10 +211,9 @@ public abstract class HUEditorViewFactoryTemplate implements IViewFactory
 		{
 			sqlViewBinding
 					.filterDescriptors(createFilterDescriptorsProvider())
-					.filterConverter(HUBarcodeSqlDocumentFilterConverter.FILTER_ID, HUBarcodeSqlDocumentFilterConverter.instance)
-					.filterConverter(HUIdsFilterHelper.FILTER_ID, HUIdsFilterHelper.SQL_DOCUMENT_FILTER_CONVERTER);
-
-			createFilterConvertersIndexedByFilterId().forEach(sqlViewBinding::filterConverter);
+					.filterConverter(HUBarcodeSqlDocumentFilterConverter.instance)
+					.filterConverter(HUIdsFilterHelper.SQL_DOCUMENT_FILTER_CONVERTER)
+					.filterConverters(createFilterConverters());
 		}
 
 		//
@@ -237,9 +236,9 @@ public abstract class HUEditorViewFactoryTemplate implements IViewFactory
 				.build();
 	}
 
-	protected Map<String, SqlDocumentFilterConverter> createFilterConvertersIndexedByFilterId()
+	protected List<SqlDocumentFilterConverter> createFilterConverters()
 	{
-		return ImmutableMap.of();
+		return ImmutableList.of();
 	}
 
 	@Override
@@ -404,7 +403,7 @@ public abstract class HUEditorViewFactoryTemplate implements IViewFactory
 	 */
 	private static final class HUBarcodeSqlDocumentFilterConverter implements SqlDocumentFilterConverter
 	{
-		public static final String FILTER_ID = "barcode";
+		private static final String FILTER_ID = "barcode";
 
 		public static final transient HUBarcodeSqlDocumentFilterConverter instance = new HUBarcodeSqlDocumentFilterConverter();
 
@@ -428,6 +427,12 @@ public abstract class HUEditorViewFactoryTemplate implements IViewFactory
 
 		private HUBarcodeSqlDocumentFilterConverter()
 		{
+		}
+
+		@Override
+		public boolean canConvert(final String filterId)
+		{
+			return Objects.equals(filterId, FILTER_ID);
 		}
 
 		@Override

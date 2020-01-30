@@ -32,7 +32,7 @@ import lombok.NonNull;
  * #L%
  */
 
-public class HUTraceResultExtender implements SqlDocumentFilterConverter
+final class HUTraceResultExtender implements SqlDocumentFilterConverter
 {
 	private static final String WHERE_IN_T_SELECTION = "(M_HU_Trace_ID IN (select T_Selection_ID from T_Selection where AD_PInstance_ID=%s))";
 
@@ -52,6 +52,12 @@ public class HUTraceResultExtender implements SqlDocumentFilterConverter
 	{
 		this.huTraceRepository = huTraceRepository;
 		this.converter = converter;
+	}
+
+	@Override
+	public boolean canConvert(final String filterId)
+	{
+		return true;
 	}
 
 	@Override

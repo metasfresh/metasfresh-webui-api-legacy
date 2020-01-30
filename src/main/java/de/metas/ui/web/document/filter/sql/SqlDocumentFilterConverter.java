@@ -42,9 +42,11 @@ import lombok.NonNull;
  * @author metas-dev <dev@metasfresh.com>
  *
  */
-@FunctionalInterface
 public interface SqlDocumentFilterConverter
 {
+	/** @return true if the filter identified by <code>filterId</code> can be converted to SQL by this converter */
+	boolean canConvert(final String filterId);
+
 	/**
 	 * Converts given <code>filter</code> to SQL and returns it.
 	 * In case the produced SQL requires parameters, those parameters will be added to <code>sqlParamsOut</code> parameter.

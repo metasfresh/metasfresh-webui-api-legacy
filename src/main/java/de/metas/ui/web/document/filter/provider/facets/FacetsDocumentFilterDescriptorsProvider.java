@@ -35,25 +35,25 @@ import lombok.Singular;
 
 public class FacetsDocumentFilterDescriptorsProvider implements DocumentFilterDescriptorsProvider
 {
-	private final ImmutableMap<String, DocumentFilterDescriptor> filterDescriptors;
+	private final ImmutableMap<String, DocumentFilterDescriptor> filterDescriptorsByFilterId;
 
 	@Builder
 	private FacetsDocumentFilterDescriptorsProvider(
 			@Singular final List<DocumentFilterDescriptor> filterDescriptors)
 	{
-		this.filterDescriptors = Maps.uniqueIndex(filterDescriptors, DocumentFilterDescriptor::getFilterId);
+		this.filterDescriptorsByFilterId = Maps.uniqueIndex(filterDescriptors, DocumentFilterDescriptor::getFilterId);
 	}
 
 	@Override
 	public Collection<DocumentFilterDescriptor> getAll()
 	{
-		return filterDescriptors.values();
+		return filterDescriptorsByFilterId.values();
 	}
 
 	@Override
 	public DocumentFilterDescriptor getByFilterIdOrNull(String filterId)
 	{
-		return filterDescriptors.get(filterId);
+		return filterDescriptorsByFilterId.get(filterId);
 	}
 
 }

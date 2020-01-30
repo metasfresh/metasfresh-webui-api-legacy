@@ -169,11 +169,11 @@ public class SqlViewSelectData
 	}
 
 	private static IStringExpression buildSqlSelect_WithoutGrouping(
-			final String sqlTableName,
-			final String sqlTableAlias,
-			final SqlViewKeyColumnNamesMap keyColumnNamesMap,
-			final Collection<String> displayFieldNames,
-			final Collection<SqlViewRowFieldBinding> allFields)
+			@NonNull final String sqlTableName,
+			@NonNull final String sqlTableAlias,
+			@NonNull final SqlViewKeyColumnNamesMap keyColumnNamesMap,
+			@NonNull final Collection<String> displayFieldNames,
+			@NonNull final Collection<SqlViewRowFieldBinding> allFields)
 	{
 		final List<String> sqlSelectValuesList = new ArrayList<>();
 		final List<IStringExpression> sqlSelectDisplayNamesList = new ArrayList<>();
