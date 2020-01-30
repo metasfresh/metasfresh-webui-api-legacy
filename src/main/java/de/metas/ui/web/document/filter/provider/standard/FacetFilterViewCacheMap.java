@@ -1,9 +1,10 @@
-package de.metas.ui.web.document.filter.provider.facets;
+package de.metas.ui.web.document.filter.provider.standard;
 
-import de.metas.ui.web.window.datatypes.LookupValuesList;
-import lombok.Builder;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
+
 import lombok.NonNull;
-import lombok.Value;
+import lombok.ToString;
 
 /*
  * #%L
@@ -27,13 +28,24 @@ import lombok.Value;
  * #L%
  */
 
-@Builder
-@Value
-public class FacetFilterViewCache
+@ToString
+public final class FacetFilterViewCacheMap
 {
-	@NonNull
-	String filterId;
+	public static FacetFilterViewCacheMap newInstance()
+	{
+		return new FacetFilterViewCacheMap();
+	}
 
-	@NonNull
-	LookupValuesList availableValues;
+	private final ConcurrentHashMap<String, FacetFilterViewCache> cachesById = new ConcurrentHashMap<>();
+
+	private FacetFilterViewCacheMap()
+	{
+	}
+
+	public FacetFilterViewCache computeIfAbsent(
+			@NonNull final String id,
+			@NonNull final Supplier<FacetFilterViewCache> supplier)
+	{
+		return cachesById.computeIfAbsent(id, k -> supplier.get());
+	}
 }

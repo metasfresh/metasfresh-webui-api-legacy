@@ -62,7 +62,7 @@ public final class DocumentFilterDescriptorsProvidersService
 			@Nullable final String tableName,
 			@NonNull final Collection<DocumentFieldDescriptor> fields)
 	{
-		final List<DocumentFilterDescriptorsProvider> providers = new ArrayList<>();
+		final ArrayList<DocumentFilterDescriptorsProvider> providers = new ArrayList<>();
 		for (DocumentFilterDescriptorsProviderFactory providerFactory : providerFactories)
 		{
 			final DocumentFilterDescriptorsProvider provider = providerFactory.createFiltersProvider(adTabId, tableName, fields);

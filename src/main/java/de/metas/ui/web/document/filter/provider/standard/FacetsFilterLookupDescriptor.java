@@ -1,4 +1,4 @@
-package de.metas.ui.web.document.filter.provider.facets;
+package de.metas.ui.web.document.filter.provider.standard;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -23,13 +23,14 @@ import de.metas.ui.web.window.datatypes.LookupValue;
 import de.metas.ui.web.window.datatypes.LookupValue.StringLookupValue;
 import de.metas.ui.web.window.datatypes.LookupValuesList;
 import de.metas.ui.web.window.datatypes.Values;
-import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
 import de.metas.ui.web.window.descriptor.LookupDescriptor;
 import de.metas.ui.web.window.descriptor.SimpleLookupDescriptorTemplate;
 import de.metas.ui.web.window.model.lookup.LookupDataSourceContext;
+import de.metas.util.Check;
 import de.metas.util.Services;
 import de.metas.util.StringUtils;
 import lombok.Builder;
+import lombok.Getter;
 import lombok.NonNull;
 
 /*
@@ -59,12 +60,14 @@ final class FacetsFilterLookupDescriptor extends SimpleLookupDescriptorTemplate
 	private final IMsgBL msgBL = Services.get(IMsgBL.class);
 	private final IViewsRepository viewsRepository;
 
+	@Getter
 	private final String filterId;
+	@Getter
 	private final String fieldName;
-	private final DocumentFieldWidgetType widgetType;
+	@Getter
+	private final boolean numericKey;
+	private final int maxFacetsToFetch;
 	private final LookupDescriptor fieldLookupDescriptor;
-
-	private static final int MAX_FACETS = 10;
 
 	@Builder
 	private FacetsFilterLookupDescriptor(
@@ -72,14 +75,18 @@ final class FacetsFilterLookupDescriptor extends SimpleLookupDescriptorTemplate
 			//
 			@NonNull final String filterId,
 			@NonNull final String fieldName,
-			@NonNull final DocumentFieldWidgetType widgetType,
+			final boolean numericKey,
+			final int maxFacetsToFetch,
 			@Nullable final LookupDescriptor fieldLookupDescriptor)
 	{
+		Check.assumeGreaterThanZero(maxFacetsToFetch, "maxFacetsToFetch");
+		
 		this.viewsRepository = viewsRepository;
 
 		this.filterId = filterId;
 		this.fieldName = fieldName;
-		this.widgetType = widgetType;
+		this.numericKey = numericKey;
+		this.maxFacetsToFetch = maxFacetsToFetch;
 		this.fieldLookupDescriptor = fieldLookupDescriptor;
 	}
 
@@ -87,23 +94,6 @@ final class FacetsFilterLookupDescriptor extends SimpleLookupDescriptorTemplate
 	public Optional<String> getLookupTableName()
 	{
 		return fieldLookupDescriptor.getLookupDataSourceFetcher().getLookupTableName();
-	}
-
-	@Override
-	public boolean isNumericKey()
-	{
-		if (widgetType.isLookup())
-		{
-			return fieldLookupDescriptor.isNumericKey();
-		}
-		else if (widgetType.isNumeric())
-		{
-			return true;
-		}
-		else
-		{
-			return false;
-		}
 	}
 
 	@Override
@@ -162,7 +152,7 @@ final class FacetsFilterLookupDescriptor extends SimpleLookupDescriptorTemplate
 				viewEvalCtx,
 				selectionId,
 				fieldName,
-				MAX_FACETS);
+				maxFacetsToFetch);
 
 		final LookupValuesList availableValues = fieldValues.stream()
 				.map(this::convertRawFieldValueToLookupValue)
