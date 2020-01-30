@@ -40,16 +40,12 @@ import de.metas.process.Param;
 import de.metas.process.ProcessPreconditionsResolution;
 import de.metas.ui.web.process.descriptor.ProcessParamLookupValuesProvider;
 import de.metas.ui.web.window.datatypes.LookupValuesList;
-import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
 import de.metas.ui.web.window.descriptor.DocumentLayoutElementFieldDescriptor;
-import de.metas.ui.web.window.descriptor.LookupDescriptor;
-import de.metas.ui.web.window.descriptor.sql.SqlLookupDescriptor;
 import de.metas.ui.web.window.model.lookup.LookupDataSourceFactory;
 import de.metas.util.Services;
 import lombok.NonNull;
 import org.adempiere.util.lang.impl.TableRecordReference;
 import org.compiere.model.I_C_Payment;
-import org.compiere.util.DisplayType;
 
 import java.math.BigDecimal;
 import java.util.Set;
@@ -119,14 +115,7 @@ public class C_BankStatement_AddBpartnerAndPayment extends JavaProcess implement
 
 		final ImmutableSet<PaymentId> paymentIds = Services.get(IPaymentDAO.class).retrieveAllMatchingPayments(isReceipt, paymentAmount, currencyId, bPartnerId);
 
-		final LookupDescriptor paymentByIdLookupDescriptor = SqlLookupDescriptor.builder()
-				.setCtxTableName(I_C_Payment.Table_Name)
-				.setCtxColumnName(I_C_Payment.COLUMNNAME_C_Payment_ID)
-				.setDisplayType(DisplayType.Search)
-				.setWidgetType(DocumentFieldWidgetType.Lookup)
-				.buildForDefaultScope();
-
-		return LookupDataSourceFactory.instance.getLookupDataSource(paymentByIdLookupDescriptor).findByIdsOrdered(paymentIds);
+		return LookupDataSourceFactory.instance.searchInTableLookup(I_C_Payment.Table_Name).findByIdsOrdered(paymentIds);
 	}
 
 	@Override
