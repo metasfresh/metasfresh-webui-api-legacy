@@ -424,7 +424,7 @@ public class SqlDocumentQueryBuilder
 				{
 					if (!firstRecord)
 					{
-						sqlWhereClauseBuilder.append(" OR ");
+						sqlWhereClauseBuilder.append("\n OR ");
 					}
 
 					if (appendParentheses)
@@ -433,10 +433,20 @@ public class SqlDocumentQueryBuilder
 					}
 
 					final Map<String, Object> keyColumnName2value = extractComposedKey(recordId, keyFields);
-					keyColumnName2value.forEach((keyColumnName, value) -> {
-						sqlWhereClauseBuilder.appendIfNotEmpty("\n AND ");
+					boolean firstKeyPart = true;
+					for (final Map.Entry<String, Object> keyPart : keyColumnName2value.entrySet())
+					{
+						if (!firstKeyPart)
+						{
+							sqlWhereClauseBuilder.append(" AND ");
+						}
+
+						final String keyColumnName = keyPart.getKey();
+						final Object value = keyPart.getValue();
 						sqlWhereClauseBuilder.append(" ").append(keyColumnName).append("=").append(sqlParams.placeholder(value));
-					});
+
+						firstKeyPart = false;
+					}
 
 					if (appendParentheses)
 					{
@@ -445,6 +455,8 @@ public class SqlDocumentQueryBuilder
 
 					firstRecord = false;
 				}
+
+				sqlWhereClauseBuilder.append(")");
 			}
 		}
 
