@@ -31,6 +31,7 @@ import de.metas.bpartner.BPartnerId;
 import de.metas.document.engine.DocStatus;
 import de.metas.i18n.IMsgBL;
 import de.metas.money.CurrencyId;
+import de.metas.money.Money;
 import de.metas.payment.PaymentId;
 import de.metas.payment.api.IPaymentDAO;
 import de.metas.process.IProcessPrecondition;
@@ -112,8 +113,9 @@ public class C_BankStatement_AddBpartnerAndPayment extends JavaProcess implement
 		final CurrencyId currencyId = CurrencyId.ofRepoId(line.getC_Currency_ID());
 		final boolean isReceipt = line.getStmtAmt().signum() >= 0;
 		final BigDecimal paymentAmount = isReceipt ? line.getStmtAmt() : line.getStmtAmt().negate();
+		final Money money = Money.of(paymentAmount, currencyId);
 
-		final ImmutableSet<PaymentId> paymentIds = Services.get(IPaymentDAO.class).retrieveAllMatchingPayments(isReceipt, paymentAmount, currencyId, bPartnerId);
+		final ImmutableSet<PaymentId> paymentIds = Services.get(IPaymentDAO.class).retrieveAllMatchingPayments(isReceipt, bPartnerId, money);
 
 		return LookupDataSourceFactory.instance.searchInTableLookup(I_C_Payment.Table_Name).findByIdsOrdered(paymentIds);
 	}
