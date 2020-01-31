@@ -60,6 +60,8 @@ public class GeoLocationDocumentService implements DocumentFilterDescriptorsProv
 {
 	private final transient IMsgBL msgBL = Services.get(IMsgBL.class);
 
+	private static final int SORT_NO = 40000;
+
 	private static final String MSG_FILTER_CAPTION = "LocationAreaSearch";
 
 	private static final GeoLocationDocumentDescriptor DESCRIPTOR_FOR_LocationId = GeoLocationDocumentDescriptor.builder()
@@ -77,12 +79,6 @@ public class GeoLocationDocumentService implements DocumentFilterDescriptorsProv
 
 	public GeoLocationDocumentService()
 	{
-	}
-
-	@Override
-	public int getOrder()
-	{
-		return 30;
 	}
 
 	@Override
@@ -164,6 +160,7 @@ public class GeoLocationDocumentService implements DocumentFilterDescriptorsProv
 
 		return DocumentFilterDescriptor.builder()
 				.setFilterId(GeoLocationFilterConverter.FILTER_ID)
+				.setSortNo(SORT_NO)
 				.setDisplayName(caption)
 				//
 				.addParameter(DocumentFilterParamDescriptor.builder()

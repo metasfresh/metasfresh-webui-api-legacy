@@ -2,6 +2,7 @@ package de.metas.ui.web.view.descriptor;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -136,7 +137,7 @@ public class ViewLayout implements ETagAware
 
 		elements = ImmutableList.copyOf(builder.buildElements());
 
-		filters = ImmutableList.copyOf(builder.getFilters());
+		filters = builder.getFilters();
 
 		defaultOrderBys = builder.getDefaultOrderBys();
 
@@ -552,6 +553,12 @@ public class ViewLayout implements ETagAware
 
 	}
 
+	//
+	//
+	// -----------------------------------------------------------------
+	//
+	//
+
 	public static final class Builder
 	{
 		private WindowId windowId;
@@ -726,13 +733,18 @@ public class ViewLayout implements ETagAware
 			return elementBuilders;
 		}
 
-		private Collection<DocumentFilterDescriptor> getFilters()
+		private ImmutableList<DocumentFilterDescriptor> getFilters()
 		{
 			if (filters == null || filters.isEmpty())
 			{
 				return ImmutableList.of();
 			}
-			return filters;
+			else
+			{
+				return filters.stream()
+						.sorted(Comparator.comparing(DocumentFilterDescriptor::getSortNo))
+						.collect(ImmutableList.toImmutableList());
+			}
 		}
 
 		public Builder setFilters(final Collection<DocumentFilterDescriptor> filters)

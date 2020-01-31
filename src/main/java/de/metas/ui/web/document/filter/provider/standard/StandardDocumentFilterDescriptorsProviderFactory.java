@@ -62,24 +62,21 @@ public class StandardDocumentFilterDescriptorsProviderFactory implements Documen
 	private final IMsgBL msgBL = Services.get(IMsgBL.class);
 	private final IViewsRepository viewsRepository;
 
+	private static final String FILTER_ID_DefaultDate = "default-date";
+	private static final int SORT_NO_DefaultDate = Integer.MIN_VALUE;
+
 	private static final String FILTER_ID_Default = "default";
 	private static final String MSG_DefaultFilterName = "default";
-
-	private static final String FILTER_ID_DefaultDate = "default-date";
+	private static final int SORT_NO_Default = 10000;
 
 	private static final String FACET_FILTER_ID_PREFIX = "facet-";
 	private static final String SYSCONFIG_MAX_FACETS_TO_FETCH = "webui.document.filters.MaxFacetsToFetch";
 	private static final int SYSCONFIG_FACETS_TO_FETCH_DEFAULT = 10;
+	private static final int SORT_NO_Facets = Integer.MAX_VALUE / 10000 * 10000;
 
 	public StandardDocumentFilterDescriptorsProviderFactory(@NonNull final IViewsRepository viewsRepository)
 	{
 		this.viewsRepository = viewsRepository;
-	}
-
-	@Override
-	public int getOrder()
-	{
-		return HIGHEST_PRECEDENCE;
 	}
 
 	/**
@@ -120,6 +117,7 @@ public class StandardDocumentFilterDescriptorsProviderFactory implements Documen
 			{
 				defaultDateFilter = DocumentFilterDescriptor.builder()
 						.setFilterId(FILTER_ID_DefaultDate)
+						.setSortNo(SORT_NO_DefaultDate)
 						.setFrequentUsed(true)
 						.setDisplayName(filterParam.getDisplayName())
 						.addParameter(filterParam)
@@ -131,6 +129,7 @@ public class StandardDocumentFilterDescriptorsProviderFactory implements Documen
 				{
 					defaultFilterBuilder = DocumentFilterDescriptor.builder()
 							.setFilterId(FILTER_ID_Default)
+							.setSortNo(SORT_NO_Default)
 							.setDisplayName(msgBL.getTranslatableMsgText(MSG_DefaultFilterName))
 							.setFrequentUsed(false);
 				}
@@ -143,7 +142,8 @@ public class StandardDocumentFilterDescriptorsProviderFactory implements Documen
 		final ArrayList<DocumentFilterDescriptor> facetFilters = new ArrayList<>();
 		for (DocumentFieldDescriptor field : fieldsForFacetFiltering)
 		{
-			final DocumentFilterDescriptor facetFilter = createFacetFilter(field);
+			final int sortNo = facetFilters.size() + 1;
+			final DocumentFilterDescriptor facetFilter = createFacetFilter(field, sortNo);
 			facetFilters.add(facetFilter);
 		}
 
@@ -208,12 +208,13 @@ public class StandardDocumentFilterDescriptorsProviderFactory implements Documen
 		}
 	}
 
-	private DocumentFilterDescriptor createFacetFilter(@NonNull final DocumentFieldDescriptor field)
+	private DocumentFilterDescriptor createFacetFilter(@NonNull final DocumentFieldDescriptor field, final int sortNo)
 	{
 		final FacetsFilterLookupDescriptor facetsLookupDescriptor = createFacetsFilterLookupDescriptor(field);
 
 		return DocumentFilterDescriptor.builder()
 				.setFilterId(facetsLookupDescriptor.getFilterId())
+				.setSortNo(SORT_NO_Facets + sortNo)
 				.setFrequentUsed(true)
 				.setParametersLayoutType(PanelLayoutType.Panel)
 				.setDisplayName(field.getCaption())

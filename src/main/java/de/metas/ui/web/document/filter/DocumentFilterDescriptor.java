@@ -60,6 +60,8 @@ public final class DocumentFilterDescriptor
 
 	@Getter
 	private final String filterId;
+	@Getter
+	private final int sortNo;
 	private final ITranslatableString displayNameTrls;
 
 	/**
@@ -93,6 +95,8 @@ public final class DocumentFilterDescriptor
 	{
 		filterId = builder.filterId;
 		Check.assumeNotEmpty(filterId, "filterId is not empty");
+
+		sortNo = builder.sortNo;
 
 		displayNameTrls = builder.getDisplayNameTrls();
 		Check.assumeNotNull(displayNameTrls, "Parameter displayNameTrls is not null");
@@ -154,6 +158,7 @@ public final class DocumentFilterDescriptor
 	public static final class Builder
 	{
 		private String filterId;
+		private int sortNo;
 		private ITranslatableString displayNameTrls;
 		private boolean frequentUsed;
 
@@ -202,6 +207,12 @@ public final class DocumentFilterDescriptor
 		public Builder setFilterId(final String filterId)
 		{
 			this.filterId = filterId;
+			return this;
+		}
+
+		public Builder setSortNo(final int sortNo)
+		{
+			this.sortNo = sortNo;
 			return this;
 		}
 
