@@ -555,21 +555,18 @@ public final class SqlViewSelectionQueryBuilder
 			for (final DocumentQueryOrderBy orderBy : orderBysEffective.toList())
 			{
 				final String fieldName = orderBy.getFieldName();
-				if (!addedFieldNames.add(fieldName))
-				{
-					continue;
-				}
 
 				final SqlSelectDisplayValue sqlSelectDisplayValue = getSqlSelectDisplayValue(fieldName);
-				if (sqlSelectDisplayValue != null)
+				if (sqlSelectDisplayValue != null && addedFieldNames.add(sqlSelectDisplayValue.getColumnNameAlias()))
 				{
 					sqlSourceTableBuilder.append("\n, ").append(sqlSelectDisplayValue
 							.withJoinOnTableNameOrAlias(getTableName())
 							.toSqlStringWithColumnNameAlias(viewEvalCtx.toEvaluatee()));
 				}
-				else
+
+				final SqlSelectValue sqlSelectValue = getSqlSelectValue(fieldName);
+				if (sqlSelectValue != null && addedFieldNames.add(sqlSelectValue.getColumnNameAlias()))
 				{
-					final SqlSelectValue sqlSelectValue = getSqlSelectValue(fieldName);
 					sqlSourceTableBuilder.append("\n, ").append(sqlSelectValue
 							.withJoinOnTableNameOrAlias(getTableName())
 							.toSqlStringWithColumnNameAlias());
