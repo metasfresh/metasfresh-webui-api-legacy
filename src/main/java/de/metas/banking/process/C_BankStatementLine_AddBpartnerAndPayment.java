@@ -51,7 +51,7 @@ import org.compiere.model.I_C_Payment;
 import java.math.BigDecimal;
 import java.util.Set;
 
-public class C_BankStatement_AddBpartnerAndPayment extends JavaProcess implements IProcessPrecondition
+public class C_BankStatementLine_AddBpartnerAndPayment extends JavaProcess implements IProcessPrecondition
 {
 	public static final String BANK_STATEMENT_MUST_BE_COMPLETED_OR_IN_PROGRESS_MSG = "de.metas.banking.process.C_BankStatement_AddBpartnerAndPayment.BankStatement_must_be_Completed_or_In_Progress";
 	public static final String A_SINGLE_LINE_SHOULD_BE_SELECTED_MSG = "de.metas.banking.process.C_BankStatement_AddBpartnerAndPayment.A_single_line_should_be_selected";

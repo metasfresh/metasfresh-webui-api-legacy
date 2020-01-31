@@ -43,7 +43,7 @@ import lombok.NonNull;
 import org.adempiere.exceptions.AdempiereException;
 import org.compiere.SpringContextHolder;
 
-public class C_BankStatementLine_AllocatePayment extends JavaProcess implements IProcessPrecondition
+public class C_BankStatement_AllocatePayment extends JavaProcess implements IProcessPrecondition
 {
 	private final static String BANK_STATEMENT_MUST_BE_COMPLETED_MSG = "de.metas.banking.process.C_BankStatementLine_AllocatePayment.Bank_Statement_has_to_be_Completed";
 
