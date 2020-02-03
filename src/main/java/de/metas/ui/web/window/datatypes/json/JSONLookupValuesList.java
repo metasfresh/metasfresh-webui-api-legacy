@@ -1,6 +1,5 @@
 package de.metas.ui.web.window.datatypes.json;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -27,6 +26,7 @@ import de.metas.ui.web.window.datatypes.LookupValue;
 import de.metas.ui.web.window.datatypes.LookupValuesList;
 import de.metas.util.GuavaCollectors;
 import io.swagger.annotations.ApiModel;
+import lombok.EqualsAndHashCode;
 import lombok.NonNull;
 
 /*
@@ -52,8 +52,8 @@ import lombok.NonNull;
  */
 
 @ApiModel(value = "lookup-values-list", description = "[ { field : value} ]")
-@SuppressWarnings("serial")
-public class JSONLookupValuesList implements Serializable
+@EqualsAndHashCode
+public class JSONLookupValuesList
 {
 	public static final JSONLookupValuesList ofLookupValuesList(@Nullable final LookupValuesList lookupValues, @NonNull final String adLanguage)
 	{
