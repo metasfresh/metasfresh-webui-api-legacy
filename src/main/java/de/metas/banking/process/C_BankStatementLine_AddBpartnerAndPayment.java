@@ -127,13 +127,14 @@ public class C_BankStatementLine_AddBpartnerAndPayment extends JavaProcess imple
 	@Override
 	protected String doIt() throws Exception
 	{
-		doIt(getSelectedBankStatementLine(), paymentId);
+		doIt(getSelectedBankStatementLine(), paymentId, bPartnerId);
 
 		return MSG_OK;
 	}
 
-	private void doIt(final I_C_BankStatementLine bankStatementLine, final PaymentId paymentId)
+	private void doIt(final I_C_BankStatementLine bankStatementLine, final PaymentId paymentId, final BPartnerId bPartnerId)
 	{
+		bankStatementLine.setC_BPartner_ID(bPartnerId.getRepoId());
 		final IBankStatmentPaymentBL bankStatementPaymentBL = Services.get(IBankStatmentPaymentBL.class);
 		bankStatementPaymentBL.setOrCreateAndLinkPaymentToBankStatementLine(bankStatementLine, paymentId);
 	}
@@ -143,5 +144,4 @@ public class C_BankStatementLine_AddBpartnerAndPayment extends JavaProcess imple
 		final Integer lineId = getSelectedIncludedRecordIds(I_C_BankStatementLine.class).iterator().next();
 		return bankStatementDAO.getLineById(lineId);
 	}
-
 }
