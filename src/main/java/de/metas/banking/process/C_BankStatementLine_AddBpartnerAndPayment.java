@@ -25,7 +25,7 @@ package de.metas.banking.process;
 import com.google.common.collect.ImmutableSet;
 import de.metas.banking.model.I_C_BankStatement;
 import de.metas.banking.model.I_C_BankStatementLine;
-import de.metas.banking.service.IBankStatementBL;
+import de.metas.banking.payment.IBankStatmentPaymentBL;
 import de.metas.banking.service.IBankStatementDAO;
 import de.metas.bpartner.BPartnerId;
 import de.metas.document.engine.DocStatus;
@@ -134,8 +134,8 @@ public class C_BankStatementLine_AddBpartnerAndPayment extends JavaProcess imple
 
 	private void doIt(final I_C_BankStatementLine bankStatementLine, final PaymentId paymentId)
 	{
-		final IBankStatementBL bankStatementBL = Services.get(IBankStatementBL.class);
-		bankStatementBL.setOrCreateAndLinkPaymentToBankStatementLine(bankStatementLine, paymentId);
+		final IBankStatmentPaymentBL bankStatementPaymentBL = Services.get(IBankStatmentPaymentBL.class);
+		bankStatementPaymentBL.setOrCreateAndLinkPaymentToBankStatementLine(bankStatementLine, paymentId);
 	}
 
 	private I_C_BankStatementLine getSelectedBankStatementLine()
