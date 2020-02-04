@@ -112,10 +112,6 @@ public class StandardDocumentFilterDescriptorsProviderFactory implements Documen
 		for (final DocumentFieldDescriptor field : fieldsForDefaultFiltering)
 		{
 			final DocumentFilterParamDescriptor.Builder filterParam = createFilterParam(field);
-			if (filterParam.getWidgetType() == DocumentFieldWidgetType.Timestamp)
-			{
-				filterParam.setWidgetType(DocumentFieldWidgetType.LocalDate);
-			}
 
 			if (defaultDateFilter == null && filterParam.getWidgetType().isDateOrTime())
 			{
@@ -204,6 +200,12 @@ public class StandardDocumentFilterDescriptorsProviderFactory implements Documen
 		final DocumentFieldWidgetType widgetType = field.getWidgetType();
 		if (widgetType == DocumentFieldWidgetType.ZonedDateTime)
 		{
+			// frontend cannot handle ZonedDateTime filter params
+			return DocumentFieldWidgetType.LocalDate;
+		}
+		if (widgetType == DocumentFieldWidgetType.Timestamp)
+		{
+			// frontend cannot handle Timestamp filter params
 			return DocumentFieldWidgetType.LocalDate;
 		}
 		else
