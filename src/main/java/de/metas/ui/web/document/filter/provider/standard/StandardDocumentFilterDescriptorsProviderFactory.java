@@ -227,6 +227,7 @@ public class StandardDocumentFilterDescriptorsProviderFactory implements Documen
 				.setFacetFilter(true)
 				.addParameter(DocumentFilterParamDescriptor.builder()
 						.setFieldName(facetsLookupDescriptor.getFieldName())
+						.setOperator(Operator.IN_ARRAY)
 						.setDisplayName(field.getCaption())
 						.setMandatory(true)
 						.setWidgetType(DocumentFieldWidgetType.List) // TODO: use some multivalues
