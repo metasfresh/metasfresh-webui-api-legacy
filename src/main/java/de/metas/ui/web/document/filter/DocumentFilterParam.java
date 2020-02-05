@@ -191,7 +191,8 @@ public final class DocumentFilterParam
 		}
 		else
 		{
-			throw new AdempiereException("Cannot convert value to Collection<?>: " + value + " (" + value.getClass() + ")");
+			return ImmutableList.of(value);
+			// throw new AdempiereException("Cannot convert value to Collection<?>: " + value + " (" + value.getClass() + ")");
 		}
 	}
 
