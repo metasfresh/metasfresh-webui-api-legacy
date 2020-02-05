@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
 import de.metas.ui.web.window.datatypes.LookupValue;
+import de.metas.ui.web.window.datatypes.LookupValue.StringLookupValue;
 import de.metas.ui.web.window.datatypes.LookupValuesList;
 import de.metas.util.GuavaCollectors;
 import io.swagger.annotations.ApiModel;
@@ -99,6 +100,16 @@ public class JSONLookupValuesList
 	{
 		@SuppressWarnings("unchecked")
 		final List<Object> values = (List<Object>)map.get("values");
+
+		//
+		// Corner case: the `map` it's just a single lookup value
+		if (values == null
+				&& map.get(JSONLookupValue.PROPERTY_Key) != null)
+		{
+			final StringLookupValue lookupValue = JSONLookupValue.stringLookupValueFromJsonMap(map);
+			return LookupValuesList.fromNullable(lookupValue);
+		}
+
 		if (values == null || values.isEmpty())
 		{
 			return LookupValuesList.EMPTY;

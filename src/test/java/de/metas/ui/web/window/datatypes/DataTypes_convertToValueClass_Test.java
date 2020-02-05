@@ -86,4 +86,22 @@ public class DataTypes_convertToValueClass_Test
 						StringLookupValue.of("k1", "value1"),
 						StringLookupValue.of("k2", "value2"))));
 	}
+
+	@Test
+	public void test_From_OneMap_to_LookupValuesList()
+	{
+		final String fieldName = "MyMultiValueParam";
+		final DocumentFieldWidgetType widgetType = DocumentFieldWidgetType.MultiValuesList;
+		final Class<?> targetType = widgetType.getValueClass();
+		final LookupValueByIdSupplier lookupDataSource = null;
+
+		final ImmutableMap<String, Object> value = ImmutableMap.of("key", "k1", "caption", "value1");
+
+		final Object valueConverted = DataTypes.convertToValueClass(fieldName, value, widgetType, targetType, lookupDataSource);
+
+		assertThat(valueConverted).isEqualTo(
+				LookupValuesList.fromCollection(ImmutableList.of(
+						StringLookupValue.of("k1", "value1"))));
+	}
+
 }
