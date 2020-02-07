@@ -415,8 +415,12 @@ public class SqlDocumentQueryBuilder
 			// Composed primary key
 			else
 			{
-				sqlWhereClauseBuilder.appendIfNotEmpty("\n /* key */ AND ");
-				sqlWhereClauseBuilder.append("(");
+				final boolean parenthesesRequired = !sqlWhereClauseBuilder.isEmpty();
+
+				if (parenthesesRequired)
+				{
+					sqlWhereClauseBuilder.append(" AND ( ");
+				}
 
 				boolean firstRecord = true;
 				final boolean appendParentheses = recordIds.size() > 1;
@@ -456,7 +460,10 @@ public class SqlDocumentQueryBuilder
 					firstRecord = false;
 				}
 
-				sqlWhereClauseBuilder.append(")");
+				if (parenthesesRequired)
+				{
+					sqlWhereClauseBuilder.append(")");
+				}
 			}
 		}
 
