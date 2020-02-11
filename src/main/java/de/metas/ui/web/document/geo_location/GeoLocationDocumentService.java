@@ -63,7 +63,7 @@ public class GeoLocationDocumentService implements DocumentFilterDescriptorsProv
 	private final transient ISysConfigBL sysConfigBL = Services.get(ISysConfigBL.class);
 
 	private static final String MSG_FILTER_CAPTION = "LocationAreaSearch";
-	private static final String SYS_CONFIG_DISABLE_GEO_LOCATION_SEARCH = "de.metas.ui.web.document.geo_location.filter_disabled";
+	private static final String SYS_CONFIG_ENABLE_GEO_LOCATION_SEARCH = "de.metas.ui.web.document.geo_location.filter_enabled";
 
 	private static final GeoLocationDocumentDescriptor DESCRIPTOR_FOR_LocationId = GeoLocationDocumentDescriptor.builder()
 			.type(LocationColumnNameType.LocationId)
@@ -125,7 +125,7 @@ public class GeoLocationDocumentService implements DocumentFilterDescriptorsProv
 	}
 
 	public boolean isActive() {
-		return !sysConfigBL.getBooleanValue(SYS_CONFIG_DISABLE_GEO_LOCATION_SEARCH, Boolean.FALSE);
+		return sysConfigBL.getBooleanValue(SYS_CONFIG_ENABLE_GEO_LOCATION_SEARCH, Boolean.TRUE);
 	}
 
 	@Nullable
