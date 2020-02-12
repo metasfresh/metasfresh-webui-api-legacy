@@ -230,7 +230,7 @@ public class StandardDocumentFilterDescriptorsProviderFactory implements Documen
 						.setOperator(Operator.IN_ARRAY)
 						.setDisplayName(field.getCaption())
 						.setMandatory(true)
-						.setWidgetType(DocumentFieldWidgetType.List) // TODO: use some multivalues
+						.setWidgetType(DocumentFieldWidgetType.MultiValuesList)
 						.setLookupDescriptor(facetsLookupDescriptor))
 				.build();
 	}

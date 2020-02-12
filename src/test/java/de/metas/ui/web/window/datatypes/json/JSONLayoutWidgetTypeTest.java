@@ -33,7 +33,10 @@ public class JSONLayoutWidgetTypeTest
 	public void test_fromNullable_fullyCovered()
 	{
 		final boolean checkAlreadyMatchedValues = false; // because ZonedDateTime is mapped to same JSONLayoutWidgetType as DateTime
-		EnumTestUtils.assertMappingFullyCovered(DocumentFieldWidgetType.values(), JSONLayoutWidgetType::fromNullable, checkAlreadyMatchedValues);
+		EnumTestUtils.assertMappingFullyCovered(
+				DocumentFieldWidgetType.values(),
+				JSONLayoutWidgetType::fromNullable,
+				checkAlreadyMatchedValues);
 	}
 
 }
