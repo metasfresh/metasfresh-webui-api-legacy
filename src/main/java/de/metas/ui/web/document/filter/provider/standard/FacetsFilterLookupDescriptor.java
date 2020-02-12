@@ -11,6 +11,7 @@ import org.adempiere.exceptions.AdempiereException;
 import org.compiere.util.DisplayType;
 
 import com.google.common.base.Predicates;
+import com.google.common.collect.ImmutableList;
 
 import de.metas.i18n.IMsgBL;
 import de.metas.i18n.TranslatableStrings;
@@ -23,6 +24,7 @@ import de.metas.ui.web.window.datatypes.LookupValue;
 import de.metas.ui.web.window.datatypes.LookupValue.StringLookupValue;
 import de.metas.ui.web.window.datatypes.LookupValuesList;
 import de.metas.ui.web.window.datatypes.Values;
+import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
 import de.metas.ui.web.window.descriptor.LookupDescriptor;
 import de.metas.ui.web.window.descriptor.SimpleLookupDescriptorTemplate;
 import de.metas.ui.web.window.model.lookup.LookupDataSourceContext;
@@ -64,6 +66,7 @@ final class FacetsFilterLookupDescriptor extends SimpleLookupDescriptorTemplate
 	private final String filterId;
 	@Getter
 	private final String fieldName;
+	private final DocumentFieldWidgetType fieldWidgetType;
 	@Getter
 	private final boolean numericKey;
 	private final int maxFacetsToFetch;
@@ -75,16 +78,18 @@ final class FacetsFilterLookupDescriptor extends SimpleLookupDescriptorTemplate
 			//
 			@NonNull final String filterId,
 			@NonNull final String fieldName,
+			@NonNull final DocumentFieldWidgetType fieldWidgetType,
 			final boolean numericKey,
 			final int maxFacetsToFetch,
 			@Nullable final LookupDescriptor fieldLookupDescriptor)
 	{
 		Check.assumeGreaterThanZero(maxFacetsToFetch, "maxFacetsToFetch");
-		
+
 		this.viewsRepository = viewsRepository;
 
 		this.filterId = filterId;
 		this.fieldName = fieldName;
+		this.fieldWidgetType = fieldWidgetType;
 		this.numericKey = numericKey;
 		this.maxFacetsToFetch = maxFacetsToFetch;
 		this.fieldLookupDescriptor = fieldLookupDescriptor;
@@ -148,21 +153,34 @@ final class FacetsFilterLookupDescriptor extends SimpleLookupDescriptorTemplate
 		final ViewEvaluationCtx viewEvalCtx = view.getViewEvaluationCtx();
 		final String selectionId = view.getDefaultSelectionBeforeFacetsFiltering().getSelectionId();
 
-		final List<Object> fieldValues = viewDataRepository.retrieveFieldValues(
+		List<Object> rawValues = viewDataRepository.retrieveFieldValues(
 				viewEvalCtx,
 				selectionId,
 				fieldName,
 				maxFacetsToFetch);
 
-		final LookupValuesList availableValues = fieldValues.stream()
+		boolean valuesAreOrdered = false;
+		if (fieldWidgetType.isDateOrTime()
+				|| fieldWidgetType.isNumeric())
+		{
+			// in case of date/time/numeric fields we shall order them by their value
+			// and not alphabetically by their string representation
+			rawValues = rawValues.stream()
+					.sorted()
+					.collect(ImmutableList.toImmutableList());
+			valuesAreOrdered = true;
+		}
+
+		final LookupValuesList lookupValues = rawValues.stream()
 				.map(this::convertRawFieldValueToLookupValue)
 				.filter(Predicates.notNull())
 				.distinct()
-				.collect(LookupValuesList.collect());
+				.collect(LookupValuesList.collect())
+				.ordered(valuesAreOrdered);
 
 		return FacetFilterViewCache.builder()
 				.filterId(filterId)
-				.availableValues(availableValues)
+				.availableValues(lookupValues)
 				.build();
 	}
 

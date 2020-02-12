@@ -258,6 +258,7 @@ public class StandardDocumentFilterDescriptorsProviderFactory implements Documen
 				.viewsRepository(viewsRepository)
 				.filterId(filterId)
 				.fieldName(columnName)
+				.fieldWidgetType(fieldWidgetType)
 				.numericKey(numericKey)
 				.maxFacetsToFetch(fieldFilteringInfo.getMaxFacetsToFetch().orElse(getMaxFacetsToFetch()))
 				.fieldLookupDescriptor(fieldLookupDescriptor)
