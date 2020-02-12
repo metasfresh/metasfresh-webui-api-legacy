@@ -12,6 +12,7 @@ import com.google.common.collect.ImmutableSet;
 
 import de.metas.ui.web.document.filter.DocumentFilterParam.Operator;
 import de.metas.ui.web.window.datatypes.LookupValue.StringLookupValue;
+import de.metas.ui.web.window.datatypes.LookupValuesList;
 
 /*
  * #%L
@@ -113,8 +114,23 @@ public class DocumentFilterParamTest
 			assertThat(newParam(value).getValueAsCollection()).isSameAs(value);
 		}
 
+		/**
+		 * Needed for widget types like MultiListValue.
+		 */
+		@Test
+		public void fromLookupValuesList()
+		{
+			final DocumentFilterParam param = newParam(LookupValuesList.fromCollection(ImmutableList.of(
+					StringLookupValue.of("id1", "displayName1"),
+					StringLookupValue.of("id2", "displayName2"))));
+
+			assertThat(param.getValueAsCollection().toArray()).containsExactly(
+					StringLookupValue.of("id1", "displayName1"),
+					StringLookupValue.of("id2", "displayName2"));
+		}
+
 		@Nested
-		public class fromNonCollectionValue
+		public class fromSomethingWhichCannotBeConvertedToCollection
 		{
 			private void test(final Object value)
 			{
