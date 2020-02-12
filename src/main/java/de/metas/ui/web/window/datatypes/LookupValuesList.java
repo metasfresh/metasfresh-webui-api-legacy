@@ -360,10 +360,16 @@ public final class LookupValuesList implements Iterable<LookupValue>
 	}
 
 	/** @see #isOrdered() */
+	public LookupValuesList ordered(final boolean ordered)
+	{
+		return this.ordered != ordered
+				? new LookupValuesList(valuesById, ordered, debugProperties)
+				: this;
+	}
+
+	/** @see #isOrdered() */
 	public LookupValuesList notOrdered()
 	{
-		return ordered
-				? new LookupValuesList(valuesById, !ordered, debugProperties)
-				: this;
+		return ordered(false);
 	}
 }
