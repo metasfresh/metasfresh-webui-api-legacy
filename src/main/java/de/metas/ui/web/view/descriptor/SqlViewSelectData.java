@@ -481,17 +481,27 @@ public class SqlViewSelectData
 
 		final CompositeStringExpression.Builder sqlExpression = IStringExpression.composer()
 				.append("SELECT DISTINCT ")
-				.append("\n ").append(sqlValue.withJoinOnTableNameOrAlias(sqlTableName).toSqlStringWithColumnNameAlias());
-
+				.append(sqlValue.getColumnNameAlias());
 		if (sqlDisplayValue != null)
 		{
-			sqlExpression.append("\n, ").append(sqlDisplayValue.withJoinOnTableNameOrAlias(sqlTableName).toStringExpressionWithColumnNameAlias());
+			sqlExpression.append(", ").append(sqlDisplayValue.getColumnNameAlias());
 		}
 
+		sqlExpression
+				.append("\n FROM (")
+				.append("\n SELECT ")
+				.append("\n ").append(sqlValue.withJoinOnTableNameOrAlias(sqlTableName).toSqlStringWithColumnNameAlias());
+		if (sqlDisplayValue != null)
+		{
+			sqlExpression
+					.append("\n, ").append(sqlDisplayValue.withJoinOnTableNameOrAlias(sqlTableName).toStringExpressionWithColumnNameAlias());
+		}
 		sqlExpression.append("\n FROM " + I_T_WEBUI_ViewSelection.Table_Name + " sel")
 				.append("\n INNER JOIN " + sqlTableName + " ON (" + keyColumnNamesMap.getSqlJoinCondition(sqlTableName, "sel") + ")")
 				// Filter by UUID. Keep this closer to the source table, see https://github.com/metasfresh/metasfresh-webui-api/issues/437
 				.append("\n WHERE sel." + I_T_WEBUI_ViewSelection.COLUMNNAME_UUID + "=?")
+				.append("\n ORDER BY sel." + I_T_WEBUI_ViewSelection.COLUMNNAME_Line)
+				.append("\n) t")
 				.append("\n LIMIT ?");
 
 		final String sql = sqlExpression.build()
