@@ -611,7 +611,7 @@ public final class SqlViewSelectionQueryBuilder
 				.append("\n, ").append("row_number() OVER (").append(sqlOrderBys != null ? "ORDER BY " + sqlOrderBys : "").append(")") // Line
 				.append("\n, ").append(keyColumnNamesMap.getKeyColumnNamesCommaSeparated()) // keys
 				.append("\n FROM ").append(I_T_WEBUI_ViewSelection.Table_Name).append(" sel")
-				.append("\n LEFT OUTER JOIN ").append(sqlSourceTable).append(" ").append(sqlTableAlias).append(" ON (").append(sqlJoinCondition).append(")")
+				.append("\n INNER JOIN ").append(sqlSourceTable).append(" ").append(sqlTableAlias).append(" ON (").append(sqlJoinCondition).append(")")
 				.append("\n WHERE sel.").append(I_T_WEBUI_ViewSelection.COLUMNNAME_UUID).append("=?", fromSelectionId) // fromUUID
 				.build();
 	}
