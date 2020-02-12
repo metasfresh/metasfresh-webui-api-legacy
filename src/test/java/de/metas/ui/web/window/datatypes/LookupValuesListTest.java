@@ -16,6 +16,7 @@ import com.google.common.collect.ImmutableMap;
 
 import de.metas.product.ProductId;
 import de.metas.ui.web.window.datatypes.LookupValue.IntegerLookupValue;
+import de.metas.ui.web.window.datatypes.LookupValue.StringLookupValue;
 
 /*
  * #%L
@@ -77,6 +78,59 @@ public class LookupValuesListTest
 		assertThat(LookupValuesList.EMPTY.isEmpty()).isTrue();
 		assertThat(LookupValuesList.EMPTY.getValues()).isEmpty();
 		assertThat(LookupValuesList.EMPTY.getDebugProperties()).isEmpty();
+	}
+
+	@Nested
+	public class hashCode_and_equals
+	{
+		@Test
+		public void equal_values()
+		{
+			final LookupValuesList list1 = Stream.of(StringLookupValue.of("1", "displayName1"))
+					.collect(LookupValuesList.collect());
+
+			final LookupValuesList list2 = Stream.of(StringLookupValue.of("1", "displayName1"))
+					.collect(LookupValuesList.collect());
+
+			assertThat(list1).isEqualTo(list2);
+		}
+
+		@Test
+		public void not_equal_values()
+		{
+			final LookupValuesList list1 = Stream.of(StringLookupValue.of("1", "displayName1"))
+					.collect(LookupValuesList.collect());
+
+			final LookupValuesList list2 = Stream.of(StringLookupValue.of("2", "displayName2"))
+					.collect(LookupValuesList.collect());
+
+			assertThat(list1).isNotEqualTo(list2);
+		}
+
+		@Test
+		public void equals_ordered_flag()
+		{
+			final LookupValuesList list1 = Stream.of(StringLookupValue.of("1", "displayName1"))
+					.collect(LookupValuesList.collect());
+
+			final LookupValuesList list2 = Stream.of(StringLookupValue.of("1", "displayName1"))
+					.collect(LookupValuesList.collect());
+
+			assertThat(list1).isEqualTo(list2);
+			assertThat(list1.notOrdered()).isEqualTo(list2.notOrdered());
+		}
+
+		@Test
+		public void ignore_debugProperties()
+		{
+			final LookupValuesList list1 = Stream.<LookupValue> empty()
+					.collect(LookupValuesList.collect(ImmutableMap.of("key1", "value1")));
+
+			final LookupValuesList list2 = Stream.<LookupValue> empty()
+					.collect(LookupValuesList.collect(ImmutableMap.of("key1", "value2")));
+
+			assertThat(list1).isEqualTo(list2);
+		}
 	}
 
 	@Nested
@@ -311,5 +365,46 @@ public class LookupValuesListTest
 			assertThat(resultActual).isEqualTo(list);
 			assertThat(resultActual).isSameAs(list);
 		}
+	}
+
+	@Nested
+	public class notOrdered
+	{
+		private LookupValuesList newOrderedList()
+		{
+			final LookupValuesList listOrdered = LookupValuesList.fromCollection(ImmutableList.of(
+					IntegerLookupValue.of(1, "name1"),
+					IntegerLookupValue.of(2, "name2")));
+
+			assertThat(listOrdered.isOrdered()).isTrue(); // just to make sure
+
+			return listOrdered;
+		}
+
+		@Test
+		public void standardCase()
+		{
+			assertThat(newOrderedList().notOrdered().isOrdered()).isFalse();
+		}
+
+		@Test
+		public void notOrdered_returns_the_same()
+		{
+			final LookupValuesList list = newOrderedList().notOrdered();
+			assertThat(list.notOrdered()).isSameAs(list);
+		}
+
+		@Test
+		public void empty_is_ordered()
+		{
+			assertThat(LookupValuesList.EMPTY.isOrdered()).isTrue();
+		}
+
+		@Test
+		public void empty_notOrdered()
+		{
+			assertThat(LookupValuesList.EMPTY.notOrdered().isOrdered()).isFalse();
+		}
+
 	}
 }
