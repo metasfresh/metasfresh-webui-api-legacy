@@ -42,11 +42,6 @@ import lombok.ToString;
 @ToString
 public class SqlSelectDisplayValue
 {
-	public static SqlSelectDisplayValue ofColumnName(@NonNull final String columnName)
-	{
-		return builder().joinOnColumnName(columnName).build();
-	}
-
 	private final String joinOnTableNameOrAlias;
 	private final String joinOnColumnName;
 	private final SqlForFetchingLookupById sqlExpression;
