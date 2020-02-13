@@ -3,9 +3,9 @@ package de.metas.ui.web.window.datatypes.json;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -56,7 +56,7 @@ public class JsonMapAsValuesListSerializerTest
 
 	private ObjectMapper jsonObjectMapper;
 
-	@Before
+	@BeforeEach
 	public void init()
 	{
 		jsonObjectMapper = new ObjectMapper();
@@ -70,7 +70,7 @@ public class JsonMapAsValuesListSerializerTest
 
 		final String jsonExpected = "{\"values\":null}";
 		final String json = jsonObjectMapper.writeValueAsString(pojo);
-		Assert.assertEquals(jsonExpected, json);
+		Assertions.assertEquals(jsonExpected, json);
 	}
 
 	@Test
@@ -81,7 +81,7 @@ public class JsonMapAsValuesListSerializerTest
 
 		final String jsonExpected = "{\"values\":[]}";
 		final String json = jsonObjectMapper.writeValueAsString(pojo);
-		Assert.assertEquals(jsonExpected, json);
+		Assertions.assertEquals(jsonExpected, json);
 	}
 
 	@Test
@@ -95,7 +95,7 @@ public class JsonMapAsValuesListSerializerTest
 
 		final String jsonExpected = "{\"values\":[\"one\",\"two\",\"three\"]}";
 		final String json = jsonObjectMapper.writeValueAsString(pojo);
-		Assert.assertEquals(jsonExpected, json);
+		Assertions.assertEquals(jsonExpected, json);
 	}
 
 	@Test
@@ -114,7 +114,7 @@ public class JsonMapAsValuesListSerializerTest
 
 		final String jsonExpected = "{}";
 		final String json = jsonObjectMapper.writeValueAsString(pojo);
-		Assert.assertEquals("Failed for map=" + map, jsonExpected, json);
+		Assertions.assertEquals(jsonExpected, json, "Failed for map=" + map);
 	}
 
 }

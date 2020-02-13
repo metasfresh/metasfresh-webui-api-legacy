@@ -4,14 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Optional;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 import de.metas.ui.web.document.filter.DocumentFilter;
 import de.metas.ui.web.window.datatypes.WindowId;
 import de.metas.ui.web.window.descriptor.sql.SqlEntityBinding;
 import de.metas.ui.web.window.model.sql.SqlOptions;
-import mockit.Expectations;
-import mockit.Mocked;
 
 /*
  * #%L
@@ -37,9 +36,6 @@ import mockit.Mocked;
 
 public class SqlDocumentFilterConvertersTest
 {
-	@Mocked
-	private SqlEntityBinding sqlEntityBinding;
-
 	private final static SqlDocumentFilterConverter customConverter = new SqlDocumentFilterConverter()
 	{
 		public boolean canConvert(final String filterId)
@@ -60,11 +56,13 @@ public class SqlDocumentFilterConvertersTest
 	@Test
 	public void createEntityBindingEffectiveConverter_uses_decorator_of_entityBinding()
 	{
-		// @formatter:off
-		new Expectations()
-		{{
-			sqlEntityBinding.getFilterConverterDecorator(); result = Optional.of(new CustomDocumentFilterConverterDecorator());
-		}};	// @formatter:on
+		final SqlEntityBinding sqlEntityBinding = Mockito.mock(SqlEntityBinding.class);
+		Mockito.doReturn(Optional.of(new CustomDocumentFilterConverterDecorator()))
+				.when(sqlEntityBinding)
+				.getFilterConverterDecorator();
+		Mockito.doReturn(SqlDocumentFilterConverters.emptyList())
+				.when(sqlEntityBinding)
+				.getFilterConverters();
 
 		final SqlDocumentFilterConverter result = SqlDocumentFilterConverters.createEntityBindingEffectiveConverter(sqlEntityBinding);
 		assertThat(result).isNotNull();

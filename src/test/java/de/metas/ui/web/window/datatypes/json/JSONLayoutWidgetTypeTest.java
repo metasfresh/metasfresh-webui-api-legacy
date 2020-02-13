@@ -1,6 +1,6 @@
 package de.metas.ui.web.window.datatypes.json;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import de.metas.ui.web.test.util.EnumTestUtils;
 import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
