@@ -9,9 +9,7 @@ import com.jgoodies.common.base.Objects;
 import de.metas.attachments.AttachmentEntry;
 import de.metas.attachments.AttachmentEntryId;
 import de.metas.attachments.AttachmentEntryService;
-import de.metas.attachments.listener.AttachmentListener;
-import de.metas.attachments.listener.TableAttachmentListenerRepository;
-import de.metas.javaclasses.IJavaClassBL;
+import de.metas.attachments.listener.TableAttachmentListenerService;
 import de.metas.ui.web.attachments.json.JSONAttachment;
 import de.metas.ui.web.exceptions.EntityNotFoundException;
 import de.metas.ui.web.window.datatypes.DocumentId;
@@ -28,8 +26,6 @@ import org.adempiere.model.InterfaceWrapperHelper;
 import org.adempiere.util.lang.IPair;
 import org.adempiere.util.lang.ITableRecordReference;
 import org.adempiere.util.lang.ImmutablePair;
-import org.adempiere.util.lang.impl.TableRecordReference;
-import org.compiere.SpringContextHolder;
 import org.compiere.model.I_AD_Archive;
 import org.compiere.model.I_AD_AttachmentEntry;
 import org.compiere.util.Env;
@@ -78,8 +74,8 @@ final class DocumentAttachments
 	private static final Splitter ID_Splitter = Splitter.on(ID_SEPARATOR);
 	private static final Joiner ID_Joiner = Joiner.on(ID_SEPARATOR);
 
-	private final transient AttachmentEntryService attachmentEntryService = SpringContextHolder.instance.getBean(AttachmentEntryService.class);
-	private final transient TableAttachmentListenerRepository tableAttachmentListenerRepository = SpringContextHolder.instance.getBean(TableAttachmentListenerRepository.class);
+	private final AttachmentEntryService attachmentEntryService;
+	private final TableAttachmentListenerService tableAttachmentListenerService;
 
 	private final DocumentPath documentPath;
 	private final ITableRecordReference recordRef;
@@ -91,12 +87,16 @@ final class DocumentAttachments
 			@NonNull final DocumentPath documentPath,
 			@NonNull final ITableRecordReference recordRef,
 			@NonNull final DocumentEntityDescriptor entityDescriptor,
-			@NonNull final DocumentWebsocketPublisher websocketPublisher)
+			@NonNull final DocumentWebsocketPublisher websocketPublisher,
+			@NonNull final AttachmentEntryService attachmentEntryService,
+			@NonNull final TableAttachmentListenerService tableAttachmentListenerService)
 	{
 		this.documentPath = documentPath;
 		this.recordRef = recordRef;
 		this.entityDescriptor = entityDescriptor;
 		this.websocketPublisher = websocketPublisher;
+		this.tableAttachmentListenerService = tableAttachmentListenerService;
+		this.attachmentEntryService = attachmentEntryService;
 	}
 
 	@Override
@@ -132,7 +132,7 @@ final class DocumentAttachments
 
 		notifyRelatedDocumentTabsChanged();
 
-		fireAttachmentListeners(attachmentEntry);
+		tableAttachmentListenerService.notifyAttachmentListeners(attachmentEntry);
 	}
 
 	public void addURLEntry(final String name, final URI url)
@@ -238,23 +238,4 @@ final class DocumentAttachments
 
 		websocketPublisher.staleTabs(documentPath.getWindowId(), documentPath.getDocumentId(), attachmentRelatedTabIds);
 	}
-
-	private void fireAttachmentListeners(final AttachmentEntry attachmentEntry)
-	{
-		attachmentEntry.getLinkedRecords().forEach( linkedRecord -> fireAttachmentListenersFor(linkedRecord, attachmentEntry));
-	}
-
-	private void fireAttachmentListenersFor( final TableRecordReference tableRecordReference, final AttachmentEntry attachmentEntry )
-	{
-		final IJavaClassBL javaClassBL = Services.get(IJavaClassBL.class);
-
-		tableAttachmentListenerRepository.findForId(tableRecordReference.getAdTableId())
-				.forEach( listenerSettings ->
-				{
-					final AttachmentListener attachmentListener = javaClassBL.newInstance(listenerSettings.getListenerJavaClassId());
-
-					attachmentListener.afterPersist(listenerSettings, attachmentEntry, tableRecordReference);
-				} );
-	}
-
 }
