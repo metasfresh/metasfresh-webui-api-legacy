@@ -3,10 +3,14 @@ package de.metas.ui.web.request.process;
 import java.util.ArrayList;
 import java.util.List;
 
+import de.metas.inout.IInOutDAO;
+import de.metas.inout.InOutId;
+import de.metas.inout.impl.InOutDAO;
 import org.adempiere.util.lang.impl.TableRecordReference;
 import org.compiere.SpringContextHolder;
 import org.compiere.model.I_AD_User;
 import org.compiere.model.I_C_BPartner;
+import org.compiere.model.I_M_InOut;
 import org.compiere.model.I_R_Request;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -49,7 +53,7 @@ public class WEBUI_CreateRequest extends JavaProcess
 {
 	@Autowired
 	private DocumentCollection documentCollection;
-	
+
 	public WEBUI_CreateRequest()
 	{
 		SpringContextHolder.instance.autowire(this);
@@ -65,6 +69,12 @@ public class WEBUI_CreateRequest extends JavaProcess
 			final I_C_BPartner bpartner = getRecord(I_C_BPartner.class);
 			createRequestFromBPartner(bpartner);
 		}
+		else if (I_M_InOut.Table_Name.equals(tableName))
+		{
+			final IInOutDAO inOutDAO = Services.get(IInOutDAO.class);
+			final I_M_InOut shipment = inOutDAO.getById(InOutId.ofRepoId(getProcessInfo().getRecord_ID()));
+			createRequestFromShipment(shipment);
+		}
 		else
 		{
 			throw new IllegalStateException("Not supported: " + tableName);
@@ -75,27 +85,53 @@ public class WEBUI_CreateRequest extends JavaProcess
 	private void createRequestFromBPartner(final I_C_BPartner bpartner)
 	{
 		final I_AD_User defaultContact = Services.get(IBPartnerDAO.class).retrieveDefaultContactOrNull(bpartner, I_AD_User.class);
-		
+
 		final List<JSONDocumentChangedEvent> events = new ArrayList<>();
 		events.add(JSONDocumentChangedEvent.replace(I_R_Request.COLUMNNAME_SalesRep_ID, getAD_User_ID()));
 		events.add(JSONDocumentChangedEvent.replace(I_R_Request.COLUMNNAME_C_BPartner_ID, bpartner.getC_BPartner_ID()));
-		if(defaultContact != null)
+		if (defaultContact != null)
 		{
 			events.add(JSONDocumentChangedEvent.replace(I_R_Request.COLUMNNAME_AD_User_ID, defaultContact.getAD_User_ID()));
 		}
-		
+
 		final DocumentPath documentPath = DocumentPath.builder()
 				.setDocumentType(WindowConstants.WINDOWID_R_Request)
 				.setDocumentId(DocumentId.NEW_ID_STRING)
 				.allowNewDocumentId()
 				.build();
-		
+
 		final DocumentId documentId = documentCollection.forDocumentWritable(documentPath, NullDocumentChangesCollector.instance, document -> {
 			document.processValueChanges(events, ReasonSupplier.NONE);
 			return document.getDocumentId();
 		});
 
-		
+		getResult().setRecordToOpen(TableRecordReference.of(I_R_Request.Table_Name, documentId.toInt()), documentPath.getWindowId().toInt(), OpenTarget.SingleDocumentModal);
+	}
+
+	private void createRequestFromShipment(final I_M_InOut shipment)
+	{
+		final I_AD_User defaultContact = Services.get(IBPartnerDAO.class).retrieveretrieveDefaultContactOrNull(shipment, I_AD_User.class);
+
+		final List<JSONDocumentChangedEvent> events = new ArrayList<>();
+		events.add(JSONDocumentChangedEvent.replace(I_R_Request.COLUMNNAME_SalesRep_ID, getAD_User_ID()));
+		events.add(JSONDocumentChangedEvent.replace(I_R_Request.COLUMNNAME_C_BPartner_ID, shipment.getC_BPartner_ID()));
+		events.add(JSONDocumentChangedEvent.replace(I_R_Request.COLUMNNAME_M_InOut_ID, shipment.getM_InOut_ID()));
+		if (defaultContact != null)
+		{
+			events.add(JSONDocumentChangedEvent.replace(I_R_Request.COLUMNNAME_AD_User_ID, defaultContact.getAD_User_ID()));
+		}
+
+		final DocumentPath documentPath = DocumentPath.builder()
+				.setDocumentType(WindowConstants.WINDOWID_R_Request)
+				.setDocumentId(DocumentId.NEW_ID_STRING)
+				.allowNewDocumentId()
+				.build();
+
+		final DocumentId documentId = documentCollection.forDocumentWritable(documentPath, NullDocumentChangesCollector.instance, document -> {
+			document.processValueChanges(events, ReasonSupplier.NONE);
+			return document.getDocumentId();
+		});
+
 		getResult().setRecordToOpen(TableRecordReference.of(I_R_Request.Table_Name, documentId.toInt()), documentPath.getWindowId().toInt(), OpenTarget.SingleDocumentModal);
 	}
 }
