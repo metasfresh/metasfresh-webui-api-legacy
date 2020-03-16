@@ -66,7 +66,8 @@ public class WEBUI_CreateRequest extends JavaProcess
 		final String tableName = getTableName();
 		if (I_C_BPartner.Table_Name.equals(tableName))
 		{
-			final I_C_BPartner bpartner = getRecord(I_C_BPartner.class);
+			final IBPartnerDAO bPartnerDAO = Services.get(IBPartnerDAO.class);
+			final I_C_BPartner bpartner = bPartnerDAO.getById(getProcessInfo().getRecord_ID());
 			createRequestFromBPartner(bpartner);
 		}
 		else if (I_M_InOut.Table_Name.equals(tableName))
@@ -110,7 +111,10 @@ public class WEBUI_CreateRequest extends JavaProcess
 
 	private void createRequestFromShipment(final I_M_InOut shipment)
 	{
-		final I_AD_User defaultContact = Services.get(IBPartnerDAO.class).retrieveretrieveDefaultContactOrNull(shipment, I_AD_User.class);
+
+		final IBPartnerDAO bPartnerDAO = Services.get(IBPartnerDAO.class);
+		final I_C_BPartner bPartner = bPartnerDAO.getById(shipment.getC_BPartner_ID());
+		final I_AD_User defaultContact = Services.get(IBPartnerDAO.class).retrieveDefaultContactOrNull(bPartner, I_AD_User.class);
 
 		final List<JSONDocumentChangedEvent> events = new ArrayList<>();
 		events.add(JSONDocumentChangedEvent.replace(I_R_Request.COLUMNNAME_SalesRep_ID, getAD_User_ID()));
