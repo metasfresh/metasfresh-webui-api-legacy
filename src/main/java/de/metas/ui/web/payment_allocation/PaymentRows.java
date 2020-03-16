@@ -13,6 +13,7 @@ import com.google.common.collect.ImmutableSet;
 
 import de.metas.payment.PaymentId;
 import de.metas.ui.web.view.template.IRowsData;
+import de.metas.ui.web.view.template.ImmutableRowsIndex;
 import de.metas.ui.web.window.datatypes.DocumentId;
 import de.metas.ui.web.window.datatypes.DocumentIdsSelection;
 import lombok.Builder;

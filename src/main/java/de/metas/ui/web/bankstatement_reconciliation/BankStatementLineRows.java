@@ -10,8 +10,8 @@ import com.google.common.collect.ImmutableSet;
 
 import de.metas.banking.model.BankStatementLineId;
 import de.metas.banking.model.I_C_BankStatementLine;
-import de.metas.ui.web.payment_allocation.ImmutableRowsIndex;
 import de.metas.ui.web.view.template.IRowsData;
+import de.metas.ui.web.view.template.ImmutableRowsIndex;
 import de.metas.ui.web.window.datatypes.DocumentId;
 import de.metas.ui.web.window.datatypes.DocumentIdsSelection;
 import lombok.Builder;
