@@ -1,17 +1,16 @@
 package de.metas.ui.web.bankstatement_reconciliation;
 
 import java.util.List;
-import java.util.Map;
 
-import org.adempiere.util.lang.SynchronizedMutable;
 import org.adempiere.util.lang.impl.TableRecordReferenceSet;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 
 import de.metas.banking.model.BankStatementLineId;
 import de.metas.banking.model.I_C_BankStatementLine;
 import de.metas.ui.web.view.template.IRowsData;
-import de.metas.ui.web.view.template.ImmutableRowsIndex;
+import de.metas.ui.web.view.template.SynchronizedRowsIndexHolder;
 import de.metas.ui.web.window.datatypes.DocumentId;
 import de.metas.ui.web.window.datatypes.DocumentIdsSelection;
 import lombok.Builder;
@@ -47,7 +46,7 @@ public class BankStatementLineRows implements IRowsData<BankStatementLineRow>
 	}
 
 	private final BankStatementLineAndPaymentsToReconcileRepository repository;
-	private final SynchronizedMutable<ImmutableRowsIndex<BankStatementLineRow>> rowsHolder;
+	private final SynchronizedRowsIndexHolder<BankStatementLineRow> rowsHolder;
 
 	@Builder
 	private BankStatementLineRows(
@@ -55,22 +54,21 @@ public class BankStatementLineRows implements IRowsData<BankStatementLineRow>
 			@NonNull final List<BankStatementLineRow> rows)
 	{
 		this.repository = repository;
-		this.rowsHolder = SynchronizedMutable.of(ImmutableRowsIndex.of(rows));
+		this.rowsHolder = SynchronizedRowsIndexHolder.of(rows);
 	}
 
 	@Override
-	public Map<DocumentId, BankStatementLineRow> getDocumentId2TopLevelRows()
+	public ImmutableMap<DocumentId, BankStatementLineRow> getDocumentId2TopLevelRows()
 	{
-		return rowsHolder.getValue().getDocumentId2TopLevelRows();
+		return rowsHolder.getDocumentId2TopLevelRows();
 	}
 
 	@Override
 	public DocumentIdsSelection getDocumentIdsToInvalidate(@NonNull final TableRecordReferenceSet recordRefs)
 	{
-		final ImmutableRowsIndex<BankStatementLineRow> rows = rowsHolder.getValue();
 		return recordRefs.streamIds(I_C_BankStatementLine.Table_Name, BankStatementLineId::ofRepoId)
 				.map(BankStatementLineRow::convertBankStatementLineIdToDocumentId)
-				.filter(rows::isRelevantForRefreshing)
+				.filter(rowsHolder.isRelevantForRefreshingByDocumentId())
 				.collect(DocumentIdsSelection.toDocumentIdsSelection());
 	}
 
@@ -84,7 +82,6 @@ public class BankStatementLineRows implements IRowsData<BankStatementLineRow>
 	public void invalidate(final DocumentIdsSelection rowIds)
 	{
 		final ImmutableSet<BankStatementLineId> bankStatementLineIds = rowsHolder
-				.getValue()
 				.getRecordIdsToRefresh(rowIds, BankStatementLineRow::convertDocumentIdToBankStatementLineId);
 
 		final List<BankStatementLineRow> newRows = repository.getBankStatementLineRowsByIds(bankStatementLineIds);

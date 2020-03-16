@@ -3,7 +3,6 @@ package de.metas.ui.web.bankstatement_reconciliation;
 import java.util.List;
 import java.util.Map;
 
-import org.adempiere.util.lang.SynchronizedMutable;
 import org.adempiere.util.lang.impl.TableRecordReferenceSet;
 import org.compiere.model.I_C_Payment;
 
@@ -11,7 +10,7 @@ import com.google.common.collect.ImmutableSet;
 
 import de.metas.payment.PaymentId;
 import de.metas.ui.web.view.template.IRowsData;
-import de.metas.ui.web.view.template.ImmutableRowsIndex;
+import de.metas.ui.web.view.template.SynchronizedRowsIndexHolder;
 import de.metas.ui.web.window.datatypes.DocumentId;
 import de.metas.ui.web.window.datatypes.DocumentIdsSelection;
 import lombok.Builder;
@@ -47,7 +46,7 @@ public class PaymentToReconcileRows implements IRowsData<PaymentToReconcileRow>
 	}
 
 	private final BankStatementLineAndPaymentsToReconcileRepository repository;
-	private final SynchronizedMutable<ImmutableRowsIndex<PaymentToReconcileRow>> rowsHolder;
+	private final SynchronizedRowsIndexHolder<PaymentToReconcileRow> rowsHolder;
 
 	@Builder
 	private PaymentToReconcileRows(
@@ -55,22 +54,21 @@ public class PaymentToReconcileRows implements IRowsData<PaymentToReconcileRow>
 			@NonNull final List<PaymentToReconcileRow> rows)
 	{
 		this.repository = repository;
-		rowsHolder = SynchronizedMutable.of(ImmutableRowsIndex.of(rows));
+		rowsHolder = SynchronizedRowsIndexHolder.of(rows);
 	}
 
 	@Override
 	public Map<DocumentId, PaymentToReconcileRow> getDocumentId2TopLevelRows()
 	{
-		return rowsHolder.getValue().getDocumentId2TopLevelRows();
+		return rowsHolder.getDocumentId2TopLevelRows();
 	}
 
 	@Override
 	public DocumentIdsSelection getDocumentIdsToInvalidate(TableRecordReferenceSet recordRefs)
 	{
-		final ImmutableRowsIndex<PaymentToReconcileRow> rows = rowsHolder.getValue();
 		return recordRefs.streamIds(I_C_Payment.Table_Name, PaymentId::ofRepoId)
 				.map(PaymentToReconcileRow::convertPaymentIdToDocumentId)
-				.filter(rows::isRelevantForRefreshing)
+				.filter(rowsHolder.isRelevantForRefreshingByDocumentId())
 				.collect(DocumentIdsSelection.toDocumentIdsSelection());
 	}
 
@@ -84,7 +82,6 @@ public class PaymentToReconcileRows implements IRowsData<PaymentToReconcileRow>
 	public void invalidate(final DocumentIdsSelection rowIds)
 	{
 		final ImmutableSet<PaymentId> paymentIds = rowsHolder
-				.getValue()
 				.getRecordIdsToRefresh(rowIds, PaymentToReconcileRow::convertDocumentIdToPaymentId);
 
 		final List<PaymentToReconcileRow> newRows = repository.getPaymentToReconcileRowsByIds(paymentIds);
