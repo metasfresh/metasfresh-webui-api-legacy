@@ -67,12 +67,11 @@ import de.metas.ui.web.window.descriptor.DocumentFieldDescriptor;
 import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
 import de.metas.ui.web.window.descriptor.factory.NewRecordDescriptorsProvider;
 import de.metas.ui.web.window.events.DocumentWebsocketPublisher;
-import de.metas.ui.web.window.exceptions.InvalidDocumentPathException;
 import de.metas.ui.web.window.model.Document;
 import de.metas.ui.web.window.model.DocumentChangeLogService;
 import de.metas.ui.web.window.model.DocumentCollection;
 import de.metas.ui.web.window.model.DocumentCollection.DocumentPrint;
-import de.metas.ui.web.window.model.DocumentQueryOrderBy;
+import de.metas.ui.web.window.model.DocumentQueryOrderByList;
 import de.metas.ui.web.window.model.DocumentReference;
 import de.metas.ui.web.window.model.DocumentReferencesService;
 import de.metas.ui.web.window.model.IDocumentChangesCollector;
@@ -213,8 +212,7 @@ public class WindowRestController
 	{
 		final WindowId windowId = WindowId.fromJson(windowIdStr);
 		final DocumentPath documentPath = DocumentPath.rootDocumentPath(windowId, documentIdStr);
-		final List<DocumentQueryOrderBy> orderBys = ImmutableList.of();
-		return getData(documentPath, fieldsListStr, advanced, orderBys);
+		return getData(documentPath, fieldsListStr, advanced, DocumentQueryOrderByList.EMPTY);
 	}
 
 	@GetMapping("/{windowId}/{documentId}/{tabId}")
@@ -222,6 +220,7 @@ public class WindowRestController
 			@PathVariable("windowId") final String windowIdStr,
 			@PathVariable("documentId") final String documentIdStr,
 			@PathVariable("tabId") final String tabIdStr,
+			@RequestParam(name = "ids", required = false) @ApiParam("comma separated rowIds") final String rowIdsListStr,
 			@RequestParam(name = PARAM_FieldsList, required = false) @ApiParam("comma separated field names") final String fieldsListStr,
 			@RequestParam(name = PARAM_Advanced, required = false, defaultValue = PARAM_Advanced_DefaultValue) final boolean advanced,
 			@RequestParam(name = "orderBy", required = false) final String orderBysListStr)
@@ -229,8 +228,19 @@ public class WindowRestController
 		final WindowId windowId = WindowId.fromJson(windowIdStr);
 		final DocumentId documentId = DocumentId.of(documentIdStr);
 		final DetailId tabId = DetailId.fromJson(tabIdStr);
-		final DocumentPath documentPath = DocumentPath.includedDocumentPath(windowId, documentId, tabId);
-		final List<DocumentQueryOrderBy> orderBys = DocumentQueryOrderBy.parseOrderBysList(orderBysListStr);
+
+		final DocumentIdsSelection onlyRowIds = DocumentIdsSelection.ofCommaSeparatedString(rowIdsListStr);
+		final DocumentPath documentPath;
+		if (onlyRowIds.isEmpty() || onlyRowIds.isAll())
+		{
+			documentPath = DocumentPath.includedDocumentPath(windowId, documentId, tabId);
+		}
+		else
+		{
+			documentPath = DocumentPath.includedDocumentPath(windowId, documentId, tabId, onlyRowIds);
+		}
+
+		final DocumentQueryOrderByList orderBys = DocumentQueryOrderByList.parse(orderBysListStr);
 		return getData(documentPath, fieldsListStr, advanced, orderBys);
 	}
 
@@ -246,11 +256,10 @@ public class WindowRestController
 	{
 		final WindowId windowId = WindowId.fromJson(windowIdStr);
 		final DocumentPath documentPath = DocumentPath.includedDocumentPath(windowId, documentIdStr, tabIdStr, rowIdStr);
-		final List<DocumentQueryOrderBy> orderBys = ImmutableList.of();
-		return getData(documentPath, fieldsListStr, advanced, orderBys);
+		return getData(documentPath, fieldsListStr, advanced, DocumentQueryOrderByList.EMPTY);
 	}
 
-	private List<JSONDocument> getData(final DocumentPath documentPath, final String fieldsListStr, final boolean advanced, final List<DocumentQueryOrderBy> orderBys)
+	private List<JSONDocument> getData(final DocumentPath documentPath, final String fieldsListStr, final boolean advanced, final DocumentQueryOrderByList orderBys)
 	{
 		userSession.assertLoggedIn();
 
@@ -275,7 +284,7 @@ public class WindowRestController
 			}
 			else
 			{
-				throw new InvalidDocumentPathException(documentPath);
+				documents = rootDocument.getIncludedDocuments(documentPath.getDetailId(), documentPath.getRowIds()).toList();
 			}
 
 			return JSONDocument.ofDocumentsList(documents, jsonOpts);

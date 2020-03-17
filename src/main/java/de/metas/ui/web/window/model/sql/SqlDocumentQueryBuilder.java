@@ -5,7 +5,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Properties;
+import java.util.Set;
 
 import org.adempiere.ad.expression.api.IExpressionEvaluator.OnVariableNotFound;
 import org.adempiere.ad.expression.api.IStringExpression;
@@ -13,17 +15,18 @@ import org.adempiere.ad.expression.api.impl.CompositeStringExpression;
 import org.adempiere.exceptions.AdempiereException;
 import org.adempiere.util.lang.IPair;
 import org.adempiere.util.lang.ImmutablePair;
+import org.compiere.util.DB;
 import org.compiere.util.Env;
 import org.compiere.util.Evaluatee;
 import org.compiere.util.Evaluatees;
 
 import com.google.common.base.MoreObjects;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 
 import de.metas.security.UserRolePermissionsKey;
 import de.metas.security.impl.AccessSqlStringExpression;
-import de.metas.ui.web.document.filter.DocumentFilter;
+import de.metas.ui.web.document.filter.DocumentFilterList;
 import de.metas.ui.web.document.filter.sql.SqlDocumentFilterConverterContext;
 import de.metas.ui.web.document.filter.sql.SqlDocumentFilterConverters;
 import de.metas.ui.web.document.filter.sql.SqlParamsCollector;
@@ -38,10 +41,11 @@ import de.metas.ui.web.window.descriptor.sql.SqlDocumentFieldDataBindingDescript
 import de.metas.ui.web.window.descriptor.sql.SqlEntityFieldBinding;
 import de.metas.ui.web.window.model.Document;
 import de.metas.ui.web.window.model.DocumentQuery;
-import de.metas.ui.web.window.model.DocumentQueryOrderBy;
+import de.metas.ui.web.window.model.DocumentQueryOrderByList;
 import de.metas.ui.web.window.model.IDocumentFieldView;
 import de.metas.ui.web.window.model.lookup.LookupValueByIdSupplier;
 import de.metas.util.Check;
+import lombok.NonNull;
 
 /*
  * #%L
@@ -78,7 +82,7 @@ public class SqlDocumentQueryBuilder
 		return new SqlDocumentQueryBuilder(query.getEntityDescriptor())
 				.setDocumentFilters(query.getFilters())
 				.setParentDocument(query.getParentDocument())
-				.setRecordId(query.getRecordId())
+				.setRecordIds(query.getRecordIds())
 				//
 				.noSorting(query.isNoSorting())
 				.setOrderBys(query.getOrderBys())
@@ -92,12 +96,12 @@ public class SqlDocumentQueryBuilder
 	private final SqlDocumentEntityDataBindingDescriptor entityBinding;
 
 	private transient Evaluatee _evaluationContext = null; // lazy
-	private final List<DocumentFilter> documentFilters = new ArrayList<>();
+	private DocumentFilterList documentFilters = DocumentFilterList.EMPTY;
 	private Document parentDocument;
-	private DocumentId recordId = null;
+	private Set<DocumentId> recordIds = ImmutableSet.of();
 
 	private boolean noSorting = false;
-	private List<DocumentQueryOrderBy> orderBys;
+	private DocumentQueryOrderByList orderBys = DocumentQueryOrderByList.EMPTY;
 
 	private int firstRow;
 	private int pageLength;
@@ -311,8 +315,8 @@ public class SqlDocumentQueryBuilder
 		// ORDER BY
 		if (isSorting())
 		{
-			final IStringExpression sqlOrderBy = getSqlOrderByEffective();
-			if (sqlOrderBy != null && !sqlOrderBy.isNullExpression())
+			final IStringExpression sqlOrderBy = getSqlOrderByEffective().orElse(null);
+			if (sqlOrderBy != null)
 			{
 				sqlBuilder.append("\n ORDER BY ").append(sqlOrderBy);
 			}
@@ -389,29 +393,77 @@ public class SqlDocumentQueryBuilder
 		// FIXME: handle AD_Reference/AD_Ref_List(s). In that case the recordId will be AD_Ref_List.Value,
 		// so the SQL where clause which is currently build is AD_Ref_List_ID=<the AD_Ref_List.Value>.
 		// The build SQL where clause shall be something like AD_Reference_ID=<the reference, i think we shall fetch it somehow from Lookup> AND Value=<the value, which currently is the recordId>
-		final DocumentId recordId = getRecordId();
-		if (recordId != null)
+		final Set<DocumentId> recordIds = getRecordIds();
+		if (!recordIds.isEmpty())
 		{
 			final List<SqlDocumentFieldDataBindingDescriptor> keyFields = entityBinding.getKeyFields();
 			if (keyFields.isEmpty())
 			{
 				throw new AdempiereException("Failed building where clause because there is no Key Column defined in " + entityBinding);
 			}
+
 			// Single primary key
-			else if (keyFields.size() == 1)
+			if (keyFields.size() == 1)
 			{
-				final String keyColumnName = keyFields.get(0).getColumnName();
-				sqlWhereClauseBuilder.appendIfNotEmpty("\n AND ");
-				sqlWhereClauseBuilder.append(" /* key */ ").append(keyColumnName).append("=").append(sqlParams.placeholder(recordId.toInt()));
+				final String singleKeyColumnName = keyFields.get(0).getColumnName();
+				final ImmutableSet<Integer> recordIdsIntSet = recordIds.stream()
+						.map(DocumentId::toInt)
+						.collect(ImmutableSet.toImmutableSet());
+				sqlWhereClauseBuilder.appendIfNotEmpty("\n /* key */ AND ");
+				sqlWhereClauseBuilder.append(DB.buildSqlList(singleKeyColumnName, recordIdsIntSet, sqlParams.toLiveList()));
 			}
 			// Composed primary key
 			else
 			{
-				final Map<String, Object> keyColumnName2value = extractComposedKey(recordId, keyFields);
-				keyColumnName2value.forEach((keyColumnName, value) -> {
-					sqlWhereClauseBuilder.appendIfNotEmpty("\n AND ");
-					sqlWhereClauseBuilder.append(" /* key */ ").append(keyColumnName).append("=").append(sqlParams.placeholder(value));
-				});
+				final boolean parenthesesRequired = !sqlWhereClauseBuilder.isEmpty();
+
+				if (parenthesesRequired)
+				{
+					sqlWhereClauseBuilder.append(" AND ( ");
+				}
+
+				boolean firstRecord = true;
+				final boolean appendParentheses = recordIds.size() > 1;
+				for (final DocumentId recordId : recordIds)
+				{
+					if (!firstRecord)
+					{
+						sqlWhereClauseBuilder.append("\n OR ");
+					}
+
+					if (appendParentheses)
+					{
+						sqlWhereClauseBuilder.append("(");
+					}
+
+					final Map<String, Object> keyColumnName2value = extractComposedKey(recordId, keyFields);
+					boolean firstKeyPart = true;
+					for (final Map.Entry<String, Object> keyPart : keyColumnName2value.entrySet())
+					{
+						if (!firstKeyPart)
+						{
+							sqlWhereClauseBuilder.append(" AND ");
+						}
+
+						final String keyColumnName = keyPart.getKey();
+						final Object value = keyPart.getValue();
+						sqlWhereClauseBuilder.append(" ").append(keyColumnName).append("=").append(sqlParams.placeholder(value));
+
+						firstKeyPart = false;
+					}
+
+					if (appendParentheses)
+					{
+						sqlWhereClauseBuilder.append(")");
+					}
+
+					firstRecord = false;
+				}
+
+				if (parenthesesRequired)
+				{
+					sqlWhereClauseBuilder.append(")");
+				}
 			}
 		}
 
@@ -455,14 +507,14 @@ public class SqlDocumentQueryBuilder
 		return ImmutablePair.of(sqlWhereClauseBuilder.build(), Collections.unmodifiableList(sqlParams.toList()));
 	}
 
-	private List<DocumentQueryOrderBy> getOrderBysEffective()
+	private DocumentQueryOrderByList getOrderBysEffective()
 	{
 		if (noSorting)
 		{
-			return ImmutableList.of();
+			return DocumentQueryOrderByList.EMPTY;
 		}
 
-		final List<DocumentQueryOrderBy> queryOrderBys = getOrderBys();
+		final DocumentQueryOrderByList queryOrderBys = getOrderBys();
 		if (queryOrderBys != null && !queryOrderBys.isEmpty())
 		{
 			return queryOrderBys;
@@ -471,27 +523,22 @@ public class SqlDocumentQueryBuilder
 		return entityBinding.getDefaultOrderBys();
 	}
 
-	private IStringExpression getSqlOrderByEffective()
+	private Optional<IStringExpression> getSqlOrderByEffective()
 	{
-		final List<DocumentQueryOrderBy> orderBys = getOrderBysEffective();
-		return SqlDocumentOrderByBuilder.newInstance(entityBinding::getFieldOrderBy).buildSqlOrderBy(orderBys);
+		final DocumentQueryOrderByList orderBys = getOrderBysEffective();
+		return SqlDocumentOrderByBuilder.newInstance(entityBinding::getFieldOrderBy)
+				.joinOnTableNameOrAlias(entityBinding.getTableAlias())
+				.buildSqlOrderBy(orderBys);
 	}
 
-	private List<DocumentFilter> getDocumentFilters()
+	private DocumentFilterList getDocumentFilters()
 	{
-		return documentFilters == null ? ImmutableList.of() : ImmutableList.copyOf(documentFilters);
+		return documentFilters;
 	}
 
-	public SqlDocumentQueryBuilder setDocumentFilters(final List<DocumentFilter> documentFilters)
+	public SqlDocumentQueryBuilder setDocumentFilters(@NonNull final DocumentFilterList documentFilters)
 	{
-		this.documentFilters.clear();
-		this.documentFilters.addAll(documentFilters);
-		return this;
-	}
-
-	public SqlDocumentQueryBuilder addDocumentFilters(final List<DocumentFilter> documentFiltersToAdd)
-	{
-		this.documentFilters.addAll(documentFiltersToAdd);
+		this.documentFilters = documentFilters;
 		return this;
 	}
 
@@ -506,15 +553,18 @@ public class SqlDocumentQueryBuilder
 		return this;
 	}
 
-	public SqlDocumentQueryBuilder setRecordId(final DocumentId recordId)
+	public SqlDocumentQueryBuilder setRecordIds(final Set<DocumentId> recordIds)
 	{
-		this.recordId = recordId;
+		this.recordIds = recordIds != null
+				? ImmutableSet.copyOf(recordIds)
+				: ImmutableSet.of();
+
 		return this;
 	}
 
-	private DocumentId getRecordId()
+	private Set<DocumentId> getRecordIds()
 	{
-		return recordId;
+		return recordIds;
 	}
 
 	public SqlDocumentQueryBuilder noSorting()
@@ -544,12 +594,12 @@ public class SqlDocumentQueryBuilder
 		return noSorting;
 	}
 
-	private List<DocumentQueryOrderBy> getOrderBys()
+	private DocumentQueryOrderByList getOrderBys()
 	{
 		return orderBys;
 	}
 
-	public SqlDocumentQueryBuilder setOrderBys(final List<DocumentQueryOrderBy> orderBys)
+	public SqlDocumentQueryBuilder setOrderBys(final DocumentQueryOrderByList orderBys)
 	{
 		// Don't throw exception if noSorting is true. Just do nothing.
 		// REASON: it gives us better flexibility when this builder is handled by different methods, each of them adding stuff to it
@@ -559,7 +609,7 @@ public class SqlDocumentQueryBuilder
 			return this;
 		}
 
-		this.orderBys = orderBys;
+		this.orderBys = orderBys != null ? orderBys : DocumentQueryOrderByList.EMPTY;
 		return this;
 	}
 

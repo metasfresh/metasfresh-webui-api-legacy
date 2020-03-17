@@ -1,26 +1,7 @@
 package de.metas.ui.web.view.descriptor;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.function.BiFunction;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-
-import javax.annotation.Nullable;
-
-import org.adempiere.exceptions.AdempiereException;
-import org.adempiere.exceptions.DBException;
-import org.compiere.util.DB;
-
-import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-
 import de.metas.ui.web.base.model.I_T_WEBUI_ViewSelection;
 import de.metas.ui.web.window.datatypes.DocumentId;
 import de.metas.ui.web.window.datatypes.DocumentIdsSelection;
@@ -32,6 +13,22 @@ import lombok.Builder;
 import lombok.NonNull;
 import lombok.Singular;
 import lombok.ToString;
+import org.adempiere.exceptions.AdempiereException;
+import org.adempiere.exceptions.DBException;
+import org.compiere.util.DB;
+
+import javax.annotation.Nullable;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.function.BiFunction;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /*
  * #%L
@@ -145,6 +142,13 @@ public final class SqlViewKeyColumnNamesMap
 		return getKeyColumnNamesCommaSeparated(Function.identity());
 	}
 
+	public String getKeyColumnNamesCommaSeparated(@Nullable final String sqlTableAlias)
+	{
+		return sqlTableAlias != null
+				? getKeyColumnNamesCommaSeparated(columnName -> sqlTableAlias + "." + columnName)
+				: getKeyColumnNamesCommaSeparated(Function.identity());
+	}
+
 	public String getKeyColumnNamesCommaSeparated(final Function<String, String> mapper)
 	{
 		return getKeyColumnNames()
@@ -217,7 +221,7 @@ public final class SqlViewKeyColumnNamesMap
 		return getWebuiSelectionColumnNamesCommaSeparated(Function.identity());
 	}
 
-	public String getWebuiSelectionColumnNamesCommaSeparated(final String sqlTableAlias)
+	public String getWebuiSelectionColumnNamesCommaSeparated(@NonNull final String sqlTableAlias)
 	{
 		Check.assumeNotEmpty(sqlTableAlias, "sqlTableAlias is not empty");
 		return getWebuiSelectionColumnNamesCommaSeparated(columnName -> sqlTableAlias + "." + columnName);
@@ -279,7 +283,7 @@ public final class SqlViewKeyColumnNamesMap
 		return sqlJoinCondition.toString();
 	}
 
-	public String getSqlIsNullExpression(final String sqlTableAlias)
+	public String getSqlIsNullExpression(@NonNull final String sqlTableAlias)
 	{
 		final String sqlIsNull = getKeyColumnNames()
 				.stream()
@@ -389,7 +393,7 @@ public final class SqlViewKeyColumnNamesMap
 						keyField.getSqlValueClass()))
 				.collect(Collectors.toList());
 
-		final boolean isNotNull = rowIdParts.stream().anyMatch(Predicates.notNull());
+		final boolean isNotNull = rowIdParts.stream().anyMatch(Objects::nonNull);
 		if (!isNotNull)
 		{
 			return null;

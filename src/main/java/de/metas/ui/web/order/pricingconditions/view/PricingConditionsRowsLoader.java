@@ -16,7 +16,7 @@ import javax.annotation.Nullable;
 
 import org.slf4j.Logger;
 
-import com.google.common.base.Predicates;
+import java.util.Objects;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -42,7 +42,7 @@ import de.metas.pricing.conditions.PricingConditionsId;
 import de.metas.pricing.conditions.service.IPricingConditionsRepository;
 import de.metas.product.ProductCategoryId;
 import de.metas.product.ProductId;
-import de.metas.ui.web.document.filter.DocumentFiltersList;
+import de.metas.ui.web.document.filter.DocumentFilterList;
 import de.metas.ui.web.window.datatypes.LookupValue;
 import de.metas.util.Services;
 import de.metas.util.lang.Percent;
@@ -87,7 +87,7 @@ class PricingConditionsRowsLoader
 	private final PricingConditionsRowLookups lookups;
 	private final PricingConditionsBreaksExtractor pricingConditionsBreaksExtractor;
 	private final BasePricingSystemPriceCalculator basePricingSystemPriceCalculator;
-	private final DocumentFiltersList filters;
+	private final DocumentFilterList filters;
 	private final SourceDocumentLine sourceDocumentLine;
 
 	private ImmutableSetMultimap<PricingConditionsId, PricingConditionsInfo> pricingConditionsInfoById; // lazy
@@ -108,13 +108,13 @@ class PricingConditionsRowsLoader
 			@NonNull final PricingConditionsRowLookups lookups,
 			@NonNull final PricingConditionsBreaksExtractor pricingConditionsBreaksExtractor,
 			@NonNull final BasePricingSystemPriceCalculator basePricingSystemPriceCalculator,
-			final DocumentFiltersList filters,
+			final DocumentFilterList filters,
 			@Nullable final SourceDocumentLine sourceDocumentLine)
 	{
 		this.lookups = lookups;
 		this.pricingConditionsBreaksExtractor = pricingConditionsBreaksExtractor;
 		this.basePricingSystemPriceCalculator = basePricingSystemPriceCalculator;
-		this.filters = filters != null ? filters : DocumentFiltersList.EMPTY;
+		this.filters = filters != null ? filters : DocumentFilterList.EMPTY;
 		this.sourceDocumentLine = sourceDocumentLine;
 	}
 
@@ -125,7 +125,7 @@ class PricingConditionsRowsLoader
 		final List<PricingConditionsRow> rows = pricingConditionsRepo.getPricingConditionsByIds(pricingConditionsIds)
 				.stream()
 				.flatMap(pricingConditionsBreaksExtractor::streamPricingConditionsBreaks)
-				.filter(Predicates.notNull())
+				.filter(Objects::nonNull)
 				.flatMap(this::createPricingConditionsRows)
 				.sorted(ROWS_SORTING)
 				.collect(ImmutableList.toImmutableList());
@@ -175,7 +175,7 @@ class PricingConditionsRowsLoader
 		return discountSchemaIdsByBPartnerId.keySet()
 				.stream()
 				.map(lookups::lookupBPartner)
-				.filter(Predicates.notNull())
+				.filter(Objects::nonNull)
 				.map(bpartner -> PricingConditionsInfo.builder()
 						.bpartner(bpartner)
 						.pricingConditionsId(getPricingConditionsIdByBPartner(bpartner, discountSchemaIdsByBPartnerId))
@@ -329,7 +329,7 @@ class PricingConditionsRowsLoader
 	}
 
 	@FunctionalInterface
-	public static interface PricingConditionsBreaksExtractor
+	public interface PricingConditionsBreaksExtractor
 	{
 		Stream<PricingConditionsBreak> streamPricingConditionsBreaks(PricingConditions pricingConditions);
 	}

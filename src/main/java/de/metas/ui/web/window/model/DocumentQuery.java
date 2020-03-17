@@ -1,18 +1,23 @@
 package de.metas.ui.web.window.model;
 
 import java.util.ArrayList;
-import java.util.List;
+import java.util.Collection;
+import java.util.Set;
 import java.util.function.Function;
+
+import javax.annotation.Nullable;
 
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 
 import de.metas.ui.web.document.filter.DocumentFilter;
+import de.metas.ui.web.document.filter.DocumentFilterList;
 import de.metas.ui.web.window.controller.Execution;
 import de.metas.ui.web.window.datatypes.DocumentId;
 import de.metas.ui.web.window.descriptor.DocumentEntityDescriptor;
 import de.metas.util.Check;
+import lombok.NonNull;
 
 /*
  * #%L
@@ -46,27 +51,26 @@ import de.metas.util.Check;
  */
 public final class DocumentQuery
 {
-	public static final Builder builder(final DocumentEntityDescriptor entityDescriptor)
+	public static Builder builder(final DocumentEntityDescriptor entityDescriptor)
 	{
 		return new Builder(entityDescriptor);
 	}
 
-	public static final Builder ofRecordId(final DocumentEntityDescriptor entityDescriptor, final DocumentId recordId)
+	public static Builder ofRecordId(final DocumentEntityDescriptor entityDescriptor, final DocumentId recordId)
 	{
-		Check.assumeNotNull(recordId, "Parameter recordId is not null");
 		return builder(entityDescriptor)
 				.setRecordId(recordId)
 				.noSorting();
 	}
 
 	private final DocumentEntityDescriptor entityDescriptor;
-	private final DocumentId recordId;
+	private final ImmutableSet<DocumentId> recordIds;
 	private final Document parentDocument;
 
-	private final List<DocumentFilter> filters;
+	private final DocumentFilterList filters;
 
 	private final boolean noSorting;
-	private final List<DocumentQueryOrderBy> orderBys;
+	private final DocumentQueryOrderByList orderBys;
 
 	private final int firstRow;
 	private final int pageLength;
@@ -75,12 +79,11 @@ public final class DocumentQuery
 
 	private DocumentQuery(final Builder builder)
 	{
-		super();
 		entityDescriptor = builder.entityDescriptor; // not null
-		recordId = builder.recordId;
+		recordIds = ImmutableSet.copyOf(builder.recordIds);
 		parentDocument = builder.parentDocument;
 
-		filters = builder.filters == null ? ImmutableList.of() : ImmutableList.copyOf(builder.filters);
+		filters = DocumentFilterList.ofList(builder.filters);
 
 		noSorting = builder.isNoSorting();
 		orderBys = builder.getOrderBysEffective();
@@ -97,7 +100,7 @@ public final class DocumentQuery
 		return MoreObjects.toStringHelper(this)
 				.omitNullValues()
 				.add("tableName", entityDescriptor.getTableNameOrNull())
-				.add("recordId", recordId)
+				.add("recordIds", recordIds.isEmpty() ? null : recordIds)
 				.add("parentDocument", parentDocument)
 				.add("filters", filters.isEmpty() ? null : filters)
 				.add("firstRow", firstRow > 0 ? firstRow : null)
@@ -111,9 +114,9 @@ public final class DocumentQuery
 		return entityDescriptor;
 	}
 
-	public DocumentId getRecordId()
+	public ImmutableSet<DocumentId> getRecordIds()
 	{
-		return recordId;
+		return recordIds;
 	}
 
 	public Document getParentDocument()
@@ -131,7 +134,7 @@ public final class DocumentQuery
 		return parentDocument != null;
 	}
 
-	public List<DocumentFilter> getFilters()
+	public DocumentFilterList getFilters()
 	{
 		return filters;
 	}
@@ -141,7 +144,7 @@ public final class DocumentQuery
 		return noSorting;
 	}
 
-	public List<DocumentQueryOrderBy> getOrderBys()
+	public DocumentQueryOrderByList getOrderBys()
 	{
 		return orderBys;
 	}
@@ -165,11 +168,11 @@ public final class DocumentQuery
 	{
 		private final DocumentEntityDescriptor entityDescriptor;
 		private Document parentDocument;
-		private DocumentId recordId;
-		public List<DocumentFilter> filters = null;
+		private Set<DocumentId> recordIds = ImmutableSet.of();
+		public ArrayList<DocumentFilter> filters = null;
 
 		private boolean _noSorting = false; // always false by default
-		public List<DocumentQueryOrderBy> _orderBys = null;
+		public ArrayList<DocumentQueryOrderBy> _orderBys = null;
 
 		private int firstRow = -1;
 		private int pageLength = -1;
@@ -179,7 +182,6 @@ public final class DocumentQuery
 
 		private Builder(final DocumentEntityDescriptor entityDescriptor)
 		{
-			super();
 			this.entityDescriptor = Preconditions.checkNotNull(entityDescriptor);
 		}
 
@@ -213,7 +215,7 @@ public final class DocumentQuery
 			final DocumentsRepository documentsRepository = getDocumentsRepository();
 			return documentsRepository.retrieveParentDocumentId(parentEntityDescriptor, query);
 		}
-		
+
 		public int retrieveLastLineNo()
 		{
 			final DocumentQuery query = build();
@@ -221,48 +223,32 @@ public final class DocumentQuery
 			return documentsRepository.retrieveLastLineNo(query);
 		}
 
-
 		private DocumentsRepository getDocumentsRepository()
 		{
 			return entityDescriptor.getDataBinding().getDocumentsRepository();
 		}
 
-		public Builder setRecordId(final DocumentId documentId)
+		public Builder setRecordId(@Nullable final DocumentId documentId)
 		{
-			recordId = documentId;
+			recordIds = documentId != null
+					? ImmutableSet.of(documentId)
+					: ImmutableSet.of();
+
+			return this;
+		}
+
+		public Builder setRecordIds(@Nullable final Collection<DocumentId> documentIds)
+		{
+			recordIds = documentIds != null
+					? ImmutableSet.copyOf(documentIds)
+					: ImmutableSet.of();
+
 			return this;
 		}
 
 		public Builder setParentDocument(final Document parentDocument)
 		{
 			this.parentDocument = parentDocument;
-			return this;
-		}
-
-		public Builder addFilter(final DocumentFilter filter)
-		{
-			Check.assumeNotNull(filter, "Parameter filter is not null");
-
-			if (filters == null)
-			{
-				filters = new ArrayList<>();
-			}
-			filters.add(filter);
-			return this;
-		}
-
-		public Builder addFilters(final List<DocumentFilter> filtersToAdd)
-		{
-			if (filtersToAdd == null || filtersToAdd.isEmpty())
-			{
-				return this;
-			}
-
-			if (filters == null)
-			{
-				filters = new ArrayList<>();
-			}
-			filters.addAll(filtersToAdd);
 			return this;
 		}
 
@@ -278,9 +264,8 @@ public final class DocumentQuery
 			return _noSorting;
 		}
 
-		public Builder addOrderBy(final DocumentQueryOrderBy orderBy)
+		public Builder addOrderBy(@NonNull final DocumentQueryOrderBy orderBy)
 		{
-			Check.assumeNotNull(orderBy, "Parameter orderBy is not null for {}", this);
 			Check.assume(!_noSorting, "sorting not disabled for {}", this);
 
 			if (_orderBys == null)
@@ -290,31 +275,25 @@ public final class DocumentQuery
 			_orderBys.add(orderBy);
 			return this;
 		}
-		
-		public Builder setOrderBys(final List<DocumentQueryOrderBy> orderBys)
+
+		public Builder setOrderBys(final DocumentQueryOrderByList orderBys)
 		{
-			if(orderBys == null || orderBys.isEmpty())
+			if (orderBys == null || orderBys.isEmpty())
 			{
 				_orderBys = null;
 			}
 			else
 			{
-				_orderBys = new ArrayList<>(orderBys);
+				_orderBys = new ArrayList<>(orderBys.toList());
 			}
 			return this;
 		}
 
-		private List<DocumentQueryOrderBy> getOrderBysEffective()
+		private DocumentQueryOrderByList getOrderBysEffective()
 		{
-			if (_noSorting)
-			{
-				return ImmutableList.of();
-			}
-			if (_orderBys == null || _orderBys.isEmpty())
-			{
-				return ImmutableList.of();
-			}
-			return ImmutableList.copyOf(_orderBys);
+			return _noSorting
+					? DocumentQueryOrderByList.EMPTY
+					: DocumentQueryOrderByList.ofList(_orderBys);
 		}
 
 		public Builder setFirstRow(final int firstRow)

@@ -2,10 +2,14 @@ package de.metas.ui.web.window.model;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.List;
+
+import javax.annotation.Nullable;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
 
+import de.metas.ui.web.window.datatypes.DocumentId;
 import lombok.NonNull;
 import lombok.ToString;
 
@@ -42,28 +46,40 @@ import lombok.ToString;
 @ToString
 public final class OrderedDocumentsList
 {
-	public static final OrderedDocumentsList of(final Collection<Document> documents, final List<DocumentQueryOrderBy> orderBys)
+	public static OrderedDocumentsList of(final Collection<Document> documents, final DocumentQueryOrderByList orderBys)
 	{
 		return new OrderedDocumentsList(documents, orderBys);
 	}
 
-	public static final OrderedDocumentsList newEmpty(final List<DocumentQueryOrderBy> orderBys)
+	public static OrderedDocumentsList newEmpty()
+	{
+		return new OrderedDocumentsList(ImmutableList.of(), DocumentQueryOrderByList.EMPTY);
+	}
+
+	public static OrderedDocumentsList newEmpty(final DocumentQueryOrderByList orderBys)
 	{
 		return new OrderedDocumentsList(ImmutableList.of(), orderBys);
 	}
 
-	private final List<Document> documents;
-	private final List<DocumentQueryOrderBy> orderBys;
+	private final ArrayList<Document> documents;
+	private final DocumentQueryOrderByList orderBys;
 
-	private OrderedDocumentsList(final Collection<Document> documents, final List<DocumentQueryOrderBy> orderBys)
+	private OrderedDocumentsList(
+			@Nullable final Collection<Document> documents,
+			@NonNull final DocumentQueryOrderByList orderBys)
 	{
 		this.documents = documents == null ? new ArrayList<>() : new ArrayList<>(documents);
-		this.orderBys = ImmutableList.copyOf(orderBys);
+		this.orderBys = orderBys;
 	}
 
-	public List<Document> toList()
+	public ArrayList<Document> toList()
 	{
 		return documents;
+	}
+
+	public ImmutableMap<DocumentId, Document> toImmutableMap()
+	{
+		return Maps.uniqueIndex(documents, Document::getDocumentId);
 	}
 
 	public void addDocument(@NonNull final Document document)
@@ -96,7 +112,7 @@ public final class OrderedDocumentsList
 		return documents.get(index);
 	}
 
-	public List<DocumentQueryOrderBy> getOrderBys()
+	public DocumentQueryOrderByList getOrderBys()
 	{
 		return orderBys;
 	}

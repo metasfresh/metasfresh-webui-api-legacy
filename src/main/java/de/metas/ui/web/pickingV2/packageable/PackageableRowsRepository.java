@@ -12,7 +12,7 @@ import org.compiere.model.I_M_Shipper;
 import org.compiere.util.Util.ArrayKey;
 import org.slf4j.Logger;
 
-import com.google.common.base.Predicates;
+import java.util.Objects;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
@@ -28,7 +28,7 @@ import de.metas.money.Money;
 import de.metas.money.MoneyService;
 import de.metas.order.OrderId;
 import de.metas.shipping.ShipperId;
-import de.metas.ui.web.document.filter.DocumentFilter;
+import de.metas.ui.web.document.filter.DocumentFilterList;
 import de.metas.ui.web.pickingV2.packageable.PackageableRowsData.PackageableRowsDataBuilder;
 import de.metas.ui.web.window.datatypes.LookupValue;
 import de.metas.ui.web.window.model.lookup.LookupDataSource;
@@ -89,7 +89,7 @@ final class PackageableRowsRepository
 		return PackageableRowsData.builder().repo(this);
 	}
 
-	List<PackageableRow> retrieveRows(final List<DocumentFilter> filters)
+	List<PackageableRow> retrieveRows(final DocumentFilterList filters)
 	{
 		final PackageableQuery query = createPackageableQuery(filters);
 
@@ -99,12 +99,12 @@ final class PackageableRowsRepository
 				.values()
 				.stream()
 				.map(this::createPackageableRowNoFail)
-				.filter(Predicates.notNull())
+				.filter(Objects::nonNull)
 				.sorted(Comparator.comparing(PackageableRow::getPreparationDate).thenComparing(PackageableRow::getOrderDocumentNo))
 				.collect(ImmutableList.toImmutableList());
 	}
 
-	private PackageableQuery createPackageableQuery(final List<DocumentFilter> filters)
+	private PackageableQuery createPackageableQuery(final DocumentFilterList filters)
 	{
 		final PackageableViewFilterVO filterVO = PackageableViewFilters.extractPackageableViewFilterVO(filters);
 
@@ -184,7 +184,7 @@ final class PackageableRowsRepository
 	{
 		return packageables.stream()
 				.map(Packageable::getSalesOrderLineNetAmt)
-				.filter(Predicates.notNull())
+				.filter(Objects::nonNull)
 				.collect(Money.sumByCurrencyAndStream())
 				.map(moneyService::toTranslatableString)
 				.collect(TranslatableStrings.joining(", "));

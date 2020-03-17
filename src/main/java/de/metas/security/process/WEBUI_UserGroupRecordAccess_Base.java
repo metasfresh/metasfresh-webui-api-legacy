@@ -5,7 +5,7 @@ import java.util.Set;
 
 import org.adempiere.exceptions.AdempiereException;
 import org.adempiere.exceptions.FillMandatoryException;
-import org.compiere.Adempiere;
+import org.compiere.SpringContextHolder;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -15,6 +15,7 @@ import de.metas.process.Param;
 import de.metas.process.ProcessPreconditionsResolution;
 import de.metas.security.Principal;
 import de.metas.security.permissions.Access;
+import de.metas.security.permissions.record_access.PermissionIssuer;
 import de.metas.security.permissions.record_access.RecordAccessGrantRequest;
 import de.metas.security.permissions.record_access.RecordAccessRevokeRequest;
 import de.metas.security.permissions.record_access.RecordAccessService;
@@ -48,7 +49,7 @@ import de.metas.util.Check;
 
 abstract class WEBUI_UserGroupRecordAccess_Base extends ViewBasedProcessTemplate implements IProcessPrecondition
 {
-	private final RecordAccessService userGroupRecordAccessService = Adempiere.getBean(RecordAccessService.class);
+	private final RecordAccessService userGroupRecordAccessService = SpringContextHolder.instance.getBean(RecordAccessService.class);
 
 	@Param(parameterName = "PrincipalType", mandatory = true)
 	private String principalTypeCode;
@@ -88,6 +89,7 @@ abstract class WEBUI_UserGroupRecordAccess_Base extends ViewBasedProcessTemplate
 	{
 		final Principal principal = getPrincipal();
 		final Set<Access> permissionsToGrant = getPermissionsToGrant();
+		final UserId requestedBy = getUserId();
 
 		final IView view = getView();
 		getSelectedRowIds()
@@ -97,12 +99,15 @@ abstract class WEBUI_UserGroupRecordAccess_Base extends ViewBasedProcessTemplate
 						.recordRef(recordRef)
 						.principal(principal)
 						.permissions(permissionsToGrant)
+						.issuer(PermissionIssuer.MANUAL)
+						.requestedBy(requestedBy)
 						.build()));
 	}
 
 	protected final void revokeAccessFromSelectedRows()
 	{
 		final Principal principal = getPrincipal();
+		final UserId requestedBy = getUserId();
 
 		final boolean revokeAllPermissions;
 		final List<Access> permissionsToRevoke;
@@ -127,6 +132,8 @@ abstract class WEBUI_UserGroupRecordAccess_Base extends ViewBasedProcessTemplate
 						.principal(principal)
 						.revokeAllPermissions(revokeAllPermissions)
 						.permissions(permissionsToRevoke)
+						.issuer(PermissionIssuer.MANUAL)
+						.requestedBy(requestedBy)
 						.build()));
 	}
 
@@ -176,5 +183,4 @@ abstract class WEBUI_UserGroupRecordAccess_Base extends ViewBasedProcessTemplate
 			return Access.ofCode(permissionCode);
 		}
 	}
-
 }

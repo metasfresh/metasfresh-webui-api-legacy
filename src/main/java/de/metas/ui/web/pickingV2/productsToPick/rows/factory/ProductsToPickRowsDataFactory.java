@@ -19,7 +19,7 @@ import org.adempiere.mm.attributes.api.ImmutableAttributeSet;
 import org.adempiere.mm.attributes.api.impl.LotNumberDateAttributeDAO;
 import org.eevolution.api.IPPOrderBL;
 
-import com.google.common.base.Predicates;
+import java.util.Objects;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
@@ -38,6 +38,7 @@ import de.metas.handlingunits.picking.PickingCandidateService;
 import de.metas.handlingunits.picking.PickingCandidateStatus;
 import de.metas.handlingunits.reservation.HUReservation;
 import de.metas.handlingunits.reservation.HUReservationService;
+import de.metas.inoutcandidate.api.Packageable;
 import de.metas.inoutcandidate.api.ShipmentScheduleId;
 import de.metas.material.planning.pporder.PPOrderBOMLineId;
 import de.metas.material.planning.pporder.PPOrderId;
@@ -142,7 +143,7 @@ public final class ProductsToPickRowsDataFactory
 	{
 		final ImmutableList<ProductsToPickRow> rows = packageableRow.getPackageables()
 				.stream()
-				.map(AllocablePackageable::of)
+				.map(this::toAllocablePackageable)
 				.flatMap(this::createRowsAndStream)
 				.collect(ImmutableList.toImmutableList());
 
@@ -150,6 +151,29 @@ public final class ProductsToPickRowsDataFactory
 				.pickingCandidateService(pickingCandidateService)
 				.rows(rows)
 				.orderBy(DocumentQueryOrderBy.byFieldName(ProductsToPickRow.FIELD_Locator))
+				.build();
+	}
+
+	private AllocablePackageable toAllocablePackageable(@NonNull final Packageable packageable)
+	{
+		final Quantity qtyToAllocateTarget = packageable.getQtyToDeliver()
+				.subtract(packageable.getQtyPickedNotDelivered())
+				// IMPORTANT: don't subtract the Qty PickedPlanned
+				// because we will also allocate existing DRAFT picking candidates
+				// .subtract(packageable.getQtyPickedPlanned())
+				.toZeroIfNegative();
+
+		return AllocablePackageable.builder()
+				.customerId(packageable.getCustomerId())
+				.productId(packageable.getProductId())
+				.asiId(packageable.getAsiId())
+				.shipmentScheduleId(packageable.getShipmentScheduleId())
+				.bestBeforePolicy(packageable.getBestBeforePolicy())
+				.warehouseId(packageable.getWarehouseId())
+				.salesOrderLineIdOrNull(packageable.getSalesOrderLineIdOrNull())
+				.shipperId(packageable.getShipperId())
+				.pickFromOrderId(packageable.getPickFromOrderId())
+				.qtyToAllocateTarget(qtyToAllocateTarget)
 				.build();
 	}
 
@@ -192,7 +216,7 @@ public final class ProductsToPickRowsDataFactory
 		return pickingCandidates
 				.stream()
 				.map(pickingCandidate -> createRowFromExistingPickingCandidate(packageable, pickingCandidate))
-				.filter(Predicates.notNull())
+				.filter(Objects::nonNull)
 				.collect(ImmutableList.toImmutableList());
 	}
 
@@ -269,7 +293,7 @@ public final class ProductsToPickRowsDataFactory
 						.<ProductsToPickRow> comparingInt(row -> row.isHuReservedForThisRow() ? 0 : 1) // consider reserved HU first
 						.thenComparing(bestBeforePolicy.comparator(ProductsToPickRow::getExpiringDate))) // then first/last expiring HU
 				.map(row -> allocateRowFromHU(row, packageable))
-				.filter(Predicates.notNull())
+				.filter(Objects::nonNull)
 				.collect(ImmutableList.toImmutableList());
 	}
 

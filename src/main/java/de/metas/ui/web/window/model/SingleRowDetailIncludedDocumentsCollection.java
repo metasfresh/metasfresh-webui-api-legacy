@@ -1,11 +1,10 @@
 package de.metas.ui.web.window.model;
 
-import java.util.List;
-
 import org.adempiere.ad.expression.api.LogicExpressionResult;
 import org.slf4j.Logger;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 
 import de.metas.logging.LogManager;
 import de.metas.ui.web.window.datatypes.DocumentId;
@@ -94,7 +93,7 @@ public class SingleRowDetailIncludedDocumentsCollection implements IIncludedDocu
 	}
 
 	@Override
-	public OrderedDocumentsList getDocuments(@NonNull final List<DocumentQueryOrderBy> orderBys)
+	public OrderedDocumentsList getDocuments(@NonNull final DocumentQueryOrderByList orderBys)
 	{
 		final Document document = DocumentQuery.builder(entityDescriptor)
 				.setParentDocument(parentDocument)
@@ -104,6 +103,28 @@ public class SingleRowDetailIncludedDocumentsCollection implements IIncludedDocu
 		setSingleDocument(document);
 
 		return OrderedDocumentsList.of(ImmutableList.of(document), orderBys);
+	}
+
+	@Override
+	public OrderedDocumentsList getDocumentsByIds(DocumentIdsSelection documentIds)
+	{
+		final ImmutableMap<DocumentId, Document> loadedDocuments = getDocuments(DocumentQueryOrderByList.EMPTY).toImmutableMap();
+
+		final OrderedDocumentsList result = OrderedDocumentsList.newEmpty();
+		for (final DocumentId documentId : documentIds.toSet())
+		{
+			final Document loadedDocument = loadedDocuments.get(documentId);
+			if (loadedDocument != null)
+			{
+				result.addDocument(loadedDocument);
+			}
+			else
+			{
+				// No document found for documentId. Ignore it.
+			}
+		}
+
+		return result;
 	}
 
 	@Override
