@@ -58,7 +58,7 @@ public class PaymentToReconcileRow implements IViewRow
 
 	@ViewColumn(seqNo = 50, widgetType = DocumentFieldWidgetType.Text, widgetSize = WidgetSize.Small, captionKey = "InvoiceDocumentNo")
 	@Getter
-	private final String invoiceDocumentNo;
+	private final String invoiceDocumentNos;
 
 	@ViewColumn(seqNo = 60, widgetType = DocumentFieldWidgetType.Amount, widgetSize = WidgetSize.Small, captionKey = "PayAmt")
 	@Getter
@@ -68,7 +68,11 @@ public class PaymentToReconcileRow implements IViewRow
 	private final String currencyCode;
 
 	//
+	@Getter
+	private final PaymentId paymentId;
 	private final DocumentId rowId;
+	@Getter
+	private final boolean reconciled;
 	private final ViewRowFieldNameAndJsonValuesHolder<PaymentToReconcileRow> values;
 
 	@Builder
@@ -78,19 +82,27 @@ public class PaymentToReconcileRow implements IViewRow
 			@NonNull final String documentNo,
 			@NonNull final LocalDate dateTrx,
 			@NonNull final LookupValue bpartner,
-			final String invoiceDocumentNo,
-			@NonNull final Amount payAmt)
+			final String invoiceDocumentNos,
+			@NonNull final Amount payAmt,
+			final boolean reconciled)
 	{
 		this.inboundPayment = inboundPayment;
 		this.documentNo = documentNo;
 		this.dateTrx = dateTrx;
 		this.bpartner = bpartner;
-		this.invoiceDocumentNo = invoiceDocumentNo;
+		this.invoiceDocumentNos = invoiceDocumentNos;
 		this.payAmt = payAmt;
 		this.currencyCode = payAmt.getCurrencyCode().toThreeLetterCode();
 
+		this.paymentId = paymentId;
 		this.rowId = convertPaymentIdToDocumentId(paymentId);
+		this.reconciled = reconciled;
 		this.values = ViewRowFieldNameAndJsonValuesHolder.newInstance(PaymentToReconcileRow.class);
+	}
+
+	public static PaymentToReconcileRow cast(final IViewRow row)
+	{
+		return (PaymentToReconcileRow)row;
 	}
 
 	@Override
@@ -102,7 +114,7 @@ public class PaymentToReconcileRow implements IViewRow
 	@Override
 	public boolean isProcessed()
 	{
-		return false;
+		return isReconciled();
 	}
 
 	@Override
@@ -131,5 +143,10 @@ public class PaymentToReconcileRow implements IViewRow
 	static PaymentId convertDocumentIdToPaymentId(@NonNull final DocumentId rowId)
 	{
 		return rowId.toId(PaymentId::ofRepoId);
+	}
+
+	public Amount getPayAmtNegateIfOutbound()
+	{
+		return getPayAmt().negateIf(!inboundPayment);
 	}
 }

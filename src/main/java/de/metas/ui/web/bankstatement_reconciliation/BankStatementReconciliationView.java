@@ -39,18 +39,18 @@ import lombok.NonNull;
  * #L%
  */
 
-public class BanksStatementReconciliationView extends AbstractCustomView<BankStatementLineRow> implements IViewRowOverrides
+public class BankStatementReconciliationView extends AbstractCustomView<BankStatementLineRow> implements IViewRowOverrides
 {
-	public static BanksStatementReconciliationView cast(final IView view)
+	public static BankStatementReconciliationView cast(final IView view)
 	{
-		return (BanksStatementReconciliationView)view;
+		return (BankStatementReconciliationView)view;
 	}
 
 	@Getter
 	private final PaymentsToReconcileView paymentsToReconcileView;
 
 	@Builder
-	private BanksStatementReconciliationView(
+	private BankStatementReconciliationView(
 			@NonNull final ViewId bankStatementViewId,
 			final BankStatementLineAndPaymentsRows rows,
 			@Nullable final List<RelatedProcessDescriptor> paymentToReconcilateProcesses)
@@ -61,7 +61,7 @@ public class BanksStatementReconciliationView extends AbstractCustomView<BankSta
 				NullDocumentFilterDescriptorsProvider.instance);
 
 		paymentsToReconcileView = PaymentsToReconcileView.builder()
-				.viewId(bankStatementViewId.withWindowId(PaymentsToReconcileViewFactory.WINDOW_ID))
+				.bankStatementViewId(bankStatementViewId)
 				.rows(rows.getPaymentToReconcileRows())
 				.processes(paymentToReconcilateProcesses)
 				.build();

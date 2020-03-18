@@ -69,7 +69,7 @@ abstract class BankStatementBasedProcess extends JavaProcess implements IProcess
 		final BankStatementId bankStatementId = BankStatementId.ofRepoId(context.getSingleSelectedRecordId());
 		final I_C_BankStatement bankStatement = bankStatementDAO.getById(bankStatementId);
 		final DocStatus docStatus = DocStatus.ofCode(bankStatement.getDocStatus());
-		if (!docStatus.isCompleted() && !docStatus.isDraftedOrInProgress())
+		if (!docStatus.isDraftedInProgressOrCompleted())
 		{
 			return ProcessPreconditionsResolution.reject(msgBL.getTranslatableMsgText(BANK_STATEMENT_MUST_BE_COMPLETED_OR_IN_PROGRESS_MSG));
 		}

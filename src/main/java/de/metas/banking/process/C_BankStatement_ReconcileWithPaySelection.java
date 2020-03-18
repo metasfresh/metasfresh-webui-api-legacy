@@ -1,9 +1,23 @@
 package de.metas.banking.process;
 
+import java.util.Set;
+
+import org.adempiere.exceptions.AdempiereException;
+import org.compiere.SpringContextHolder;
+
 import de.metas.banking.model.PaySelectionId;
+import de.metas.banking.payment.IPaySelectionBL;
+import de.metas.payment.PaymentId;
 import de.metas.process.IProcessPreconditionsContext;
 import de.metas.process.Param;
+import de.metas.process.ProcessExecutionResult.ViewOpenTarget;
+import de.metas.process.ProcessExecutionResult.WebuiViewToOpen;
 import de.metas.process.ProcessPreconditionsResolution;
+import de.metas.ui.web.bankstatement_reconciliation.BankStatementReconciliationViewFactory;
+import de.metas.ui.web.bankstatement_reconciliation.BankStatementReconciliationView;
+import de.metas.ui.web.bankstatement_reconciliation.BanksStatementReconciliationViewCreateRequest;
+import de.metas.ui.web.view.ViewId;
+import de.metas.util.Services;
 import lombok.NonNull;
 
 /*
@@ -30,6 +44,9 @@ import lombok.NonNull;
 
 public class C_BankStatement_ReconcileWithPaySelection extends BankStatementBasedProcess
 {
+	private final IPaySelectionBL paySelectionBL = Services.get(IPaySelectionBL.class);
+	private final BankStatementReconciliationViewFactory bankStatementReconciliationViewFactory = SpringContextHolder.instance.getBean(BankStatementReconciliationViewFactory.class);
+
 	@Param(parameterName = "C_PaySelection_ID", mandatory = true)
 	private PaySelectionId paySelectionId;
 
@@ -43,7 +60,23 @@ public class C_BankStatement_ReconcileWithPaySelection extends BankStatementBase
 	@Override
 	protected String doIt()
 	{
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException();
+		final Set<PaymentId> paymentIds = paySelectionBL.getPaymentIds(paySelectionId);
+		if (paymentIds.isEmpty())
+		{
+			throw new AdempiereException("@NoPayments@");
+		}
+
+		final BankStatementReconciliationView view = bankStatementReconciliationViewFactory.createView(BanksStatementReconciliationViewCreateRequest.builder()
+				.bankStatementLineId(getSingleSelectedBankStatementLineId())
+				.paymentIds(paymentIds)
+				.build());
+		final ViewId viewId = view.getViewId();
+
+		getResult().setWebuiViewToOpen(WebuiViewToOpen.builder()
+				.viewId(viewId.toJson())
+				.target(ViewOpenTarget.ModalOverlay)
+				.build());
+
+		return MSG_OK;
 	}
 }

@@ -46,10 +46,10 @@ public class PaymentsToReconcileViewFactory implements IViewFactory, IViewsIndex
 	static final String WINDOW_ID_String = "paymentsToReconcile";
 	public static final WindowId WINDOW_ID = WindowId.fromJson(WINDOW_ID_String);
 
-	private final BanksStatementReconciliationViewFactory banksStatementReconciliationViewFactory;
+	private final BankStatementReconciliationViewFactory banksStatementReconciliationViewFactory;
 
 	public PaymentsToReconcileViewFactory(
-			@NonNull final BanksStatementReconciliationViewFactory banksStatementReconciliationViewFactory)
+			@NonNull final BankStatementReconciliationViewFactory banksStatementReconciliationViewFactory)
 	{
 		this.banksStatementReconciliationViewFactory = banksStatementReconciliationViewFactory;
 	}
@@ -98,7 +98,7 @@ public class PaymentsToReconcileViewFactory implements IViewFactory, IViewsIndex
 	public PaymentsToReconcileView getByIdOrNull(@NonNull final ViewId paymentsToReconcileViewId)
 	{
 		final ViewId bankStatementReconciliationViewId = toBankStatementReconciliationViewId(paymentsToReconcileViewId);
-		final BanksStatementReconciliationView bankStatementReconciliationView = banksStatementReconciliationViewFactory.getByIdOrNull(bankStatementReconciliationViewId);
+		final BankStatementReconciliationView bankStatementReconciliationView = banksStatementReconciliationViewFactory.getByIdOrNull(bankStatementReconciliationViewId);
 		return bankStatementReconciliationView != null
 				? bankStatementReconciliationView.getPaymentsToReconcileView()
 				: null;
@@ -106,7 +106,7 @@ public class PaymentsToReconcileViewFactory implements IViewFactory, IViewsIndex
 
 	private static ViewId toBankStatementReconciliationViewId(@NonNull final ViewId paymentsToReconcileViewId)
 	{
-		return paymentsToReconcileViewId.withWindowId(BanksStatementReconciliationViewFactory.WINDOW_ID);
+		return paymentsToReconcileViewId.withWindowId(BankStatementReconciliationViewFactory.WINDOW_ID);
 	}
 
 	@Override
@@ -119,8 +119,8 @@ public class PaymentsToReconcileViewFactory implements IViewFactory, IViewsIndex
 	public Stream<IView> streamAllViews()
 	{
 		return banksStatementReconciliationViewFactory.streamAllViews()
-				.map(BanksStatementReconciliationView::cast)
-				.map(BanksStatementReconciliationView::getPaymentsToReconcileView);
+				.map(BankStatementReconciliationView::cast)
+				.map(BankStatementReconciliationView::getPaymentsToReconcileView);
 	}
 
 	@Override

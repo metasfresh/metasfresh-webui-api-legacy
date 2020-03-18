@@ -1,16 +1,15 @@
 package de.metas.ui.web.bankstatement_reconciliation;
 
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Stream;
-
-import org.adempiere.exceptions.AdempiereException;
 
 import com.google.common.collect.ImmutableList;
 
-import de.metas.banking.model.BankStatementLineId;
 import de.metas.i18n.IMsgBL;
+import de.metas.process.IADProcessDAO;
 import de.metas.process.RelatedProcessDescriptor;
+import de.metas.process.RelatedProcessDescriptor.DisplayPlace;
+import de.metas.ui.web.bankstatement_reconciliation.process.PaymentsToReconcileView_Reconcile;
 import de.metas.ui.web.view.CreateViewRequest;
 import de.metas.ui.web.view.DefaultViewsRepositoryStorage;
 import de.metas.ui.web.view.IView;
@@ -51,17 +50,18 @@ import lombok.NonNull;
  * #L%
  */
 
-@ViewFactory(windowId = BanksStatementReconciliationViewFactory.WINDOW_ID_String)
-public class BanksStatementReconciliationViewFactory implements IViewFactory, IViewsIndexStorage
+@ViewFactory(windowId = BankStatementReconciliationViewFactory.WINDOW_ID_String)
+public class BankStatementReconciliationViewFactory implements IViewFactory, IViewsIndexStorage
 {
 	static final String WINDOW_ID_String = "bankStatementReconciliation";
 	public static final WindowId WINDOW_ID = WindowId.fromJson(WINDOW_ID_String);
 
 	private final IMsgBL msgBL = Services.get(IMsgBL.class);
+	private final IADProcessDAO adProcessDAO = Services.get(IADProcessDAO.class);
 	private final BankStatementLineAndPaymentsToReconcileRepository rowsRepo;
 	private final DefaultViewsRepositoryStorage views = new DefaultViewsRepositoryStorage();
 
-	public BanksStatementReconciliationViewFactory(
+	public BankStatementReconciliationViewFactory(
 			@NonNull final BankStatementLineAndPaymentsToReconcileRepository rowsRepo)
 	{
 		this.rowsRepo = rowsRepo;
@@ -91,23 +91,41 @@ public class BanksStatementReconciliationViewFactory implements IViewFactory, IV
 	}
 
 	@Override
-	public BanksStatementReconciliationView createView(final CreateViewRequest request)
+	@Deprecated
+	public BankStatementReconciliationView createView(final CreateViewRequest request)
 	{
-		final ViewId bankStatementViewId = request.getViewId();
-		bankStatementViewId.assertWindowId(WINDOW_ID);
+		throw new UnsupportedOperationException();
+	}
 
-		final Set<BankStatementLineId> bankStatementLineIds = BankStatementLineId.fromIntSet(request.getFilterOnlyIds());
-		if (bankStatementLineIds.isEmpty())
-		{
-			throw new AdempiereException("@NoSelection@");
-		}
+	public BankStatementReconciliationView createView(@NonNull final BanksStatementReconciliationViewCreateRequest request)
+	{
+		final BankStatementLineAndPaymentsRows rows = retrieveRowsData(request);
 
-		final BankStatementLineAndPaymentsRows rows = null; // TODO
-
-		return BanksStatementReconciliationView.builder()
-				.bankStatementViewId(bankStatementViewId)
+		final BankStatementReconciliationView view = BankStatementReconciliationView.builder()
+				.bankStatementViewId(ViewId.random(WINDOW_ID))
 				.rows(rows)
 				.paymentToReconcilateProcesses(getPaymentToReconcilateProcesses())
+				.build();
+
+		put(view);
+
+		return view;
+	}
+
+	private BankStatementLineAndPaymentsRows retrieveRowsData(final BanksStatementReconciliationViewCreateRequest request)
+	{
+		final List<BankStatementLineRow> bankStatementLineRows = rowsRepo.getBankStatementLineRowsByIds(request.getBankStatementLineIds());
+		final List<PaymentToReconcileRow> paymentToReconcileRows = rowsRepo.getPaymentToReconcileRowsByIds(request.getPaymentIds());
+
+		return BankStatementLineAndPaymentsRows.builder()
+				.bankStatementLineRows(BankStatementLineRows.builder()
+						.repository(rowsRepo)
+						.rows(bankStatementLineRows)
+						.build())
+				.paymentToReconcileRows(PaymentToReconcileRows.builder()
+						.repository(rowsRepo)
+						.rows(paymentToReconcileRows)
+						.build())
 				.build();
 	}
 
@@ -124,9 +142,9 @@ public class BanksStatementReconciliationViewFactory implements IViewFactory, IV
 	}
 
 	@Override
-	public BanksStatementReconciliationView getByIdOrNull(final ViewId viewId)
+	public BankStatementReconciliationView getByIdOrNull(final ViewId viewId)
 	{
-		return BanksStatementReconciliationView.cast(views.getByIdOrNull(viewId));
+		return BankStatementReconciliationView.cast(views.getByIdOrNull(viewId));
 	}
 
 	@Override
@@ -149,7 +167,18 @@ public class BanksStatementReconciliationViewFactory implements IViewFactory, IV
 
 	private List<RelatedProcessDescriptor> getPaymentToReconcilateProcesses()
 	{
-		// TODO Auto-generated method stub
-		return ImmutableList.of();
+		return ImmutableList.of(
+				createProcessDescriptor(PaymentsToReconcileView_Reconcile.class));
 	}
+
+	private final RelatedProcessDescriptor createProcessDescriptor(@NonNull final Class<?> processClass)
+	{
+		return RelatedProcessDescriptor.builder()
+				.processId(adProcessDAO.retrieveProcessIdByClass(processClass))
+				.anyTable()
+				.anyWindow()
+				.displayPlace(DisplayPlace.ViewQuickActions)
+				.build();
+	}
+
 }

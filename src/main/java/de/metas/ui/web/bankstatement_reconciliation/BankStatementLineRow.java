@@ -17,6 +17,7 @@ import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
 import de.metas.ui.web.window.descriptor.WidgetSize;
 import de.metas.util.StringUtils;
 import lombok.Builder;
+import lombok.Getter;
 import lombok.NonNull;
 
 /*
@@ -50,6 +51,7 @@ public class BankStatementLineRow implements IViewRow
 	private final LocalDate dateAcct;
 
 	@ViewColumn(seqNo = 30, widgetType = DocumentFieldWidgetType.Amount, widgetSize = WidgetSize.Small, captionKey = "StmtAmt")
+	@Getter
 	private final Amount statementLineAmt;
 
 	@ViewColumn(seqNo = 40, widgetType = DocumentFieldWidgetType.Text, widgetSize = WidgetSize.Small, captionKey = "C_Currency_ID")
@@ -59,7 +61,11 @@ public class BankStatementLineRow implements IViewRow
 	private final String description;
 
 	//
+	@Getter
+	private final BankStatementLineId bankStatementLineId;
 	private final DocumentId rowId;
+	@Getter
+	private final boolean reconciled;
 	private final ViewRowFieldNameAndJsonValuesHolder<BankStatementLineRow> values;
 
 	@Builder
@@ -68,7 +74,8 @@ public class BankStatementLineRow implements IViewRow
 			final int lineNo,
 			@NonNull final LocalDate dateAcct,
 			@NonNull final Amount statementLineAmt,
-			@Nullable final String description)
+			@Nullable final String description,
+			final boolean reconciled)
 	{
 		this.lineNo = lineNo;
 		this.dateAcct = dateAcct;
@@ -76,7 +83,9 @@ public class BankStatementLineRow implements IViewRow
 		this.currencyCode = statementLineAmt.getCurrencyCode().toThreeLetterCode();
 		this.description = StringUtils.trimBlankToNull(description);
 
+		this.bankStatementLineId = bankStatementLineId;
 		this.rowId = convertBankStatementLineIdToDocumentId(bankStatementLineId);
+		this.reconciled = reconciled;
 		values = ViewRowFieldNameAndJsonValuesHolder.newInstance(BankStatementLineRow.class);
 
 	}
@@ -90,7 +99,7 @@ public class BankStatementLineRow implements IViewRow
 	@Override
 	public boolean isProcessed()
 	{
-		return false;
+		return isReconciled();
 	}
 
 	@Override
