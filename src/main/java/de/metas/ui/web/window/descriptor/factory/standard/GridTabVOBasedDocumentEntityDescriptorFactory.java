@@ -476,7 +476,7 @@ import lombok.NonNull;
 
 	/**
 	 * @return true if the given {@code gridFieldVO} is flagged as parent link and also matches the parent-link columName.
-	 *         Logically there can be only one parent link field.
+	 * Logically there can be only one parent link field.
 	 */
 	private static boolean isCurrentlyUsedParentLinkField(
 			@NonNull final GridFieldVO gridFieldVO,
@@ -603,17 +603,17 @@ import lombok.NonNull;
 		{
 			return DocumentFieldDefaultFilterDescriptor.AUTOFILTER_INITIALVALUE_DATE_NOW;
 		}
-		else if (widgetType.getValueClassOrNull() == null) // no default value class are not supported
+		else if (widgetType == DocumentFieldWidgetType.List)
 		{
-			return null;
+			return autoFilterInitialValueStr.trim();
 		}
 		else if (widgetType == DocumentFieldWidgetType.Lookup) // lookups are not supported
 		{
 			return null;
 		}
-		else if (widgetType == DocumentFieldWidgetType.List)
+		else if (widgetType.getValueClassOrNull() == null) // no default value class are not supported
 		{
-			return autoFilterInitialValueStr.trim();
+			return null;
 		}
 		else
 		{
