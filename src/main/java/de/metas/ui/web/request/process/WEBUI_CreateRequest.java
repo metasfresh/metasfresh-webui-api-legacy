@@ -116,7 +116,7 @@ public class WEBUI_CreateRequest extends JavaProcess
 		events.add(JSONDocumentChangedEvent.replace(I_R_Request.COLUMNNAME_SalesRep_ID, getAD_User_ID()));
 		events.add(JSONDocumentChangedEvent.replace(I_R_Request.COLUMNNAME_C_BPartner_ID, shipment.getC_BPartner_ID()));
 		events.add(JSONDocumentChangedEvent.replace(I_R_Request.COLUMNNAME_M_InOut_ID, shipment.getM_InOut_ID()));
-		events.add(JSONDocumentChangedEvent.replace(I_R_Request.COLUMNNAME_DateDelivered, shipment.getDateReceived()));
+		events.add(JSONDocumentChangedEvent.replace(I_R_Request.COLUMNNAME_DateDelivered, shipment.getMovementDate()));
 
 		if (defaultContact != null)
 		{
