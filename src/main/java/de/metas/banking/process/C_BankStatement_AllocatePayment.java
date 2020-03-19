@@ -22,9 +22,13 @@
 
 package de.metas.banking.process;
 
+import org.adempiere.exceptions.AdempiereException;
+import org.compiere.SpringContextHolder;
+import org.compiere.model.I_C_BankStatement;
+
 import com.google.common.collect.ImmutableSet;
+
 import de.metas.banking.model.BankStatementId;
-import de.metas.banking.model.I_C_BankStatement;
 import de.metas.banking.service.IBankStatementDAO;
 import de.metas.document.engine.DocStatus;
 import de.metas.i18n.IMsgBL;
@@ -40,8 +44,6 @@ import de.metas.ui.web.view.IViewsRepository;
 import de.metas.ui.web.view.ViewId;
 import de.metas.util.Services;
 import lombok.NonNull;
-import org.adempiere.exceptions.AdempiereException;
-import org.compiere.SpringContextHolder;
 
 public class C_BankStatement_AllocatePayment extends JavaProcess implements IProcessPrecondition
 {

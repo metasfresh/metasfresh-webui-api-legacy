@@ -24,12 +24,12 @@ package de.metas.banking.process;
 
 import java.math.BigDecimal;
 
+import org.compiere.model.I_C_BankStatement;
+import org.compiere.model.I_C_BankStatementLine;
 import org.compiere.model.I_C_Payment;
 
 import com.google.common.collect.ImmutableSet;
 
-import de.metas.banking.model.I_C_BankStatement;
-import de.metas.banking.model.I_C_BankStatementLine;
 import de.metas.bpartner.BPartnerId;
 import de.metas.money.CurrencyId;
 import de.metas.money.Money;
