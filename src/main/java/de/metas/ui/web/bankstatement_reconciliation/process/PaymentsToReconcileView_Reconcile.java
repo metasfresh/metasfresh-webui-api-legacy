@@ -5,10 +5,12 @@ import java.util.List;
 
 import de.metas.banking.payment.BankStatementLineReconcileRequest;
 import de.metas.banking.payment.BankStatementLineReconcileRequest.PaymentToReconcile;
+import de.metas.banking.payment.BankStatementLineReconcileResult;
 import de.metas.banking.payment.IBankStatmentPaymentBL;
 import de.metas.currency.Amount;
 import de.metas.currency.CurrencyCode;
 import de.metas.i18n.ExplainedOptional;
+import de.metas.payment.esr.api.IESRImportBL;
 import de.metas.process.ProcessPreconditionsResolution;
 import de.metas.ui.web.bankstatement_reconciliation.BankStatementLineRow;
 import de.metas.ui.web.bankstatement_reconciliation.PaymentToReconcileRow;
@@ -41,6 +43,7 @@ public class PaymentsToReconcileView_Reconcile extends PaymentsToReconcileViewBa
 	private static final String MSG_StatementLineAmtToReconcileIs = "StatementLineAmtToReconcileIs";
 
 	private final IBankStatmentPaymentBL bankStatmentPaymentBL = Services.get(IBankStatmentPaymentBL.class);
+	private final IESRImportBL esrImportBL = Services.get(IESRImportBL.class);
 
 	@Override
 	protected ProcessPreconditionsResolution checkPreconditionsApplicable()
@@ -78,7 +81,12 @@ public class PaymentsToReconcileView_Reconcile extends PaymentsToReconcileViewBa
 	{
 		final BankStatementLineReconcileRequest request = computeBankStatementLineReconcileRequest().get();
 
-		bankStatmentPaymentBL.reconcile(request);
+		final BankStatementLineReconcileResult result = bankStatmentPaymentBL.reconcile(request);
+
+		if (!result.isEmpty())
+		{
+			esrImportBL.linkBankStatementLinesByPaymentIds(result.getBankStatementLineRefIdIndexByPaymentId());
+		}
 
 		return MSG_OK;
 	}

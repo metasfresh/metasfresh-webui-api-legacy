@@ -1,9 +1,11 @@
 package de.metas.banking.process;
 
+import java.util.Collection;
 import java.util.Set;
 
 import org.adempiere.exceptions.AdempiereException;
 import org.adempiere.util.lang.impl.TableRecordReference;
+import org.compiere.SpringContextHolder;
 
 import de.metas.banking.model.BankStatementId;
 import de.metas.banking.model.BankStatementLineId;
@@ -14,10 +16,17 @@ import de.metas.banking.service.IBankStatementBL;
 import de.metas.banking.service.IBankStatementDAO;
 import de.metas.document.engine.DocStatus;
 import de.metas.i18n.IMsgBL;
+import de.metas.payment.PaymentId;
 import de.metas.process.IProcessPrecondition;
 import de.metas.process.IProcessPreconditionsContext;
 import de.metas.process.JavaProcess;
+import de.metas.process.ProcessExecutionResult.ViewOpenTarget;
+import de.metas.process.ProcessExecutionResult.WebuiViewToOpen;
 import de.metas.process.ProcessPreconditionsResolution;
+import de.metas.ui.web.bankstatement_reconciliation.BankStatementReconciliationView;
+import de.metas.ui.web.bankstatement_reconciliation.BankStatementReconciliationViewFactory;
+import de.metas.ui.web.bankstatement_reconciliation.BanksStatementReconciliationViewCreateRequest;
+import de.metas.ui.web.view.ViewId;
 import de.metas.util.Services;
 import lombok.NonNull;
 
@@ -49,10 +58,12 @@ abstract class BankStatementBasedProcess extends JavaProcess implements IProcess
 	public static final String A_SINGLE_LINE_SHOULD_BE_SELECTED_MSG = "de.metas.banking.process.C_BankStatement_AddBpartnerAndPayment.A_single_line_should_be_selected";
 	public static final String LINE_SHOULD_NOT_HAVE_A_PAYMENT_MSG = "de.metas.banking.process.C_BankStatement_AddBpartnerAndPayment.Line_should_not_have_a_Payment";
 
+	// services
 	private final IMsgBL msgBL = Services.get(IMsgBL.class);
 	private final IBankStatementBL bankStatementBL = Services.get(IBankStatementBL.class);
 	private final IBankStatementDAO bankStatementDAO = Services.get(IBankStatementDAO.class);
 	protected final IBankStatmentPaymentBL bankStatementPaymentBL = Services.get(IBankStatmentPaymentBL.class);
+	private final BankStatementReconciliationViewFactory bankStatementReconciliationViewFactory = SpringContextHolder.instance.getBean(BankStatementReconciliationViewFactory.class);
 
 	protected final ProcessPreconditionsResolution checkBankStatementIsDraftOrInProcessOrCompleted(@NonNull final IProcessPreconditionsContext context)
 	{
@@ -126,4 +137,22 @@ abstract class BankStatementBasedProcess extends JavaProcess implements IProcess
 		}
 	}
 
+	protected final void openBankStatementReconciliationView(@NonNull final Collection<PaymentId> paymentIds)
+	{
+		if (paymentIds.isEmpty())
+		{
+			throw new AdempiereException("@NoPayments@");
+		}
+
+		final BankStatementReconciliationView view = bankStatementReconciliationViewFactory.createView(BanksStatementReconciliationViewCreateRequest.builder()
+				.bankStatementLineId(getSingleSelectedBankStatementLineId())
+				.paymentIds(paymentIds)
+				.build());
+		final ViewId viewId = view.getViewId();
+
+		getResult().setWebuiViewToOpen(WebuiViewToOpen.builder()
+				.viewId(viewId.toJson())
+				.target(ViewOpenTarget.ModalOverlay)
+				.build());
+	}
 }
