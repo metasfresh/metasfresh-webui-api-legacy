@@ -153,7 +153,7 @@ public final class SqlViewSelectionQueryBuilder
 
 		final SqlParamsCollector sqlParamsOut = SqlParamsCollector.newInstance();
 		final String sql = getSqlDocumentFilterConverter().getSql(sqlParamsOut, filters, sqlOpts, context);
-		return !Check.isBlank(sql)
+		return Check.isNotBlank(sql)
 				? SqlAndParams.of(sql, sqlParamsOut.toList())
 				: null;
 	}
