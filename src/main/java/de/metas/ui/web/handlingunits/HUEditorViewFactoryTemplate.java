@@ -30,6 +30,8 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import javax.annotation.OverridingMethodsMustInvokeSuper;
 
+import com.google.common.collect.ImmutableSet;
+import de.metas.handlingunits.IHandlingUnitsBL;
 import org.adempiere.ad.dao.ConstantQueryFilter;
 import org.adempiere.ad.dao.IQueryBuilder;
 import org.adempiere.ad.dao.ISqlQueryFilter;
@@ -133,7 +135,7 @@ public abstract class HUEditorViewFactoryTemplate implements IViewFactory
 		return viewCustomizersByReferencingTableName.get(referencingTableName);
 	}
 
-	private HUEditorRowIsProcessedPredicate getRowProcessedPredicate(final String referencingTableName)
+	private HUEditorRowIsProcessedPredicate getRowProcessedPredicate(@Nullable final String referencingTableName)
 	{
 		return rowProcessedPredicateByReferencingTableName.getOrDefault(referencingTableName, HUEditorRowIsProcessedPredicates.NEVER);
 	}
@@ -250,10 +252,12 @@ public abstract class HUEditorViewFactoryTemplate implements IViewFactory
 		return layouts.getOrLoad(key, this::createHUViewLayout);
 	}
 
-	private final ViewLayout createHUViewLayout(final ViewLayoutKey key)
+	private ViewLayout createHUViewLayout(final ViewLayoutKey key)
 	{
 		final WindowId windowId = key.getWindowId();
 		final JSONViewDataType viewDataType = key.getViewDataType();
+
+		final Collection<DocumentFilterDescriptor> all = getViewFilterDescriptors().getAll();
 
 		final ViewLayout.Builder viewLayoutBuilder = ViewLayout.builder()
 				.setWindowId(windowId)
@@ -261,7 +265,7 @@ public abstract class HUEditorViewFactoryTemplate implements IViewFactory
 				.setEmptyResultText(LayoutFactory.HARDCODED_TAB_EMPTY_RESULT_TEXT)
 				.setEmptyResultHint(LayoutFactory.HARDCODED_TAB_EMPTY_RESULT_HINT)
 				.setIdFieldName(HUEditorRow.FIELDNAME_M_HU_ID)
-				.setFilters(getViewFilterDescriptors().getAll())
+				.setFilters(all)
 				//
 				.setHasAttributesSupport(true)
 				.setHasTreeSupport(true)
@@ -357,6 +361,7 @@ public abstract class HUEditorViewFactoryTemplate implements IViewFactory
 		// nothing on this level
 	}
 
+	@Nullable
 	private String extractReferencingTablename(final Set<DocumentPath> referencingDocumentPaths)
 	{
 		final String referencingTableName;
@@ -374,9 +379,7 @@ public abstract class HUEditorViewFactoryTemplate implements IViewFactory
 	}
 
 	/**
-	 * @param requestStickyFilters
-	 * @param huIds {@code null} means "no restriction". Empty means "select none"
-	 * @return
+	 * @param filterOnlyIds {@code null} means "no restriction". Empty means "select none"
 	 */
 	private static DocumentFilterList extractStickyFilters(
 			@NonNull final DocumentFilterList requestStickyFilters,
@@ -455,21 +458,23 @@ public abstract class HUEditorViewFactoryTemplate implements IViewFactory
 				throw new IllegalArgumentException("Barcode parameter is empty: " + filter);
 			}
 
-			final List<Integer> huIds = Services.get(IHandlingUnitsDAO.class).createHUQueryBuilder()
+			final ImmutableSet<HuId> huIds = Services.get(IHandlingUnitsDAO.class).createHUQueryBuilder()
 					.setContext(PlainContextAware.newOutOfTrx())
 					.onlyContextClient(false) // avoid enforcing context AD_Client_ID because it might be that we are not in a user thread (so no context)
 					.setOnlyWithBarcode(barcode)
+					.setOnlyTopLevelHUs(false)
 					.createQueryBuilder()
 					.setOption(IQueryBuilder.OPTION_Explode_OR_Joins_To_SQL_Unions)
 					.create()
-					.listIds();
-
+					.listIds(HuId::ofRepoId);
 			if (huIds.isEmpty())
 			{
 				return ConstantQueryFilter.of(false).getSql();
 			}
 
-			final ISqlQueryFilter sqlQueryFilter = new InArrayQueryFilter<>(I_M_HU.COLUMNNAME_M_HU_ID, huIds);
+			final ImmutableSet<HuId> topLevelHuIds = Services.get(IHandlingUnitsBL.class).getTopLevelHUs(huIds);
+
+			final ISqlQueryFilter sqlQueryFilter = new InArrayQueryFilter<>(I_M_HU.COLUMNNAME_M_HU_ID, topLevelHuIds);
 
 			final String sql = sqlQueryFilter.getSql();
 			sqlParamsOut.collectAll(sqlQueryFilter);
@@ -485,10 +490,8 @@ public abstract class HUEditorViewFactoryTemplate implements IViewFactory
 	@Value(staticConstructor = "of")
 	private static class ViewLayoutKey
 	{
-		@NonNull
-		final WindowId windowId;
+		@NonNull WindowId windowId;
 
-		@NonNull
-		final JSONViewDataType viewDataType;
+		@NonNull JSONViewDataType viewDataType;
 	}
 }
