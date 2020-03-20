@@ -49,7 +49,7 @@ public class C_BankStatementLine_AddBpartnerAndPayment extends BankStatementBase
 {
 	private static final String C_BPartner_ID_PARAM_NAME = "C_BPartner_ID";
 	@Param(parameterName = C_BPartner_ID_PARAM_NAME)
-	private BPartnerId bPartnerId;
+	private BPartnerId bpartnerId;
 
 	private static final String C_Payment_ID_PARAM_NAME = "C_Payment_ID";
 	@Param(parameterName = C_Payment_ID_PARAM_NAME)
@@ -71,7 +71,7 @@ public class C_BankStatementLine_AddBpartnerAndPayment extends BankStatementBase
 		final BigDecimal paymentAmount = isReceipt ? line.getStmtAmt() : line.getStmtAmt().negate();
 		final Money money = Money.of(paymentAmount, currencyId);
 
-		final ImmutableSet<PaymentId> paymentIds = Services.get(IPaymentDAO.class).retrieveAllMatchingPayments(isReceipt, bPartnerId, money);
+		final ImmutableSet<PaymentId> paymentIds = Services.get(IPaymentDAO.class).retrieveAllMatchingPayments(isReceipt, bpartnerId, money);
 
 		return LookupDataSourceFactory.instance.searchInTableLookup(I_C_Payment.Table_Name).findByIdsOrdered(paymentIds);
 	}
@@ -82,8 +82,16 @@ public class C_BankStatementLine_AddBpartnerAndPayment extends BankStatementBase
 		final I_C_BankStatement bankStatement = getSelectedBankStatement();
 		final I_C_BankStatementLine bankStatementLine = getSingleSelectedBankStatementLine();
 
-		bankStatementLine.setC_BPartner_ID(bPartnerId.getRepoId());
-		bankStatementPaymentBL.setOrCreateAndLinkPaymentToBankStatementLine(bankStatement, bankStatementLine, paymentId);
+		bankStatementLine.setC_BPartner_ID(bpartnerId.getRepoId());
+
+		if (paymentId != null)
+		{
+			bankStatementPaymentBL.linkSinglePayment(bankStatement, bankStatementLine, paymentId);
+		}
+		else
+		{
+			bankStatementPaymentBL.createSinglePaymentAndLink(bankStatement, bankStatementLine);
+		}
 
 		return MSG_OK;
 	}
