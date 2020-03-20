@@ -3,9 +3,9 @@ package de.metas.ui.web.bankstatement_reconciliation.process;
 import java.util.ArrayList;
 import java.util.List;
 
-import de.metas.banking.payment.BankStatementLineReconcileRequest;
-import de.metas.banking.payment.BankStatementLineReconcileRequest.PaymentToReconcile;
-import de.metas.banking.payment.BankStatementLineReconcileResult;
+import de.metas.banking.payment.BankStatementLineMultiPaymentLinkRequest;
+import de.metas.banking.payment.BankStatementLineMultiPaymentLinkRequest.PaymentToLink;
+import de.metas.banking.payment.BankStatementLineMultiPaymentLinkResult;
 import de.metas.banking.payment.IBankStatmentPaymentBL;
 import de.metas.currency.Amount;
 import de.metas.currency.CurrencyCode;
@@ -67,7 +67,7 @@ public class PaymentsToReconcileView_Reconcile extends PaymentsToReconcileViewBa
 		}
 
 		//
-		final ExplainedOptional<BankStatementLineReconcileRequest> optionalRequest = computeBankStatementLineReconcileRequest();
+		final ExplainedOptional<BankStatementLineMultiPaymentLinkRequest> optionalRequest = computeBankStatementLineReconcileRequest();
 		if (!optionalRequest.isPresent())
 		{
 			return ProcessPreconditionsResolution.reject(optionalRequest.getExplanation());
@@ -79,9 +79,9 @@ public class PaymentsToReconcileView_Reconcile extends PaymentsToReconcileViewBa
 	@Override
 	protected String doIt()
 	{
-		final BankStatementLineReconcileRequest request = computeBankStatementLineReconcileRequest().get();
+		final BankStatementLineMultiPaymentLinkRequest request = computeBankStatementLineReconcileRequest().get();
 
-		final BankStatementLineReconcileResult result = bankStatmentPaymentBL.reconcile(request);
+		final BankStatementLineMultiPaymentLinkResult result = bankStatmentPaymentBL.linkMultiPayments(request);
 
 		if (!result.isEmpty())
 		{
@@ -91,7 +91,7 @@ public class PaymentsToReconcileView_Reconcile extends PaymentsToReconcileViewBa
 		return MSG_OK;
 	}
 
-	private ExplainedOptional<BankStatementLineReconcileRequest> computeBankStatementLineReconcileRequest()
+	private ExplainedOptional<BankStatementLineMultiPaymentLinkRequest> computeBankStatementLineReconcileRequest()
 	{
 		final BankStatementLineRow bankStatementLineRow = getSingleSelectedBankStatementRowOrNull();
 		if (bankStatementLineRow == null)
@@ -113,7 +113,7 @@ public class PaymentsToReconcileView_Reconcile extends PaymentsToReconcileViewBa
 		final CurrencyCode currencyCode = statementLineAmt.getCurrencyCode();
 
 		Amount statementLineAmtReconciled = Amount.zero(currencyCode);
-		final ArrayList<PaymentToReconcile> paymentsToReconcile = new ArrayList<>();
+		final ArrayList<PaymentToLink> paymentsToReconcile = new ArrayList<>();
 		for (final PaymentToReconcileRow paymentRow : paymentRows)
 		{
 			if (paymentRow.isReconciled())
@@ -128,7 +128,7 @@ public class PaymentsToReconcileView_Reconcile extends PaymentsToReconcileViewBa
 
 			statementLineAmtReconciled = statementLineAmtReconciled.add(payAmt);
 
-			paymentsToReconcile.add(PaymentToReconcile.builder()
+			paymentsToReconcile.add(PaymentToLink.builder()
 					.paymentId(paymentRow.getPaymentId())
 					.statementLineAmt(payAmt)
 					.build());
@@ -140,9 +140,9 @@ public class PaymentsToReconcileView_Reconcile extends PaymentsToReconcileViewBa
 			return ExplainedOptional.emptyBecause(msgBL.getTranslatableMsgText(MSG_StatementLineAmtToReconcileIs, statementLineAmtToReconcile));
 		}
 
-		return ExplainedOptional.of(BankStatementLineReconcileRequest.builder()
+		return ExplainedOptional.of(BankStatementLineMultiPaymentLinkRequest.builder()
 				.bankStatementLineId(bankStatementLineRow.getBankStatementLineId())
-				.paymentsToReconcile(paymentsToReconcile)
+				.paymentsToLink(paymentsToReconcile)
 				.build());
 	}
 }
