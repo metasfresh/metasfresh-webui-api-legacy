@@ -7,6 +7,8 @@ import org.adempiere.util.lang.impl.TableRecordReference;
 import org.compiere.model.I_C_BankStatement;
 import org.compiere.model.I_C_BankStatementLine;
 
+import com.google.common.collect.ImmutableList;
+
 import de.metas.banking.model.BankStatementLineId;
 import de.metas.document.engine.DocStatus;
 import de.metas.process.IProcessPreconditionsContext;
@@ -80,7 +82,7 @@ public class C_BankStatement_UnReconcileLine extends BankStatementBasedProcess
 			throw new AdempiereException("line shall be reconciled");
 		}
 
-		bankStatementBL.unlinkPaymentsAndDeleteReferences(bankStatementLine);
+		bankStatementBL.unlinkPaymentsAndDeleteReferences(ImmutableList.of(bankStatementLine));
 		bankStatementBL.unpost(bankStatement);
 
 		return MSG_OK;
