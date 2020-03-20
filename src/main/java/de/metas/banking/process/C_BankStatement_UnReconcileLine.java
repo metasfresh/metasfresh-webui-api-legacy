@@ -77,11 +77,6 @@ public class C_BankStatement_UnReconcileLine extends BankStatementBasedProcess
 		}
 
 		final I_C_BankStatementLine bankStatementLine = getSingleSelectedBankStatementLine();
-		if (!bankStatementBL.isReconciled(bankStatementLine))
-		{
-			throw new AdempiereException("line shall be reconciled");
-		}
-
 		bankStatementBL.unlinkPaymentsAndDeleteReferences(ImmutableList.of(bankStatementLine));
 		bankStatementBL.unpost(bankStatement);
 
