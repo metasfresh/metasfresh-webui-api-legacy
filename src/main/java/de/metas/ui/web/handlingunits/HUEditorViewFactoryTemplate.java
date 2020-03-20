@@ -32,6 +32,7 @@ import javax.annotation.OverridingMethodsMustInvokeSuper;
 
 import com.google.common.collect.ImmutableSet;
 import de.metas.handlingunits.IHandlingUnitsBL;
+import de.metas.ui.web.view.SqlViewFactory;
 import org.adempiere.ad.dao.ConstantQueryFilter;
 import org.adempiere.ad.dao.IQueryBuilder;
 import org.adempiere.ad.dao.ISqlQueryFilter;
@@ -319,7 +320,18 @@ public abstract class HUEditorViewFactoryTemplate implements IViewFactory
 			@SuppressWarnings("deprecation") // as long as the deprecated getFilterOnlyIds() is around we can't ignore it
 			final DocumentFilterList stickyFilters = extractStickyFilters(request.getStickyFilters(), request.getFilterOnlyIds());
 			final DocumentFilterDescriptorsProvider filterDescriptors = getViewFilterDescriptors();
-			final DocumentFilterList filters = request.getFiltersUnwrapped(filterDescriptors);
+			final DocumentFilterList userFilters = request.getFiltersUnwrapped(filterDescriptors);
+
+			final DocumentFilterList finalFilters;
+			if (request.isUseAutoFilters() && userFilters.isEmpty())
+			{
+				final List<DocumentFilter> autoFilters = SqlViewFactory.createAutoFilters(filterDescriptors.getAll());
+				finalFilters = DocumentFilterList.ofList(autoFilters);
+			}
+			else
+			{
+				finalFilters = userFilters;
+			}
 
 			// Start building the HUEditorView
 			final HUEditorViewBuilder huViewBuilder = HUEditorView.builder()
@@ -328,7 +340,7 @@ public abstract class HUEditorViewFactoryTemplate implements IViewFactory
 					.setViewId(viewId)
 					.setViewType(request.getViewType())
 					.setStickyFilters(stickyFilters)
-					.setFilters(filters)
+					.setFilters(finalFilters)
 					.setFilterDescriptors(filterDescriptors)
 					.setReferencingDocumentPaths(referencingTableName, referencingDocumentPaths)
 					.orderBys(sqlViewBinding.getDefaultOrderBys())
