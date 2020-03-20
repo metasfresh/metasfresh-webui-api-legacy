@@ -59,9 +59,9 @@ abstract class BankStatementBasedProcess extends JavaProcess implements IProcess
 	public static final String LINE_SHOULD_NOT_HAVE_A_PAYMENT_MSG = "de.metas.banking.process.C_BankStatement_AddBpartnerAndPayment.Line_should_not_have_a_Payment";
 
 	// services
-	private final IMsgBL msgBL = Services.get(IMsgBL.class);
-	private final IBankStatementBL bankStatementBL = Services.get(IBankStatementBL.class);
-	private final IBankStatementDAO bankStatementDAO = Services.get(IBankStatementDAO.class);
+	protected final IMsgBL msgBL = Services.get(IMsgBL.class);
+	protected final IBankStatementBL bankStatementBL = Services.get(IBankStatementBL.class);
+	protected final IBankStatementDAO bankStatementDAO = Services.get(IBankStatementDAO.class);
 	protected final IBankStatmentPaymentBL bankStatementPaymentBL = Services.get(IBankStatmentPaymentBL.class);
 	private final BankStatementReconciliationViewFactory bankStatementReconciliationViewFactory = SpringContextHolder.instance.getBean(BankStatementReconciliationViewFactory.class);
 
@@ -107,7 +107,7 @@ abstract class BankStatementBasedProcess extends JavaProcess implements IProcess
 
 		return ProcessPreconditionsResolution.accept();
 	}
-
+	
 	protected final I_C_BankStatement getSelectedBankStatement()
 	{
 		final BankStatementId bankStatementId = BankStatementId.ofRepoId(getRecord_ID());
