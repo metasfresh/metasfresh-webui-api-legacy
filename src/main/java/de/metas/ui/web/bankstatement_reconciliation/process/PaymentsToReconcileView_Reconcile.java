@@ -1,19 +1,10 @@
 package de.metas.ui.web.bankstatement_reconciliation.process;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import de.metas.banking.payment.BankStatementLineMultiPaymentLinkRequest;
-import de.metas.banking.payment.BankStatementLineMultiPaymentLinkRequest.PaymentToLink;
-import de.metas.banking.payment.BankStatementLineMultiPaymentLinkResult;
 import de.metas.banking.payment.IBankStatmentPaymentBL;
-import de.metas.currency.Amount;
-import de.metas.currency.CurrencyCode;
-import de.metas.i18n.ExplainedOptional;
 import de.metas.payment.esr.api.IESRImportBL;
 import de.metas.process.ProcessPreconditionsResolution;
-import de.metas.ui.web.bankstatement_reconciliation.BankStatementLineRow;
-import de.metas.ui.web.bankstatement_reconciliation.PaymentToReconcileRow;
+import de.metas.ui.web.bankstatement_reconciliation.actions.ReconcilePaymentsCommand;
+import de.metas.ui.web.bankstatement_reconciliation.actions.ReconcilePaymentsRequest;
 import de.metas.util.Services;
 
 /*
@@ -40,109 +31,34 @@ import de.metas.util.Services;
 
 public class PaymentsToReconcileView_Reconcile extends PaymentsToReconcileViewBasedProcess
 {
-	private static final String MSG_StatementLineAmtToReconcileIs = "StatementLineAmtToReconcileIs";
-
 	private final IBankStatmentPaymentBL bankStatmentPaymentBL = Services.get(IBankStatmentPaymentBL.class);
 	private final IESRImportBL esrImportBL = Services.get(IESRImportBL.class);
 
 	@Override
 	protected ProcessPreconditionsResolution checkPreconditionsApplicable()
 	{
-		//
-		final BankStatementLineRow bankStatementLine = getSingleSelectedBankStatementRowOrNull();
-		if (bankStatementLine == null)
-		{
-			return ProcessPreconditionsResolution.rejectWithInternalReason("no bank statement line selected");
-		}
-		if (bankStatementLine.isReconciled())
-		{
-			return ProcessPreconditionsResolution.rejectWithInternalReason("bank statement line was already reconciled");
-		}
-
-		//
-		final List<PaymentToReconcileRow> payments = getSelectedPaymentToReconcileRows();
-		if (payments.isEmpty())
-		{
-			return ProcessPreconditionsResolution.rejectWithInternalReason("no payment rows selected");
-		}
-
-		//
-		final ExplainedOptional<BankStatementLineMultiPaymentLinkRequest> optionalRequest = computeBankStatementLineReconcileRequest();
-		if (!optionalRequest.isPresent())
-		{
-			return ProcessPreconditionsResolution.reject(optionalRequest.getExplanation());
-		}
-
-		return ProcessPreconditionsResolution.accept();
+		return reconcilePayments().checkCanExecute();
 	}
 
 	@Override
 	protected String doIt()
 	{
-		final BankStatementLineMultiPaymentLinkRequest request = computeBankStatementLineReconcileRequest().get();
-
-		final BankStatementLineMultiPaymentLinkResult result = bankStatmentPaymentBL.linkMultiPayments(request);
-
-		if (!result.isEmpty())
-		{
-			esrImportBL.linkBankStatementLinesByPaymentIds(result.getBankStatementLineRefIdIndexByPaymentId());
-		}
-
+		reconcilePayments().execute();
 		return MSG_OK;
 	}
 
-	private ExplainedOptional<BankStatementLineMultiPaymentLinkRequest> computeBankStatementLineReconcileRequest()
+	private ReconcilePaymentsCommand reconcilePayments()
 	{
-		final BankStatementLineRow bankStatementLineRow = getSingleSelectedBankStatementRowOrNull();
-		if (bankStatementLineRow == null)
-		{
-			return ExplainedOptional.emptyBecause("no bank statement line selected");
-		}
-		if (bankStatementLineRow.isReconciled())
-		{
-			return ExplainedOptional.emptyBecause("bank statement line was already reconciled");
-		}
-
-		final List<PaymentToReconcileRow> paymentRows = getSelectedPaymentToReconcileRows();
-		if (paymentRows.isEmpty())
-		{
-			return ExplainedOptional.emptyBecause("no payment rows selected");
-		}
-
-		final Amount statementLineAmt = bankStatementLineRow.getStatementLineAmt();
-		final CurrencyCode currencyCode = statementLineAmt.getCurrencyCode();
-
-		Amount statementLineAmtReconciled = Amount.zero(currencyCode);
-		final ArrayList<PaymentToLink> paymentsToReconcile = new ArrayList<>();
-		for (final PaymentToReconcileRow paymentRow : paymentRows)
-		{
-			if (paymentRow.isReconciled())
-			{
-				return ExplainedOptional.emptyBecause("Payment `" + paymentRow.getDocumentNo() + "` was already reconciled");
-			}
-			final Amount payAmt = paymentRow.getPayAmtNegateIfOutbound();
-			if (!payAmt.getCurrencyCode().equals(currencyCode))
-			{
-				return ExplainedOptional.emptyBecause("Payment `" + paymentRow.getDocumentNo() + "` shall be in `" + currencyCode + "` instead of `" + payAmt.getCurrencyCode() + "`");
-			}
-
-			statementLineAmtReconciled = statementLineAmtReconciled.add(payAmt);
-
-			paymentsToReconcile.add(PaymentToLink.builder()
-					.paymentId(paymentRow.getPaymentId())
-					.statementLineAmt(payAmt)
-					.build());
-		}
-
-		final Amount statementLineAmtToReconcile = statementLineAmt.subtract(statementLineAmtReconciled);
-		if (!statementLineAmtToReconcile.isZero())
-		{
-			return ExplainedOptional.emptyBecause(msgBL.getTranslatableMsgText(MSG_StatementLineAmtToReconcileIs, statementLineAmtToReconcile));
-		}
-
-		return ExplainedOptional.of(BankStatementLineMultiPaymentLinkRequest.builder()
-				.bankStatementLineId(bankStatementLineRow.getBankStatementLineId())
-				.paymentsToLink(paymentsToReconcile)
-				.build());
+		return ReconcilePaymentsCommand.builder()
+				.msgBL(msgBL)
+				.bankStatmentPaymentBL(bankStatmentPaymentBL)
+				.esrImportBL(esrImportBL)
+				//
+				.request(ReconcilePaymentsRequest.builder()
+						.selectedBankStatementLine(getSingleSelectedBankStatementRowOrNull())
+						.selectedPaymentsToReconcile(getSelectedPaymentToReconcileRows())
+						.build())
+				//
+				.build();
 	}
 }
