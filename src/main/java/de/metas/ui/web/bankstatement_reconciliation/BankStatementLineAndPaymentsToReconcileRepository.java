@@ -7,12 +7,14 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.adempiere.invoice.service.IInvoiceDAO;
+import org.compiere.Adempiere;
 import org.compiere.model.I_C_BPartner;
 import org.compiere.model.I_C_BankStatementLine;
 import org.compiere.model.I_C_Payment;
 import org.compiere.util.TimeUtil;
 import org.springframework.stereotype.Repository;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSetMultimap;
@@ -68,14 +70,28 @@ public class BankStatementLineAndPaymentsToReconcileRepository
 	private final IInvoiceDAO invoiceDAO = Services.get(IInvoiceDAO.class);
 	private final IAllocationDAO allocationDAO = Services.get(IAllocationDAO.class);
 	private final CurrencyRepository currencyRepository;
-	private final LookupDataSource bpartnerLookup;
+	private LookupDataSource bpartnerLookup;
 
 	public BankStatementLineAndPaymentsToReconcileRepository(
 			@NonNull final CurrencyRepository currencyRepository)
 	{
 		this.currencyRepository = currencyRepository;
 
-		bpartnerLookup = LookupDataSourceFactory.instance.searchInTableLookup(I_C_BPartner.Table_Name);
+		if (!Adempiere.isUnitTestMode()) // FIXME: workaround to be able to test it
+		{
+			bpartnerLookup = LookupDataSourceFactory.instance.searchInTableLookup(I_C_BPartner.Table_Name);
+		}
+		else
+		{
+			bpartnerLookup = null;
+		}
+	}
+
+	@VisibleForTesting
+	public void setBpartnerLookup(@NonNull final LookupDataSource bpartnerLookup)
+	{
+		Adempiere.assertUnitTestMode();
+		this.bpartnerLookup = bpartnerLookup;
 	}
 
 	public List<BankStatementLineRow> getBankStatementLineRowsByIds(final Set<BankStatementLineId> ids)
