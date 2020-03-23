@@ -336,6 +336,7 @@ public abstract class HUEditorViewFactoryTemplate implements IViewFactory
 					.setActions(request.getActions())
 					.addAdditionalRelatedProcessDescriptors(request.getAdditionalRelatedProcessDescriptors())
 					.setHUEditorViewRepository(huEditorViewRepository)
+					.setUseAutoFilters(request.isUseAutoFilters())
 					.setParameters(request.getParameters());
 
 			//

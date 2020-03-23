@@ -47,10 +47,7 @@ public class DefaultHUEditorViewFactory extends HUEditorViewFactoryTemplate
 	@Override
 	protected void customizeHUEditorView(final HUEditorViewBuilder huViewBuilder)
 	{
-		// todo: how to get `request.isUseAutoFilters()` ?
-		// 		this if would be more correct: if (request.isUseAutoFilters() && huViewBuilder.getFilters().isEmpty())
-		// 		where request is CreateViewRequest
-		if (huViewBuilder.getFilters().isEmpty())
+		if (huViewBuilder.isUseAutoFilters() && huViewBuilder.getFilters().isEmpty())
 		{
 			final List<DocumentFilter> autoFilters = SqlViewFactory.createAutoFilters(huViewBuilder.getFilterDescriptors().getAll());
 			huViewBuilder.setFilters(DocumentFilterList.ofList(autoFilters));
