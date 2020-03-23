@@ -1,19 +1,22 @@
 package de.metas.ui.web.bankstatement_reconciliation.actions;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.LocalDate;
-import java.util.List;
 
+import org.adempiere.exceptions.AdempiereException;
 import org.adempiere.test.AdempiereTestHelper;
 import org.adempiere.test.AdempiereTestWatcher;
 import org.compiere.SpringContextHolder;
 import org.compiere.model.I_C_BP_BankAccount;
 import org.compiere.model.I_C_BPartner;
 import org.compiere.model.I_C_BankStatement;
+import org.compiere.model.I_C_BankStatementLine;
 import org.compiere.model.I_C_Payment;
 import org.compiere.util.Trace;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
@@ -33,7 +36,9 @@ import de.metas.banking.service.IBankStatementDAO;
 import de.metas.banking.service.impl.BankStatementBL;
 import de.metas.bpartner.BPartnerId;
 import de.metas.business.BusinessTestHelper;
+import de.metas.currency.CurrencyCode;
 import de.metas.currency.CurrencyRepository;
+import de.metas.currency.impl.PlainCurrencyDAO;
 import de.metas.document.engine.DocStatus;
 import de.metas.i18n.IMsgBL;
 import de.metas.money.CurrencyId;
@@ -90,7 +95,9 @@ public class ReconcilePaymentsCommandTest
 	private static final LocalDate statementDate = LocalDate.parse("2020-03-21");
 	private static final LocalDate paymentDate = LocalDate.parse("2020-03-10");
 	private CurrencyId euroCurrencyId;
+	private CurrencyId chfCurrencyId;
 	private BankAccountId euroOrgBankAccountId;
+	private BPartnerId customerId;
 
 	@BeforeEach
 	public void beforeEach()
@@ -121,8 +128,31 @@ public class ReconcilePaymentsCommandTest
 
 	private void createMasterdata()
 	{
-		euroCurrencyId = BusinessTestHelper.getEURCurrencyId();
+		euroCurrencyId = PlainCurrencyDAO.createCurrencyId(CurrencyCode.EUR);
+		chfCurrencyId = PlainCurrencyDAO.createCurrencyId(CurrencyCode.CHF);
 		euroOrgBankAccountId = createOrgBankAccount(euroCurrencyId);
+		customerId = createCustomer();
+	}
+
+	private void executeReconcilePaymentsCommand(final ReconcilePaymentsRequest request)
+	{
+		ReconcilePaymentsCommand.builder()
+				.msgBL(msgBL)
+				.bankStatmentPaymentBL(bankStatmentPaymentBL)
+				.esrImportBL(esrImportBL)
+				.request(request)
+				.build()
+				.execute();
+	}
+
+	private Money euro(final String amount)
+	{
+		return Money.of(amount, euroCurrencyId);
+	}
+
+	private Money chf(final String amount)
+	{
+		return Money.of(amount, chfCurrencyId);
 	}
 
 	private BPartnerId createCustomer()
@@ -158,11 +188,11 @@ public class ReconcilePaymentsCommandTest
 
 	@Builder(builderMethodName = "bankStatementLineRow", builderClassName = "BankStatementLineRowBuilder")
 	private BankStatementLineRow createBankStatementLineRow(
-			@NonNull final BankStatementId bankStatementId,
+			@NonNull DocStatus docStatus,
 			@NonNull final Money statementAmt)
 	{
 		final BankStatementLineId bankStatementLineId = bankStatementDAO.createBankStatementLine(BankStatementLineCreateRequest.builder()
-				.bankStatementId(bankStatementId)
+				.bankStatementId(bankStatement().docStatus(docStatus).build())
 				.orgId(OrgId.ANY)
 				.lineNo(10)
 				.statementLineDate(statementDate)
@@ -176,7 +206,8 @@ public class ReconcilePaymentsCommandTest
 	private PaymentToReconcileRow createPaymentRow(
 			@NonNull final Boolean inboundPayment,
 			@NonNull final BPartnerId customerId,
-			@NonNull final Money paymentAmt)
+			@NonNull final Money paymentAmt,
+			final boolean reconciled)
 	{
 		final DefaultPaymentBuilder builder = inboundPayment
 				? paymentBL.newInboundReceiptBuilder()
@@ -192,52 +223,251 @@ public class ReconcilePaymentsCommandTest
 				.dateTrx(paymentDate)
 				.tenderType(TenderType.Check)
 				.createAndProcess();
+
 		payment.setDocumentNo("documentNo-" + payment.getC_Payment_ID());
 		paymentDAO.save(payment);
+
+		if (reconciled)
+		{
+			paymentBL.markReconciledAndSave(payment);
+		}
+
 		final PaymentId paymentId = PaymentId.ofRepoId(payment.getC_Payment_ID());
 
 		return rowsRepo.getPaymentToReconcileRowsByIds(ImmutableSet.of(paymentId)).get(0);
 	}
 
-	@Test
-	public void test()
+	private PaymentToReconcileRow retrievePaymentRow(@NonNull final PaymentToReconcileRow paymentRow)
 	{
-		final BankStatementId bankStatementId = bankStatement()
-				.docStatus(DocStatus.Drafted)
-				.build();
+		return rowsRepo.getPaymentToReconcileRowsByIds(ImmutableSet.of(paymentRow.getPaymentId())).get(0);
+	}
 
-		final BankStatementLineRow bankStatementLineRow = bankStatementLineRow()
-				.bankStatementId(bankStatementId)
-				.statementAmt(Money.of("1000", euroCurrencyId))
-				.build();
+	private void assertMultiplePayments(final BankStatementLineId bankStatementLineId)
+	{
+		final I_C_BankStatementLine bankStatementLine = bankStatementDAO.getLineById(bankStatementLineId);
 
-		final BPartnerId customerId = createCustomer();
-		final List<PaymentToReconcileRow> paymentRows = ImmutableList.of(
-				paymentRow().inboundPayment(true).customerId(customerId).paymentAmt(Money.of("1000", euroCurrencyId)).build());
+		assertThat(bankStatementLine.isMultiplePaymentOrInvoice()).isTrue();
+		assertThat(bankStatementLine.isMultiplePayment()).isTrue();
+		assertThat(bankStatementLine.getC_Payment_ID()).isLessThanOrEqualTo(0);
+	}
 
-		ReconcilePaymentsCommand.builder()
-				.msgBL(msgBL)
-				.bankStatmentPaymentBL(bankStatmentPaymentBL)
-				.esrImportBL(esrImportBL)
-				//
-				.request(ReconcilePaymentsRequest.builder()
-						.selectedBankStatementLine(bankStatementLineRow)
-						.selectedPaymentsToReconcile(paymentRows)
-						.build())
-				//
-				.build()
-				.execute();
-
-		//
-		// Assertions
+	@Nested
+	public class inboundStatementLineAmount
+	{
+		@Nested
+		public class draftStatement
 		{
-			final ImmutableList<BankStatementLineReference> lineReferences = ImmutableList.copyOf(bankStatementDAO.retrieveLineReferences(bankStatementLineRow.getBankStatementLineId()));
-			assertThat(lineReferences).hasSize(1);
+			@Test
+			public void singleMatchingPayment()
+			{
+				final BankStatementLineRow bankStatementLineRow = bankStatementLineRow()
+						.docStatus(DocStatus.Drafted)
+						.statementAmt(euro("1000"))
+						.build();
 
-			final BankStatementLineReference lineReference = lineReferences.get(0);
-			assertThat(lineReference.getPaymentId()).isEqualTo(paymentRows.get(0).getPaymentId());
-			assertThat(lineReference.getBpartnerId()).isEqualTo(customerId);
-			assertThat(lineReference.getTrxAmt()).isEqualTo(Money.of("1000", euroCurrencyId));
+				PaymentToReconcileRow paymentRow = paymentRow().inboundPayment(true).customerId(customerId).paymentAmt(euro("1000")).build();
+				assertThat(paymentRow.isInboundPayment()).isTrue();
+				assertThat(paymentRow.isReconciled()).isFalse();
+
+				executeReconcilePaymentsCommand(ReconcilePaymentsRequest.builder()
+						.selectedBankStatementLine(bankStatementLineRow)
+						.selectedPaymentToReconcile(paymentRow)
+						.build());
+
+				paymentRow = retrievePaymentRow(paymentRow);
+
+				//
+				// Assertions
+				{
+					final BankStatementLineId bankStatementLineId = bankStatementLineRow.getBankStatementLineId();
+					assertMultiplePayments(bankStatementLineId);
+
+					final ImmutableList<BankStatementLineReference> lineReferences = ImmutableList.copyOf(bankStatementDAO.retrieveLineReferences(bankStatementLineId));
+					assertThat(lineReferences).hasSize(1);
+					assertThat(lineReferences).element(0)
+							.returns(paymentRow.getPaymentId(), BankStatementLineReference::getPaymentId)
+							.returns(customerId, BankStatementLineReference::getBpartnerId)
+							.returns(euro("1000"), BankStatementLineReference::getTrxAmt);
+
+					assertThat(paymentRow.isInboundPayment()).isTrue();
+					assertThat(paymentRow.isReconciled()).isFalse();
+				}
+			}
+		}
+
+		@Nested
+		public class completedStatement
+		{
+			private BankStatementLineRow bankStatementLineRow;
+
+			@BeforeEach
+			public void beforeEach()
+			{
+				bankStatementLineRow = bankStatementLineRow()
+						.docStatus(DocStatus.Completed)
+						.statementAmt(euro("1000"))
+						.build();
+			}
+
+			@Test
+			public void singleMatchingPayment()
+			{
+				PaymentToReconcileRow paymentRow = paymentRow().inboundPayment(true).customerId(customerId).paymentAmt(euro("1000")).build();
+				assertThat(paymentRow.isInboundPayment()).isTrue();
+				assertThat(paymentRow.isReconciled()).isFalse();
+
+				executeReconcilePaymentsCommand(ReconcilePaymentsRequest.builder()
+						.selectedBankStatementLine(bankStatementLineRow)
+						.selectedPaymentToReconcile(paymentRow)
+						.build());
+
+				paymentRow = retrievePaymentRow(paymentRow);
+
+				//
+				// Assertions
+				{
+					final BankStatementLineId bankStatementLineId = bankStatementLineRow.getBankStatementLineId();
+					assertMultiplePayments(bankStatementLineId);
+
+					final ImmutableList<BankStatementLineReference> lineReferences = ImmutableList.copyOf(bankStatementDAO.retrieveLineReferences(bankStatementLineId));
+					assertThat(lineReferences).hasSize(1);
+					assertThat(lineReferences).element(0)
+							.returns(paymentRow.getPaymentId(), BankStatementLineReference::getPaymentId)
+							.returns(customerId, BankStatementLineReference::getBpartnerId)
+							.returns(euro("1000"), BankStatementLineReference::getTrxAmt);
+
+					assertThat(paymentRow.isInboundPayment()).isTrue();
+					assertThat(paymentRow.isReconciled()).isTrue();
+				}
+			}
+
+			@Test
+			public void amountNotMatching()
+			{
+				final PaymentToReconcileRow paymentRow = paymentRow().inboundPayment(true).customerId(customerId).paymentAmt(euro("900")).build();
+
+				assertThatThrownBy(() -> executeReconcilePaymentsCommand(ReconcilePaymentsRequest.builder()
+						.selectedBankStatementLine(bankStatementLineRow)
+						.selectedPaymentToReconcile(paymentRow)
+						.build()))
+								.isInstanceOf(AdempiereException.class)
+								.hasMessageContaining(ReconcilePaymentsCommand.MSG_StatementLineAmtToReconcileIs);
+			}
+
+			@Test
+			public void currencyNotMatching()
+			{
+				final PaymentToReconcileRow paymentRow = paymentRow().inboundPayment(true).customerId(customerId).paymentAmt(chf("1000")).build();
+
+				assertThatThrownBy(() -> executeReconcilePaymentsCommand(ReconcilePaymentsRequest.builder()
+						.selectedBankStatementLine(bankStatementLineRow)
+						.selectedPaymentToReconcile(paymentRow)
+						.build()))
+								.isInstanceOf(AdempiereException.class)
+								.hasMessageContaining("shall be in `EUR` instead of `CHF`");
+			}
+
+			@Test
+			public void alreadyReconciledPayment()
+			{
+				final PaymentToReconcileRow paymentRow = paymentRow()
+						.inboundPayment(true)
+						.customerId(customerId)
+						.paymentAmt(euro("1000"))
+						.reconciled(true)
+						.build();
+
+				assertThatThrownBy(() -> executeReconcilePaymentsCommand(ReconcilePaymentsRequest.builder()
+						.selectedBankStatementLine(bankStatementLineRow)
+						.selectedPaymentToReconcile(paymentRow)
+						.build()))
+								.isInstanceOf(AdempiereException.class)
+								.hasMessageContaining("was already reconciled");
+			}
+
+			@Test
+			public void multipleMatchingPayments()
+			{
+				final PaymentRowBuilder paymentRowBuilder = paymentRow().inboundPayment(true).customerId(customerId);
+				PaymentToReconcileRow paymentRow1 = paymentRowBuilder.paymentAmt(euro("700")).build();
+				PaymentToReconcileRow paymentRow2 = paymentRowBuilder.paymentAmt(euro("300")).build();
+
+				executeReconcilePaymentsCommand(ReconcilePaymentsRequest.builder()
+						.selectedBankStatementLine(bankStatementLineRow)
+						.selectedPaymentToReconcile(paymentRow1)
+						.selectedPaymentToReconcile(paymentRow2)
+						.build());
+
+				paymentRow1 = retrievePaymentRow(paymentRow1);
+				paymentRow2 = retrievePaymentRow(paymentRow2);
+
+				//
+				// Assertions
+				{
+					final BankStatementLineId bankStatementLineId = bankStatementLineRow.getBankStatementLineId();
+					assertMultiplePayments(bankStatementLineId);
+
+					final ImmutableList<BankStatementLineReference> lineReferences = ImmutableList.copyOf(bankStatementDAO.retrieveLineReferences(bankStatementLineId));
+					assertThat(lineReferences).hasSize(2);
+					assertThat(lineReferences).element(0)
+							.returns(paymentRow1.getPaymentId(), BankStatementLineReference::getPaymentId)
+							.returns(customerId, BankStatementLineReference::getBpartnerId)
+							.returns(euro("700"), BankStatementLineReference::getTrxAmt);
+					assertThat(lineReferences).element(1)
+							.returns(paymentRow2.getPaymentId(), BankStatementLineReference::getPaymentId)
+							.returns(customerId, BankStatementLineReference::getBpartnerId)
+							.returns(euro("300"), BankStatementLineReference::getTrxAmt);
+
+					assertThat(paymentRow1.isReconciled()).isTrue();
+					assertThat(paymentRow2.isReconciled()).isTrue();
+				}
+			}
+		}
+	}
+
+	@Nested
+	public class outboundStatementLineAmount
+	{
+		private BankStatementLineRow bankStatementLineRow;
+
+		@BeforeEach
+		public void beforeTest()
+		{
+			bankStatementLineRow = bankStatementLineRow()
+					.docStatus(DocStatus.Drafted)
+					.statementAmt(euro("-1000"))
+					.build();
+		}
+
+		@Test
+		public void singleMatchingPayment()
+		{
+			PaymentToReconcileRow paymentRow = paymentRow().inboundPayment(false).customerId(customerId).paymentAmt(euro("1000")).build();
+
+			executeReconcilePaymentsCommand(ReconcilePaymentsRequest.builder()
+					.selectedBankStatementLine(bankStatementLineRow)
+					.selectedPaymentToReconcile(paymentRow)
+					.build());
+
+			paymentRow = retrievePaymentRow(paymentRow);
+
+			//
+			// Assertions
+			{
+				final BankStatementLineId bankStatementLineId = bankStatementLineRow.getBankStatementLineId();
+				assertMultiplePayments(bankStatementLineId);
+
+				final ImmutableList<BankStatementLineReference> lineReferences = ImmutableList.copyOf(bankStatementDAO.retrieveLineReferences(bankStatementLineId));
+				assertThat(lineReferences).hasSize(1);
+				assertThat(lineReferences).element(0)
+						.returns(paymentRow.getPaymentId(), BankStatementLineReference::getPaymentId)
+						.returns(customerId, BankStatementLineReference::getBpartnerId)
+						.returns(euro("-1000"), BankStatementLineReference::getTrxAmt);
+
+				final I_C_Payment payment = paymentDAO.getById(paymentRow.getPaymentId());
+				assertThat(payment.isReceipt()).isFalse();
+				assertThat(payment.isReconciled()).isFalse();
+			}
 		}
 	}
 }

@@ -1,7 +1,5 @@
 package de.metas.ui.web.bankstatement_reconciliation.actions;
 
-import java.util.List;
-
 import javax.annotation.Nullable;
 
 import com.google.common.collect.ImmutableList;
@@ -9,8 +7,8 @@ import com.google.common.collect.ImmutableList;
 import de.metas.ui.web.bankstatement_reconciliation.BankStatementLineRow;
 import de.metas.ui.web.bankstatement_reconciliation.PaymentToReconcileRow;
 import lombok.Builder;
-import lombok.Builder.Default;
 import lombok.NonNull;
+import lombok.Singular;
 import lombok.Value;
 
 /*
@@ -43,6 +41,6 @@ public class ReconcilePaymentsRequest
 	BankStatementLineRow selectedBankStatementLine;
 
 	@NonNull
-	@Default
-	List<PaymentToReconcileRow> selectedPaymentsToReconcile = ImmutableList.of();
+	@Singular("selectedPaymentToReconcile")
+	ImmutableList<PaymentToReconcileRow> selectedPaymentsToReconcile;
 }

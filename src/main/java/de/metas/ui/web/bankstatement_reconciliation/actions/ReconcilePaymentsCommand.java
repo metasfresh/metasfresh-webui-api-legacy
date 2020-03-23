@@ -3,6 +3,8 @@ package de.metas.ui.web.bankstatement_reconciliation.actions;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.google.common.annotations.VisibleForTesting;
+
 import de.metas.banking.payment.BankStatementLineMultiPaymentLinkRequest;
 import de.metas.banking.payment.BankStatementLineMultiPaymentLinkRequest.PaymentToLink;
 import de.metas.banking.payment.BankStatementLineMultiPaymentLinkResult;
@@ -42,7 +44,8 @@ import lombok.NonNull;
 
 public class ReconcilePaymentsCommand
 {
-	private static final String MSG_StatementLineAmtToReconcileIs = "StatementLineAmtToReconcileIs";
+	@VisibleForTesting
+	static final String MSG_StatementLineAmtToReconcileIs = "StatementLineAmtToReconcileIs";
 
 	private final IMsgBL msgBL;
 	private final IBankStatmentPaymentBL bankStatmentPaymentBL;
