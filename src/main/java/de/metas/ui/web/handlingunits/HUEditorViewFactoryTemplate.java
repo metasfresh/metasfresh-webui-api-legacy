@@ -320,17 +320,20 @@ public abstract class HUEditorViewFactoryTemplate implements IViewFactory
 			@SuppressWarnings("deprecation") // as long as the deprecated getFilterOnlyIds() is around we can't ignore it
 			final DocumentFilterList stickyFilters = extractStickyFilters(request.getStickyFilters(), request.getFilterOnlyIds());
 			final DocumentFilterDescriptorsProvider filterDescriptors = getViewFilterDescriptors();
-			final DocumentFilterList userFilters = request.getFiltersUnwrapped(filterDescriptors);
+			final DocumentFilterList filters;
 
-			final DocumentFilterList finalFilters;
-			if (request.isUseAutoFilters() && userFilters.isEmpty())
 			{
-				final List<DocumentFilter> autoFilters = SqlViewFactory.createAutoFilters(filterDescriptors.getAll());
-				finalFilters = DocumentFilterList.ofList(autoFilters);
-			}
-			else
-			{
-				finalFilters = userFilters;
+				// set filters
+				final DocumentFilterList userFilters = request.getFiltersUnwrapped(filterDescriptors);
+				if (request.isUseAutoFilters() && userFilters.isEmpty())
+				{
+					final List<DocumentFilter> autoFilters = SqlViewFactory.createAutoFilters(filterDescriptors.getAll());
+					filters = DocumentFilterList.ofList(autoFilters);
+				}
+				else
+				{
+					filters = userFilters;
+				}
 			}
 
 			// Start building the HUEditorView
@@ -340,7 +343,7 @@ public abstract class HUEditorViewFactoryTemplate implements IViewFactory
 					.setViewId(viewId)
 					.setViewType(request.getViewType())
 					.setStickyFilters(stickyFilters)
-					.setFilters(finalFilters)
+					.setFilters(filters)
 					.setFilterDescriptors(filterDescriptors)
 					.setReferencingDocumentPaths(referencingTableName, referencingDocumentPaths)
 					.orderBys(sqlViewBinding.getDefaultOrderBys())
