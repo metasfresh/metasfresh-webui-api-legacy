@@ -22,19 +22,17 @@
 
 package de.metas.banking.process;
 
-import java.math.BigDecimal;
+import java.util.Set;
 
+import org.adempiere.exceptions.FillMandatoryException;
 import org.compiere.model.I_C_BankStatement;
 import org.compiere.model.I_C_BankStatementLine;
 import org.compiere.model.I_C_Payment;
 
-import com.google.common.collect.ImmutableSet;
-
 import de.metas.bpartner.BPartnerId;
-import de.metas.money.CurrencyId;
-import de.metas.money.Money;
 import de.metas.payment.PaymentId;
-import de.metas.payment.api.IPaymentDAO;
+import de.metas.process.IProcessDefaultParameter;
+import de.metas.process.IProcessDefaultParametersProvider;
 import de.metas.process.IProcessPreconditionsContext;
 import de.metas.process.Param;
 import de.metas.process.ProcessPreconditionsResolution;
@@ -42,17 +40,16 @@ import de.metas.ui.web.process.descriptor.ProcessParamLookupValuesProvider;
 import de.metas.ui.web.window.datatypes.LookupValuesList;
 import de.metas.ui.web.window.descriptor.DocumentLayoutElementFieldDescriptor;
 import de.metas.ui.web.window.model.lookup.LookupDataSourceFactory;
-import de.metas.util.Services;
 import lombok.NonNull;
 
-public class C_BankStatementLine_AddBpartnerAndPayment extends BankStatementBasedProcess
+public class C_BankStatementLine_AddBpartnerAndPayment extends BankStatementBasedProcess implements IProcessDefaultParametersProvider
 {
-	private static final String C_BPartner_ID_PARAM_NAME = "C_BPartner_ID";
-	@Param(parameterName = C_BPartner_ID_PARAM_NAME)
+	private static final String PARAM_C_BPartner_ID = "C_BPartner_ID";
+	@Param(parameterName = PARAM_C_BPartner_ID, mandatory = true)
 	private BPartnerId bpartnerId;
 
-	private static final String C_Payment_ID_PARAM_NAME = "C_Payment_ID";
-	@Param(parameterName = C_Payment_ID_PARAM_NAME)
+	private static final String PARAM_C_Payment_ID = "C_Payment_ID";
+	@Param(parameterName = PARAM_C_Payment_ID)
 	private PaymentId paymentId;
 
 	@Override
@@ -62,17 +59,28 @@ public class C_BankStatementLine_AddBpartnerAndPayment extends BankStatementBase
 				.and(() -> checkSingleLineSelectedWhichIsNotReconciled(context));
 	}
 
-	@ProcessParamLookupValuesProvider(parameterName = C_Payment_ID_PARAM_NAME, numericKey = true, lookupSource = DocumentLayoutElementFieldDescriptor.LookupSource.lookup, lookupTableName = I_C_Payment.Table_Name)
+	@Override
+	public Object getParameterDefaultValue(final IProcessDefaultParameter parameter)
+	{
+		if (PARAM_C_BPartner_ID.contentEquals(parameter.getColumnName()))
+		{
+			final I_C_BankStatementLine bankStatementLine = getSingleSelectedBankStatementLine();
+			final BPartnerId bpartnerId = BPartnerId.ofRepoIdOrNull(bankStatementLine.getC_BPartner_ID());
+			if (bpartnerId != null)
+			{
+				return bpartnerId;
+			}
+		}
+
+		return DEFAULT_VALUE_NOTAVAILABLE;
+	}
+
+	@ProcessParamLookupValuesProvider(parameterName = PARAM_C_Payment_ID, numericKey = true, lookupSource = DocumentLayoutElementFieldDescriptor.LookupSource.lookup, lookupTableName = I_C_Payment.Table_Name)
 	private LookupValuesList paymentLookupProvider()
 	{
-		final I_C_BankStatementLine line = getSingleSelectedBankStatementLine();
-		final CurrencyId currencyId = CurrencyId.ofRepoId(line.getC_Currency_ID());
-		final boolean isReceipt = line.getStmtAmt().signum() >= 0;
-		final BigDecimal paymentAmount = isReceipt ? line.getStmtAmt() : line.getStmtAmt().negate();
-		final Money money = Money.of(paymentAmount, currencyId);
-
-		final ImmutableSet<PaymentId> paymentIds = Services.get(IPaymentDAO.class).retrieveAllMatchingPayments(isReceipt, bpartnerId, money);
-
+		final I_C_BankStatementLine bankStatementLine = getSingleSelectedBankStatementLine();
+		final int limit = 20;
+		final Set<PaymentId> paymentIds = bankStatementPaymentBL.findEligiblePaymentIds(bankStatementLine, limit);
 		return LookupDataSourceFactory.instance.searchInTableLookup(I_C_Payment.Table_Name).findByIdsOrdered(paymentIds);
 	}
 
@@ -90,7 +98,20 @@ public class C_BankStatementLine_AddBpartnerAndPayment extends BankStatementBase
 		}
 		else
 		{
-			bankStatementPaymentBL.createSinglePaymentAndLink(bankStatement, bankStatementLine);
+			final Set<PaymentId> eligiblePaymentIds = bankStatementPaymentBL.findEligiblePaymentIds(bankStatementLine, 2);
+			if (eligiblePaymentIds.isEmpty())
+			{
+				bankStatementPaymentBL.createSinglePaymentAndLink(bankStatement, bankStatementLine);
+			}
+			else if (eligiblePaymentIds.size() == 1)
+			{
+				PaymentId eligiblePaymentId = eligiblePaymentIds.iterator().next();
+				bankStatementPaymentBL.linkSinglePayment(bankStatement, bankStatementLine, eligiblePaymentId);
+			}
+			else
+			{
+				throw new FillMandatoryException(PARAM_C_Payment_ID);
+			}
 		}
 
 		return MSG_OK;
