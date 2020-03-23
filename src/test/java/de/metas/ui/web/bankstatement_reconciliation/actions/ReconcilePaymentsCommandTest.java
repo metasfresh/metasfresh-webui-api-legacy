@@ -1,6 +1,6 @@
 package de.metas.ui.web.bankstatement_reconciliation.actions;
 
-import static org.mockito.ArgumentMatchers.any;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -12,10 +12,10 @@ import org.compiere.model.I_C_BP_BankAccount;
 import org.compiere.model.I_C_BPartner;
 import org.compiere.model.I_C_BankStatement;
 import org.compiere.model.I_C_Payment;
+import org.compiere.util.Trace;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mockito;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -24,6 +24,7 @@ import de.metas.attachments.AttachmentEntryService;
 import de.metas.banking.api.BankAccountId;
 import de.metas.banking.model.BankStatementId;
 import de.metas.banking.model.BankStatementLineId;
+import de.metas.banking.model.BankStatementLineReference;
 import de.metas.banking.payment.IBankStatmentPaymentBL;
 import de.metas.banking.service.BankStatementCreateRequest;
 import de.metas.banking.service.BankStatementLineCreateRequest;
@@ -99,9 +100,16 @@ public class ReconcilePaymentsCommandTest
 		final CurrencyRepository currencyRepository = new CurrencyRepository();
 		SpringContextHolder.registerJUnitBean(new MoneyService(currencyRepository));
 
-		final BankStatementBL bankStatementBL = Mockito.spy(BankStatementBL.class);
+		final BankStatementBL bankStatementBL = new BankStatementBL()
+		{
+			public void unpost(I_C_BankStatement bankStatement)
+			{
+				System.out.println("In JUnit test BankStatementBL.unpost() does nothing"
+						+ "\n\t bank statement: " + bankStatement
+						+ "\n\t called via " + Trace.toOneLineStackTraceString());
+			}
+		};
 		Services.registerService(IBankStatementBL.class, bankStatementBL);
-		Mockito.doNothing().when(bankStatementBL).unpost(any(I_C_BankStatement.class));
 
 		esrImportBL = new ESRImportBL(AttachmentEntryService.createInstanceForUnitTesting());
 
@@ -113,15 +121,6 @@ public class ReconcilePaymentsCommandTest
 
 	private void createMasterdata()
 	{
-		// final I_AD_Client adClient = newInstance(I_AD_Client.class);
-		// saveRecord(adClient);
-		// final ClientId clientId = ClientId.ofRepoId(adClient.getAD_Client_ID());
-		// Env.setClientId(Env.getCtx(), clientId);
-		//
-		// final I_AD_ClientInfo adClientInfo = newInstance(I_AD_ClientInfo.class);
-		// InterfaceWrapperHelper.setValue(adClientInfo, "AD_Client_ID", clientId.getRepoId());
-		// saveRecord(adClientInfo);
-
 		euroCurrencyId = BusinessTestHelper.getEURCurrencyId();
 		euroOrgBankAccountId = createOrgBankAccount(euroCurrencyId);
 	}
@@ -228,5 +227,17 @@ public class ReconcilePaymentsCommandTest
 				//
 				.build()
 				.execute();
+
+		//
+		// Assertions
+		{
+			final ImmutableList<BankStatementLineReference> lineReferences = ImmutableList.copyOf(bankStatementDAO.retrieveLineReferences(bankStatementLineRow.getBankStatementLineId()));
+			assertThat(lineReferences).hasSize(1);
+
+			final BankStatementLineReference lineReference = lineReferences.get(0);
+			assertThat(lineReference.getPaymentId()).isEqualTo(paymentRows.get(0).getPaymentId());
+			assertThat(lineReference.getBpartnerId()).isEqualTo(customerId);
+			assertThat(lineReference.getTrxAmt()).isEqualTo(Money.of("1000", euroCurrencyId));
+		}
 	}
 }
