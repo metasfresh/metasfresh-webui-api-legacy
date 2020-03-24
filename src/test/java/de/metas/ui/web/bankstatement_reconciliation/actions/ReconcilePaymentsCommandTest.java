@@ -32,7 +32,7 @@ import de.metas.banking.api.BankAccountId;
 import de.metas.banking.model.BankStatementId;
 import de.metas.banking.model.BankStatementLineId;
 import de.metas.banking.model.BankStatementLineReference;
-import de.metas.banking.payment.IBankStatmentPaymentBL;
+import de.metas.banking.payment.IBankStatementPaymentBL;
 import de.metas.banking.service.BankStatementCreateRequest;
 import de.metas.banking.service.BankStatementLineCreateRequest;
 import de.metas.banking.service.IBankStatementBL;
@@ -93,7 +93,7 @@ public class ReconcilePaymentsCommandTest
 	private final IPaymentDAO paymentDAO = Services.get(IPaymentDAO.class);
 
 	private final IMsgBL msgBL = Services.get(IMsgBL.class);
-	private final IBankStatmentPaymentBL bankStatmentPaymentBL = Services.get(IBankStatmentPaymentBL.class);
+	private final IBankStatementPaymentBL bankStatmentPaymentBL = Services.get(IBankStatementPaymentBL.class);
 	private ESRImportBL esrImportBL;
 	private BankStatementLineAndPaymentsToReconcileRepository rowsRepo;
 

@@ -11,7 +11,7 @@ import org.compiere.model.I_C_BankStatementLine;
 
 import de.metas.banking.model.BankStatementId;
 import de.metas.banking.model.BankStatementLineId;
-import de.metas.banking.payment.IBankStatmentPaymentBL;
+import de.metas.banking.payment.IBankStatementPaymentBL;
 import de.metas.banking.service.IBankStatementBL;
 import de.metas.banking.service.IBankStatementDAO;
 import de.metas.document.engine.DocStatus;
@@ -62,7 +62,7 @@ abstract class BankStatementBasedProcess extends JavaProcess implements IProcess
 	protected final IMsgBL msgBL = Services.get(IMsgBL.class);
 	protected final IBankStatementBL bankStatementBL = Services.get(IBankStatementBL.class);
 	protected final IBankStatementDAO bankStatementDAO = Services.get(IBankStatementDAO.class);
-	protected final IBankStatmentPaymentBL bankStatementPaymentBL = Services.get(IBankStatmentPaymentBL.class);
+	protected final IBankStatementPaymentBL bankStatementPaymentBL = Services.get(IBankStatementPaymentBL.class);
 	private final BankStatementReconciliationViewFactory bankStatementReconciliationViewFactory = SpringContextHolder.instance.getBean(BankStatementReconciliationViewFactory.class);
 
 	protected final ProcessPreconditionsResolution checkBankStatementIsDraftOrInProcessOrCompleted(@NonNull final IProcessPreconditionsContext context)

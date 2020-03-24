@@ -1,6 +1,6 @@
 package de.metas.ui.web.bankstatement_reconciliation.process;
 
-import de.metas.banking.payment.IBankStatmentPaymentBL;
+import de.metas.banking.payment.IBankStatementPaymentBL;
 import de.metas.payment.esr.api.IESRImportBL;
 import de.metas.process.ProcessPreconditionsResolution;
 import de.metas.ui.web.bankstatement_reconciliation.actions.ReconcilePaymentsCommand;
@@ -31,7 +31,7 @@ import de.metas.util.Services;
 
 public class PaymentsToReconcileView_Reconcile extends PaymentsToReconcileViewBasedProcess
 {
-	private final IBankStatmentPaymentBL bankStatmentPaymentBL = Services.get(IBankStatmentPaymentBL.class);
+	private final IBankStatementPaymentBL bankStatmentPaymentBL = Services.get(IBankStatementPaymentBL.class);
 	private final IESRImportBL esrImportBL = Services.get(IESRImportBL.class);
 
 	@Override

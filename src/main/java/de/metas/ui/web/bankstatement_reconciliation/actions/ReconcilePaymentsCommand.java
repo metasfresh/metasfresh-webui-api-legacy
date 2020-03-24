@@ -8,7 +8,7 @@ import com.google.common.annotations.VisibleForTesting;
 import de.metas.banking.payment.BankStatementLineMultiPaymentLinkRequest;
 import de.metas.banking.payment.BankStatementLineMultiPaymentLinkRequest.PaymentToLink;
 import de.metas.banking.payment.BankStatementLineMultiPaymentLinkResult;
-import de.metas.banking.payment.IBankStatmentPaymentBL;
+import de.metas.banking.payment.IBankStatementPaymentBL;
 import de.metas.currency.Amount;
 import de.metas.currency.CurrencyCode;
 import de.metas.i18n.ExplainedOptional;
@@ -48,7 +48,7 @@ public class ReconcilePaymentsCommand
 	static final String MSG_StatementLineAmtToReconcileIs = "StatementLineAmtToReconcileIs";
 
 	private final IMsgBL msgBL;
-	private final IBankStatmentPaymentBL bankStatmentPaymentBL;
+	private final IBankStatementPaymentBL bankStatmentPaymentBL;
 	private final IESRImportBL esrImportBL;
 
 	private final ReconcilePaymentsRequest request;
@@ -56,7 +56,7 @@ public class ReconcilePaymentsCommand
 	@Builder
 	private ReconcilePaymentsCommand(
 			@NonNull final IMsgBL msgBL,
-			@NonNull final IBankStatmentPaymentBL bankStatmentPaymentBL,
+			@NonNull final IBankStatementPaymentBL bankStatmentPaymentBL,
 			@NonNull final IESRImportBL esrImportBL,
 			//
 			@NonNull final ReconcilePaymentsRequest request)
