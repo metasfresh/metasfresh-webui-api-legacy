@@ -1,11 +1,14 @@
 package de.metas.ui.web.bankstatement_reconciliation.actions;
 
+import static org.adempiere.model.InterfaceWrapperHelper.newInstance;
+import static org.adempiere.model.InterfaceWrapperHelper.saveRecord;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.LocalDate;
 
 import org.adempiere.exceptions.AdempiereException;
+import org.adempiere.model.InterfaceWrapperHelper;
 import org.adempiere.test.AdempiereTestHelper;
 import org.adempiere.test.AdempiereTestWatcher;
 import org.compiere.SpringContextHolder;
@@ -13,6 +16,7 @@ import org.compiere.model.I_C_BP_BankAccount;
 import org.compiere.model.I_C_BPartner;
 import org.compiere.model.I_C_BankStatement;
 import org.compiere.model.I_C_BankStatementLine;
+import org.compiere.model.I_C_PaySelectionLine;
 import org.compiere.model.I_C_Payment;
 import org.compiere.util.Trace;
 import org.junit.jupiter.api.BeforeEach;
@@ -51,6 +55,7 @@ import de.metas.payment.api.DefaultPaymentBuilder;
 import de.metas.payment.api.IPaymentBL;
 import de.metas.payment.api.IPaymentDAO;
 import de.metas.payment.esr.api.impl.ESRImportBL;
+import de.metas.payment.esr.model.I_ESR_ImportLine;
 import de.metas.ui.web.bankstatement_reconciliation.BankStatementLineAndPaymentsToReconcileRepository;
 import de.metas.ui.web.bankstatement_reconciliation.BankStatementLineRow;
 import de.metas.ui.web.bankstatement_reconciliation.PaymentToReconcileRow;
@@ -249,6 +254,86 @@ public class ReconcilePaymentsCommandTest
 		assertThat(bankStatementLine.isMultiplePaymentOrInvoice()).isTrue();
 		assertThat(bankStatementLine.isMultiplePayment()).isTrue();
 		assertThat(bankStatementLine.getC_Payment_ID()).isLessThanOrEqualTo(0);
+	}
+
+	private I_C_PaySelectionLine createPaySelectionLine(@NonNull final PaymentId paymentId)
+	{
+		final I_C_PaySelectionLine paySelectionLine = newInstance(I_C_PaySelectionLine.class);
+		paySelectionLine.setC_Payment_ID(paymentId.getRepoId());
+		saveRecord(paySelectionLine);
+		return paySelectionLine;
+	}
+
+	private I_ESR_ImportLine createESRImportLine(@NonNull final PaymentId paymentId)
+	{
+		final I_ESR_ImportLine esrImportLine = newInstance(I_ESR_ImportLine.class);
+		esrImportLine.setC_Payment_ID(paymentId.getRepoId());
+		saveRecord(esrImportLine);
+		return esrImportLine;
+	}
+
+	@Test
+	public void bankStatementLineIsLinkedToPaySelection()
+	{
+		final BankStatementLineRow bankStatementLineRow = bankStatementLineRow()
+				.docStatus(DocStatus.Drafted)
+				.statementAmt(euro("1000"))
+				.build();
+
+		final PaymentToReconcileRow paymentRow = paymentRow()
+				.inboundPayment(true)
+				.customerId(customerId)
+				.paymentAmt(euro("1000"))
+				.build();
+		final PaymentId paymentId = paymentRow.getPaymentId();
+
+		final I_C_PaySelectionLine paySelectionLine = createPaySelectionLine(paymentId);
+		assertThat(paySelectionLine.getC_Payment_ID()).isEqualTo(paymentId.getRepoId());
+		assertThat(paySelectionLine.getC_BankStatement_ID()).isLessThanOrEqualTo(0);
+		assertThat(paySelectionLine.getC_BankStatementLine_ID()).isLessThanOrEqualTo(0);
+		assertThat(paySelectionLine.getC_BankStatementLine_Ref_ID()).isLessThanOrEqualTo(0);
+
+		executeReconcilePaymentsCommand(ReconcilePaymentsRequest.builder()
+				.selectedBankStatementLine(bankStatementLineRow)
+				.selectedPaymentToReconcile(paymentRow)
+				.build());
+
+		InterfaceWrapperHelper.refresh(paySelectionLine);
+		assertThat(paySelectionLine.getC_BankStatement_ID()).isGreaterThan(0);
+		assertThat(paySelectionLine.getC_BankStatementLine_ID()).isEqualTo(bankStatementLineRow.getBankStatementLineId().getRepoId());
+		assertThat(paySelectionLine.getC_BankStatementLine_Ref_ID()).isGreaterThan(0);
+	}
+
+	@Test
+	public void bankStatementLineIsLinkedToESRImportLine()
+	{
+		final BankStatementLineRow bankStatementLineRow = bankStatementLineRow()
+				.docStatus(DocStatus.Drafted)
+				.statementAmt(euro("1000"))
+				.build();
+
+		final PaymentToReconcileRow paymentRow = paymentRow()
+				.inboundPayment(true)
+				.customerId(customerId)
+				.paymentAmt(euro("1000"))
+				.build();
+		final PaymentId paymentId = paymentRow.getPaymentId();
+
+		final I_ESR_ImportLine esrImportLine = createESRImportLine(paymentId);
+		assertThat(esrImportLine.getC_Payment_ID()).isEqualTo(paymentId.getRepoId());
+		assertThat(esrImportLine.getC_BankStatement_ID()).isLessThanOrEqualTo(0);
+		assertThat(esrImportLine.getC_BankStatementLine_ID()).isLessThanOrEqualTo(0);
+		assertThat(esrImportLine.getC_BankStatementLine_Ref_ID()).isLessThanOrEqualTo(0);
+
+		executeReconcilePaymentsCommand(ReconcilePaymentsRequest.builder()
+				.selectedBankStatementLine(bankStatementLineRow)
+				.selectedPaymentToReconcile(paymentRow)
+				.build());
+
+		InterfaceWrapperHelper.refresh(esrImportLine);
+		assertThat(esrImportLine.getC_BankStatement_ID()).isGreaterThan(0);
+		assertThat(esrImportLine.getC_BankStatementLine_ID()).isEqualTo(bankStatementLineRow.getBankStatementLineId().getRepoId());
+		assertThat(esrImportLine.getC_BankStatementLine_Ref_ID()).isGreaterThan(0);
 	}
 
 	@Nested
