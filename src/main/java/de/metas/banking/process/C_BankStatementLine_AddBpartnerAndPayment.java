@@ -78,9 +78,14 @@ public class C_BankStatementLine_AddBpartnerAndPayment extends BankStatementBase
 	@ProcessParamLookupValuesProvider(parameterName = PARAM_C_Payment_ID, numericKey = true, lookupSource = DocumentLayoutElementFieldDescriptor.LookupSource.lookup, lookupTableName = I_C_Payment.Table_Name)
 	private LookupValuesList paymentLookupProvider()
 	{
+		if (bpartnerId == null)
+		{
+			return LookupValuesList.EMPTY;
+		}
+
 		final I_C_BankStatementLine bankStatementLine = getSingleSelectedBankStatementLine();
 		final int limit = 20;
-		final Set<PaymentId> paymentIds = bankStatementPaymentBL.findEligiblePaymentIds(bankStatementLine, limit);
+		final Set<PaymentId> paymentIds = bankStatementPaymentBL.findEligiblePaymentIds(bankStatementLine, bpartnerId, limit);
 		return LookupDataSourceFactory.instance.searchInTableLookup(I_C_Payment.Table_Name).findByIdsOrdered(paymentIds);
 	}
 
@@ -98,7 +103,7 @@ public class C_BankStatementLine_AddBpartnerAndPayment extends BankStatementBase
 		}
 		else
 		{
-			final Set<PaymentId> eligiblePaymentIds = bankStatementPaymentBL.findEligiblePaymentIds(bankStatementLine, 2);
+			final Set<PaymentId> eligiblePaymentIds = bankStatementPaymentBL.findEligiblePaymentIds(bankStatementLine, bpartnerId, 2);
 			if (eligiblePaymentIds.isEmpty())
 			{
 				bankStatementPaymentBL.createSinglePaymentAndLink(bankStatement, bankStatementLine);
