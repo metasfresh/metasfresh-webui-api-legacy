@@ -198,7 +198,10 @@ public class SqlViewFactory implements IViewFactory
 		}
 	}
 
-	public static List<DocumentFilter> createAutoFilters(final Collection<DocumentFilterDescriptor> filters)
+	/*
+	 * Iterates the given {@code filters} and invokes this factory's createAutoFilter method on each one.
+	 */
+	public static List<DocumentFilter> createAutoFilters(@NonNull final Collection<DocumentFilterDescriptor> filters)
 	{
 		return filters
 				.stream()
