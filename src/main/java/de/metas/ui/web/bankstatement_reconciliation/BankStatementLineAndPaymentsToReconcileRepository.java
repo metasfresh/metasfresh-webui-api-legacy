@@ -22,7 +22,6 @@ import com.google.common.collect.SetMultimap;
 
 import de.metas.allocation.api.IAllocationDAO;
 import de.metas.banking.model.BankStatementLineId;
-import de.metas.banking.service.IBankStatementBL;
 import de.metas.banking.service.IBankStatementDAO;
 import de.metas.currency.Amount;
 import de.metas.currency.CurrencyCode;
@@ -64,7 +63,6 @@ import lombok.NonNull;
 @Repository
 public class BankStatementLineAndPaymentsToReconcileRepository
 {
-	private final IBankStatementBL bankStatementBL = Services.get(IBankStatementBL.class);
 	private final IBankStatementDAO bankStatementDAO = Services.get(IBankStatementDAO.class);
 	private final IPaymentDAO paymentDAO = Services.get(IPaymentDAO.class);
 	private final IInvoiceDAO invoiceDAO = Services.get(IInvoiceDAO.class);
@@ -117,7 +115,7 @@ public class BankStatementLineAndPaymentsToReconcileRepository
 				.dateAcct(TimeUtil.asLocalDate(record.getDateAcct()))
 				.statementLineAmt(statementLineAmt)
 				.description(record.getDescription())
-				.reconciled(bankStatementBL.isReconciled(record))
+				.reconciled(record.isReconciled())
 				.build();
 	}
 
