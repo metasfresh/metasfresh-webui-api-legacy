@@ -42,7 +42,7 @@ import de.metas.ui.web.window.descriptor.DocumentLayoutElementFieldDescriptor;
 import de.metas.ui.web.window.model.lookup.LookupDataSourceFactory;
 import lombok.NonNull;
 
-public class C_BankStatementLine_AddBpartnerAndPayment extends BankStatementBasedProcess implements IProcessDefaultParametersProvider
+public class C_BankStatement_ReconcileWithSinglePayment extends BankStatementBasedProcess implements IProcessDefaultParametersProvider
 {
 	private static final String PARAM_C_BPartner_ID = "C_BPartner_ID";
 	@Param(parameterName = PARAM_C_BPartner_ID, mandatory = true)
