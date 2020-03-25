@@ -7,13 +7,11 @@ import com.google.common.annotations.VisibleForTesting;
 
 import de.metas.banking.payment.BankStatementLineMultiPaymentLinkRequest;
 import de.metas.banking.payment.BankStatementLineMultiPaymentLinkRequest.PaymentToLink;
-import de.metas.banking.payment.BankStatementLineMultiPaymentLinkResult;
 import de.metas.banking.payment.IBankStatementPaymentBL;
 import de.metas.currency.Amount;
 import de.metas.currency.CurrencyCode;
 import de.metas.i18n.ExplainedOptional;
 import de.metas.i18n.IMsgBL;
-import de.metas.payment.esr.api.IESRImportBL;
 import de.metas.process.ProcessPreconditionsResolution;
 import de.metas.ui.web.bankstatement_reconciliation.BankStatementLineRow;
 import de.metas.ui.web.bankstatement_reconciliation.PaymentToReconcileRow;
@@ -49,7 +47,6 @@ public class ReconcilePaymentsCommand
 
 	private final IMsgBL msgBL;
 	private final IBankStatementPaymentBL bankStatmentPaymentBL;
-	private final IESRImportBL esrImportBL;
 
 	private final ReconcilePaymentsRequest request;
 
@@ -57,13 +54,11 @@ public class ReconcilePaymentsCommand
 	private ReconcilePaymentsCommand(
 			@NonNull final IMsgBL msgBL,
 			@NonNull final IBankStatementPaymentBL bankStatmentPaymentBL,
-			@NonNull final IESRImportBL esrImportBL,
 			//
 			@NonNull final ReconcilePaymentsRequest request)
 	{
 		this.msgBL = msgBL;
 		this.bankStatmentPaymentBL = bankStatmentPaymentBL;
-		this.esrImportBL = esrImportBL;
 
 		this.request = request;
 	}
@@ -101,13 +96,7 @@ public class ReconcilePaymentsCommand
 	public void execute()
 	{
 		final BankStatementLineMultiPaymentLinkRequest request = computeBankStatementLineReconcileRequest().get();
-
-		final BankStatementLineMultiPaymentLinkResult result = bankStatmentPaymentBL.linkMultiPayments(request);
-
-		if (!result.isEmpty())
-		{
-			esrImportBL.linkBankStatementLinesByPaymentIds(result.getBankStatementLineRefIdIndexByPaymentId());
-		}
+		bankStatmentPaymentBL.linkMultiPayments(request);
 	}
 
 	private ExplainedOptional<BankStatementLineMultiPaymentLinkRequest> computeBankStatementLineReconcileRequest()

@@ -11,11 +11,13 @@ import org.adempiere.exceptions.AdempiereException;
 import org.adempiere.model.InterfaceWrapperHelper;
 import org.adempiere.test.AdempiereTestHelper;
 import org.adempiere.test.AdempiereTestWatcher;
+import org.assertj.core.api.AbstractBooleanAssert;
 import org.compiere.SpringContextHolder;
 import org.compiere.model.I_C_BP_BankAccount;
 import org.compiere.model.I_C_BPartner;
 import org.compiere.model.I_C_BankStatement;
 import org.compiere.model.I_C_BankStatementLine;
+import org.compiere.model.I_C_PaySelection;
 import org.compiere.model.I_C_PaySelectionLine;
 import org.compiere.model.I_C_Payment;
 import org.compiere.util.Trace;
@@ -32,11 +34,16 @@ import de.metas.banking.api.BankAccountId;
 import de.metas.banking.model.BankStatementId;
 import de.metas.banking.model.BankStatementLineId;
 import de.metas.banking.model.BankStatementLineReference;
+import de.metas.banking.model.PaySelectionId;
+import de.metas.banking.model.validator.PaySelectionBankStatementListener;
 import de.metas.banking.payment.IBankStatementPaymentBL;
+import de.metas.banking.payment.IPaySelectionBL;
+import de.metas.banking.payment.IPaySelectionDAO;
 import de.metas.banking.service.BankStatementCreateRequest;
 import de.metas.banking.service.BankStatementLineCreateRequest;
 import de.metas.banking.service.IBankStatementBL;
 import de.metas.banking.service.IBankStatementDAO;
+import de.metas.banking.service.IBankStatementListenerService;
 import de.metas.banking.service.impl.BankStatementBL;
 import de.metas.bpartner.BPartnerId;
 import de.metas.business.BusinessTestHelper;
@@ -56,6 +63,7 @@ import de.metas.payment.api.IPaymentBL;
 import de.metas.payment.api.IPaymentDAO;
 import de.metas.payment.esr.api.impl.ESRImportBL;
 import de.metas.payment.esr.model.I_ESR_ImportLine;
+import de.metas.payment.esr.model.validator.ESRBankStatementListener;
 import de.metas.ui.web.bankstatement_reconciliation.BankStatementLineAndPaymentsToReconcileRepository;
 import de.metas.ui.web.bankstatement_reconciliation.BankStatementLineRow;
 import de.metas.ui.web.bankstatement_reconciliation.PaymentToReconcileRow;
@@ -91,10 +99,10 @@ public class ReconcilePaymentsCommandTest
 	private final IBankStatementDAO bankStatementDAO = Services.get(IBankStatementDAO.class);
 	private final IPaymentBL paymentBL = Services.get(IPaymentBL.class);
 	private final IPaymentDAO paymentDAO = Services.get(IPaymentDAO.class);
+	private final IPaySelectionDAO paySelectionDAO = Services.get(IPaySelectionDAO.class);
 
 	private final IMsgBL msgBL = Services.get(IMsgBL.class);
 	private final IBankStatementPaymentBL bankStatmentPaymentBL = Services.get(IBankStatementPaymentBL.class);
-	private ESRImportBL esrImportBL;
 	private BankStatementLineAndPaymentsToReconcileRepository rowsRepo;
 
 	private static final LocalDate statementDate = LocalDate.parse("2020-03-21");
@@ -112,7 +120,14 @@ public class ReconcilePaymentsCommandTest
 		final CurrencyRepository currencyRepository = new CurrencyRepository();
 		SpringContextHolder.registerJUnitBean(new MoneyService(currencyRepository));
 
-		final BankStatementBL bankStatementBL = new BankStatementBL()
+		final IBankStatementListenerService bankStatementListenerService = Services.get(IBankStatementListenerService.class);
+		final ESRImportBL esrImportBL = new ESRImportBL(AttachmentEntryService.createInstanceForUnitTesting());
+		bankStatementListenerService.addListener(new ESRBankStatementListener(esrImportBL));
+
+		final IPaySelectionBL paySelectionBL = Services.get(IPaySelectionBL.class);
+		bankStatementListenerService.addListener(new PaySelectionBankStatementListener(paySelectionBL));
+
+		Services.registerService(IBankStatementBL.class, new BankStatementBL()
 		{
 			public void unpost(I_C_BankStatement bankStatement)
 			{
@@ -120,10 +135,7 @@ public class ReconcilePaymentsCommandTest
 						+ "\n\t bank statement: " + bankStatement
 						+ "\n\t called via " + Trace.toOneLineStackTraceString());
 			}
-		};
-		Services.registerService(IBankStatementBL.class, bankStatementBL);
-
-		esrImportBL = new ESRImportBL(AttachmentEntryService.createInstanceForUnitTesting());
+		});
 
 		this.rowsRepo = new BankStatementLineAndPaymentsToReconcileRepository(currencyRepository);
 		rowsRepo.setBpartnerLookup(new MockedBPartnerLookupDataSource());
@@ -144,7 +156,6 @@ public class ReconcilePaymentsCommandTest
 		ReconcilePaymentsCommand.builder()
 				.msgBL(msgBL)
 				.bankStatmentPaymentBL(bankStatmentPaymentBL)
-				.esrImportBL(esrImportBL)
 				.request(request)
 				.build()
 				.execute();
@@ -256,9 +267,19 @@ public class ReconcilePaymentsCommandTest
 		assertThat(bankStatementLine.getC_Payment_ID()).isLessThanOrEqualTo(0);
 	}
 
-	private I_C_PaySelectionLine createPaySelectionLine(@NonNull final PaymentId paymentId)
+	private PaySelectionId createPaySelection()
+	{
+		final I_C_PaySelection paySelection = newInstance(I_C_PaySelection.class);
+		saveRecord(paySelection);
+		return PaySelectionId.ofRepoId(paySelection.getC_PaySelection_ID());
+	}
+
+	private I_C_PaySelectionLine createPaySelectionLine(
+			@NonNull final PaySelectionId paySelectionId,
+			@NonNull final PaymentId paymentId)
 	{
 		final I_C_PaySelectionLine paySelectionLine = newInstance(I_C_PaySelectionLine.class);
+		paySelectionLine.setC_PaySelection_ID(paySelectionId.getRepoId());
 		paySelectionLine.setC_Payment_ID(paymentId.getRepoId());
 		saveRecord(paySelectionLine);
 		return paySelectionLine;
@@ -287,11 +308,13 @@ public class ReconcilePaymentsCommandTest
 				.build();
 		final PaymentId paymentId = paymentRow.getPaymentId();
 
-		final I_C_PaySelectionLine paySelectionLine = createPaySelectionLine(paymentId);
+		final PaySelectionId paySelectionId = createPaySelection();
+		final I_C_PaySelectionLine paySelectionLine = createPaySelectionLine(paySelectionId, paymentId);
 		assertThat(paySelectionLine.getC_Payment_ID()).isEqualTo(paymentId.getRepoId());
 		assertThat(paySelectionLine.getC_BankStatement_ID()).isLessThanOrEqualTo(0);
 		assertThat(paySelectionLine.getC_BankStatementLine_ID()).isLessThanOrEqualTo(0);
 		assertThat(paySelectionLine.getC_BankStatementLine_Ref_ID()).isLessThanOrEqualTo(0);
+		assertReconciled(paySelectionId).isFalse();
 
 		executeReconcilePaymentsCommand(ReconcilePaymentsRequest.builder()
 				.selectedBankStatementLine(bankStatementLineRow)
@@ -302,6 +325,14 @@ public class ReconcilePaymentsCommandTest
 		assertThat(paySelectionLine.getC_BankStatement_ID()).isGreaterThan(0);
 		assertThat(paySelectionLine.getC_BankStatementLine_ID()).isEqualTo(bankStatementLineRow.getBankStatementLineId().getRepoId());
 		assertThat(paySelectionLine.getC_BankStatementLine_Ref_ID()).isGreaterThan(0);
+		assertReconciled(paySelectionId).isTrue();
+	}
+
+	private AbstractBooleanAssert<?> assertReconciled(final PaySelectionId paySelectionId)
+	{
+		final I_C_PaySelection paySelection = paySelectionDAO.getById(paySelectionId).get();
+		return assertThat(paySelection.isReconciled())
+				.as("Is " + paySelectionId + " reconciled?");
 	}
 
 	@Test

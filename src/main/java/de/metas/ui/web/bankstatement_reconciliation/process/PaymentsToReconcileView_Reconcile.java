@@ -1,7 +1,6 @@
 package de.metas.ui.web.bankstatement_reconciliation.process;
 
 import de.metas.banking.payment.IBankStatementPaymentBL;
-import de.metas.payment.esr.api.IESRImportBL;
 import de.metas.process.ProcessPreconditionsResolution;
 import de.metas.ui.web.bankstatement_reconciliation.actions.ReconcilePaymentsCommand;
 import de.metas.ui.web.bankstatement_reconciliation.actions.ReconcilePaymentsRequest;
@@ -32,7 +31,6 @@ import de.metas.util.Services;
 public class PaymentsToReconcileView_Reconcile extends PaymentsToReconcileViewBasedProcess
 {
 	private final IBankStatementPaymentBL bankStatmentPaymentBL = Services.get(IBankStatementPaymentBL.class);
-	private final IESRImportBL esrImportBL = Services.get(IESRImportBL.class);
 
 	@Override
 	protected ProcessPreconditionsResolution checkPreconditionsApplicable()
@@ -52,7 +50,6 @@ public class PaymentsToReconcileView_Reconcile extends PaymentsToReconcileViewBa
 		return ReconcilePaymentsCommand.builder()
 				.msgBL(msgBL)
 				.bankStatmentPaymentBL(bankStatmentPaymentBL)
-				.esrImportBL(esrImportBL)
 				//
 				.request(ReconcilePaymentsRequest.builder()
 						.selectedBankStatementLine(getSingleSelectedBankStatementRowOrNull())
