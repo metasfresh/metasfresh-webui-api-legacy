@@ -10,6 +10,7 @@ import de.metas.banking.payment.BankStatementLineMultiPaymentLinkRequest.Payment
 import de.metas.banking.payment.IBankStatementPaymentBL;
 import de.metas.currency.Amount;
 import de.metas.currency.CurrencyCode;
+import de.metas.i18n.AdMessageKey;
 import de.metas.i18n.ExplainedOptional;
 import de.metas.i18n.IMsgBL;
 import de.metas.process.ProcessPreconditionsResolution;
@@ -43,7 +44,7 @@ import lombok.NonNull;
 public class ReconcilePaymentsCommand
 {
 	@VisibleForTesting
-	static final String MSG_StatementLineAmtToReconcileIs = "StatementLineAmtToReconcileIs";
+	static final AdMessageKey MSG_StatementLineAmtToReconcileIs = AdMessageKey.of("StatementLineAmtToReconcileIs");
 
 	private final IMsgBL msgBL;
 	private final IBankStatementPaymentBL bankStatmentPaymentBL;

@@ -14,6 +14,7 @@ import de.metas.banking.BankStatementLineId;
 import de.metas.banking.payment.IBankStatementPaymentBL;
 import de.metas.banking.service.IBankStatementBL;
 import de.metas.document.engine.DocStatus;
+import de.metas.i18n.AdMessageKey;
 import de.metas.i18n.IMsgBL;
 import de.metas.payment.PaymentId;
 import de.metas.process.IProcessPrecondition;
@@ -53,9 +54,8 @@ import lombok.NonNull;
 
 abstract class BankStatementBasedProcess extends JavaProcess implements IProcessPrecondition
 {
-	public static final String BANK_STATEMENT_MUST_BE_COMPLETED_OR_IN_PROGRESS_MSG = "de.metas.banking.process.C_BankStatement_AddBpartnerAndPayment.BankStatement_must_be_Completed_or_In_Progress";
-	public static final String A_SINGLE_LINE_SHOULD_BE_SELECTED_MSG = "de.metas.banking.process.C_BankStatement_AddBpartnerAndPayment.A_single_line_should_be_selected";
-	public static final String LINE_SHOULD_NOT_HAVE_A_PAYMENT_MSG = "de.metas.banking.process.C_BankStatement_AddBpartnerAndPayment.Line_should_not_have_a_Payment";
+	protected static final AdMessageKey MSG_BankStatement_MustBe_Draft_InProgress_Or_Completed = AdMessageKey.of("bankstatement.BankStatement_MustBe_Draft_InProgress_Or_Completed");
+	private static final AdMessageKey MSG_LineIsAlreadyReconciled = AdMessageKey.of("bankstatement.LineIsAlreadyReconciled");
 
 	// services
 	protected final IMsgBL msgBL = Services.get(IMsgBL.class);
@@ -80,7 +80,7 @@ abstract class BankStatementBasedProcess extends JavaProcess implements IProcess
 		final DocStatus docStatus = DocStatus.ofCode(bankStatement.getDocStatus());
 		if (!docStatus.isDraftedInProgressOrCompleted())
 		{
-			return ProcessPreconditionsResolution.reject(msgBL.getTranslatableMsgText(BANK_STATEMENT_MUST_BE_COMPLETED_OR_IN_PROGRESS_MSG));
+			return ProcessPreconditionsResolution.reject(msgBL.getTranslatableMsgText(MSG_BankStatement_MustBe_Draft_InProgress_Or_Completed));
 		}
 
 		return ProcessPreconditionsResolution.accept();
@@ -92,7 +92,7 @@ abstract class BankStatementBasedProcess extends JavaProcess implements IProcess
 		final Set<TableRecordReference> bankStatemementLineRefs = context.getSelectedIncludedRecords();
 		if (bankStatemementLineRefs.size() != 1)
 		{
-			return ProcessPreconditionsResolution.reject(msgBL.getTranslatableMsgText(A_SINGLE_LINE_SHOULD_BE_SELECTED_MSG));
+			return ProcessPreconditionsResolution.rejectBecauseNotSingleSelection();
 		}
 
 		final TableRecordReference bankStatemementLineRef = bankStatemementLineRefs.iterator().next();
@@ -100,7 +100,7 @@ abstract class BankStatementBasedProcess extends JavaProcess implements IProcess
 		final I_C_BankStatementLine line = bankStatementBL.getLineById(bankStatementLineId);
 		if (line.isReconciled())
 		{
-			return ProcessPreconditionsResolution.reject(msgBL.getTranslatableMsgText(LINE_SHOULD_NOT_HAVE_A_PAYMENT_MSG));
+			return ProcessPreconditionsResolution.reject(msgBL.getTranslatableMsgText(MSG_LineIsAlreadyReconciled));
 		}
 
 		return ProcessPreconditionsResolution.accept();

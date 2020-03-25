@@ -472,7 +472,7 @@ public class ReconcilePaymentsCommandTest
 						.selectedPaymentToReconcile(paymentRow)
 						.build()))
 								.isInstanceOf(AdempiereException.class)
-								.hasMessageContaining(ReconcilePaymentsCommand.MSG_StatementLineAmtToReconcileIs);
+								.hasMessageContaining(ReconcilePaymentsCommand.MSG_StatementLineAmtToReconcileIs.toAD_Message());
 			}
 
 			@Test

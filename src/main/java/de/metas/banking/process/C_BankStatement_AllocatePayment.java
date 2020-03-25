@@ -30,6 +30,7 @@ import com.google.common.collect.ImmutableSet;
 
 import de.metas.banking.BankStatementId;
 import de.metas.document.engine.DocStatus;
+import de.metas.i18n.AdMessageKey;
 import de.metas.payment.PaymentId;
 import de.metas.process.IProcessPreconditionsContext;
 import de.metas.process.ProcessExecutionResult;
@@ -42,7 +43,7 @@ import lombok.NonNull;
 
 public class C_BankStatement_AllocatePayment extends BankStatementBasedProcess
 {
-	private final static String BANK_STATEMENT_MUST_BE_COMPLETED_MSG = "de.metas.banking.process.C_BankStatementLine_AllocatePayment.Bank_Statement_has_to_be_Completed";
+	private final static AdMessageKey BANK_STATEMENT_MUST_BE_COMPLETED_MSG = AdMessageKey.of("bankstatement.BankStatement_has_to_be_Completed");
 
 	private final IViewsRepository viewsFactory = SpringContextHolder.instance.getBean(IViewsRepository.class);
 

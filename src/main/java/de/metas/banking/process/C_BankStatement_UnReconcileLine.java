@@ -73,7 +73,7 @@ public class C_BankStatement_UnReconcileLine extends BankStatementBasedProcess
 		final DocStatus docStatus = DocStatus.ofCode(bankStatement.getDocStatus());
 		if (!docStatus.isDraftedInProgressOrCompleted())
 		{
-			throw new AdempiereException(msgBL.getTranslatableMsgText(BANK_STATEMENT_MUST_BE_COMPLETED_OR_IN_PROGRESS_MSG));
+			throw new AdempiereException(msgBL.getTranslatableMsgText(MSG_BankStatement_MustBe_Draft_InProgress_Or_Completed));
 		}
 
 		final I_C_BankStatementLine bankStatementLine = getSingleSelectedBankStatementLine();
