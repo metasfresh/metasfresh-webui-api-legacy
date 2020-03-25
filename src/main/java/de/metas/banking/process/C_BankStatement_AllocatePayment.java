@@ -29,29 +29,22 @@ import org.compiere.model.I_C_BankStatement;
 import com.google.common.collect.ImmutableSet;
 
 import de.metas.banking.BankStatementId;
-import de.metas.banking.service.IBankStatementBL;
 import de.metas.document.engine.DocStatus;
-import de.metas.i18n.IMsgBL;
 import de.metas.payment.PaymentId;
-import de.metas.process.IProcessPrecondition;
 import de.metas.process.IProcessPreconditionsContext;
-import de.metas.process.JavaProcess;
 import de.metas.process.ProcessExecutionResult;
 import de.metas.process.ProcessPreconditionsResolution;
 import de.metas.ui.web.payment_allocation.PaymentsViewFactory;
 import de.metas.ui.web.view.CreateViewRequest;
 import de.metas.ui.web.view.IViewsRepository;
 import de.metas.ui.web.view.ViewId;
-import de.metas.util.Services;
 import lombok.NonNull;
 
-public class C_BankStatement_AllocatePayment extends JavaProcess implements IProcessPrecondition
+public class C_BankStatement_AllocatePayment extends BankStatementBasedProcess
 {
 	private final static String BANK_STATEMENT_MUST_BE_COMPLETED_MSG = "de.metas.banking.process.C_BankStatementLine_AllocatePayment.Bank_Statement_has_to_be_Completed";
 
-	private final IMsgBL iMsgBL = Services.get(IMsgBL.class);
 	private final IViewsRepository viewsFactory = SpringContextHolder.instance.getBean(IViewsRepository.class);
-	private final IBankStatementBL bankStatementBL = Services.get(IBankStatementBL.class);
 
 	@Override
 	public ProcessPreconditionsResolution checkPreconditionsApplicable(@NonNull final IProcessPreconditionsContext context)
@@ -65,18 +58,19 @@ public class C_BankStatement_AllocatePayment extends JavaProcess implements IPro
 			return ProcessPreconditionsResolution.rejectBecauseNotSingleSelection();
 		}
 
-		final I_C_BankStatement selectedBankStatement = context.getSelectedModel(I_C_BankStatement.class);
-		final DocStatus docStatus = DocStatus.ofCode(selectedBankStatement.getDocStatus());
+		final BankStatementId bankStatementId = BankStatementId.ofRepoId(context.getSingleSelectedRecordId());
+		final I_C_BankStatement bankStatement = bankStatementBL.getById(bankStatementId);
+		final DocStatus docStatus = DocStatus.ofCode(bankStatement.getDocStatus());
 		if (!docStatus.isCompleted())
 		{
-			return ProcessPreconditionsResolution.reject(iMsgBL.getTranslatableMsgText(BANK_STATEMENT_MUST_BE_COMPLETED_MSG));
+			return ProcessPreconditionsResolution.reject(msgBL.getTranslatableMsgText(BANK_STATEMENT_MUST_BE_COMPLETED_MSG));
 		}
 
 		return ProcessPreconditionsResolution.accept();
 	}
 
 	@Override
-	protected String doIt() throws Exception
+	protected String doIt()
 	{
 		final ImmutableSet<PaymentId> paymentIds = retrievePaymentIds();
 		if (paymentIds.isEmpty())
@@ -101,7 +95,6 @@ public class C_BankStatement_AllocatePayment extends JavaProcess implements IPro
 	private ImmutableSet<PaymentId> retrievePaymentIds()
 	{
 		final BankStatementId bankStatementId = BankStatementId.ofRepoId(getRecord_ID());
-
 		return bankStatementBL.getLinesPaymentIds(bankStatementId);
 	}
 }
