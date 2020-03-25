@@ -22,7 +22,7 @@ import com.google.common.collect.SetMultimap;
 
 import de.metas.allocation.api.IAllocationDAO;
 import de.metas.banking.BankStatementLineId;
-import de.metas.banking.service.IBankStatementDAO;
+import de.metas.banking.service.IBankStatementBL;
 import de.metas.currency.Amount;
 import de.metas.currency.CurrencyCode;
 import de.metas.currency.CurrencyRepository;
@@ -63,7 +63,7 @@ import lombok.NonNull;
 @Repository
 public class BankStatementLineAndPaymentsToReconcileRepository
 {
-	private final IBankStatementDAO bankStatementDAO = Services.get(IBankStatementDAO.class);
+	private final IBankStatementBL bankStatementBL = Services.get(IBankStatementBL.class);
 	private final IPaymentDAO paymentDAO = Services.get(IPaymentDAO.class);
 	private final IInvoiceDAO invoiceDAO = Services.get(IInvoiceDAO.class);
 	private final IAllocationDAO allocationDAO = Services.get(IAllocationDAO.class);
@@ -99,7 +99,7 @@ public class BankStatementLineAndPaymentsToReconcileRepository
 			return ImmutableList.of();
 		}
 
-		return bankStatementDAO.getLineByIds(ids)
+		return bankStatementBL.getLinesByIds(ids)
 				.stream()
 				.map(this::toBankStatementLineRow)
 				.collect(ImmutableList.toImmutableList());

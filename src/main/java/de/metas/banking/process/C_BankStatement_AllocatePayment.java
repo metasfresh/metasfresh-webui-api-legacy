@@ -29,7 +29,7 @@ import org.compiere.model.I_C_BankStatement;
 import com.google.common.collect.ImmutableSet;
 
 import de.metas.banking.BankStatementId;
-import de.metas.banking.service.IBankStatementDAO;
+import de.metas.banking.service.IBankStatementBL;
 import de.metas.document.engine.DocStatus;
 import de.metas.i18n.IMsgBL;
 import de.metas.payment.PaymentId;
@@ -51,7 +51,7 @@ public class C_BankStatement_AllocatePayment extends JavaProcess implements IPro
 
 	private final IMsgBL iMsgBL = Services.get(IMsgBL.class);
 	private final IViewsRepository viewsFactory = SpringContextHolder.instance.getBean(IViewsRepository.class);
-	private final IBankStatementDAO bankStatementDAO = Services.get(IBankStatementDAO.class);
+	private final IBankStatementBL bankStatementBL = Services.get(IBankStatementBL.class);
 
 	@Override
 	public ProcessPreconditionsResolution checkPreconditionsApplicable(@NonNull final IProcessPreconditionsContext context)
@@ -102,6 +102,6 @@ public class C_BankStatement_AllocatePayment extends JavaProcess implements IPro
 	{
 		final BankStatementId bankStatementId = BankStatementId.ofRepoId(getRecord_ID());
 
-		return bankStatementDAO.getLinesPaymentIds(bankStatementId);
+		return bankStatementBL.getLinesPaymentIds(bankStatementId);
 	}
 }

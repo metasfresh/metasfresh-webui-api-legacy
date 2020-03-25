@@ -39,6 +39,7 @@ import de.metas.banking.model.validator.PaySelectionBankStatementListener;
 import de.metas.banking.payment.IBankStatementPaymentBL;
 import de.metas.banking.payment.IPaySelectionBL;
 import de.metas.banking.payment.IPaySelectionDAO;
+import de.metas.banking.payment.impl.BankStatementPaymentBL;
 import de.metas.banking.service.BankStatementCreateRequest;
 import de.metas.banking.service.BankStatementLineCreateRequest;
 import de.metas.banking.service.IBankStatementBL;
@@ -102,7 +103,7 @@ public class ReconcilePaymentsCommandTest
 	private final IPaySelectionDAO paySelectionDAO = Services.get(IPaySelectionDAO.class);
 
 	private final IMsgBL msgBL = Services.get(IMsgBL.class);
-	private final IBankStatementPaymentBL bankStatmentPaymentBL = Services.get(IBankStatementPaymentBL.class);
+	private BankStatementPaymentBL bankStatmentPaymentBL;
 	private BankStatementLineAndPaymentsToReconcileRepository rowsRepo;
 
 	private static final LocalDate statementDate = LocalDate.parse("2020-03-21");
@@ -118,7 +119,8 @@ public class ReconcilePaymentsCommandTest
 		AdempiereTestHelper.get().init();
 
 		final CurrencyRepository currencyRepository = new CurrencyRepository();
-		SpringContextHolder.registerJUnitBean(new MoneyService(currencyRepository));
+		final MoneyService moneyService = new MoneyService(currencyRepository);
+		SpringContextHolder.registerJUnitBean(moneyService);
 
 		final IBankStatementListenerService bankStatementListenerService = Services.get(IBankStatementListenerService.class);
 		final ESRImportBL esrImportBL = new ESRImportBL(AttachmentEntryService.createInstanceForUnitTesting());
@@ -136,6 +138,9 @@ public class ReconcilePaymentsCommandTest
 						+ "\n\t called via " + Trace.toOneLineStackTraceString());
 			}
 		});
+
+		bankStatmentPaymentBL = new BankStatementPaymentBL(moneyService);
+		SpringContextHolder.registerJUnitBean(IBankStatementPaymentBL.class, bankStatmentPaymentBL);
 
 		this.rowsRepo = new BankStatementLineAndPaymentsToReconcileRepository(currencyRepository);
 		rowsRepo.setBpartnerLookup(new MockedBPartnerLookupDataSource());
@@ -398,7 +403,7 @@ public class ReconcilePaymentsCommandTest
 					final BankStatementLineId bankStatementLineId = bankStatementLineRow.getBankStatementLineId();
 					assertMultiplePayments(bankStatementLineId);
 
-					final ImmutableList<BankStatementLineReference> lineReferences = ImmutableList.copyOf(bankStatementDAO.retrieveLineReferences(bankStatementLineId));
+					final ImmutableList<BankStatementLineReference> lineReferences = ImmutableList.copyOf(bankStatementDAO.getLineReferences(bankStatementLineId));
 					assertThat(lineReferences).hasSize(1);
 					assertThat(lineReferences).element(0)
 							.returns(paymentRow.getPaymentId(), BankStatementLineReference::getPaymentId)
@@ -445,7 +450,7 @@ public class ReconcilePaymentsCommandTest
 					final BankStatementLineId bankStatementLineId = bankStatementLineRow.getBankStatementLineId();
 					assertMultiplePayments(bankStatementLineId);
 
-					final ImmutableList<BankStatementLineReference> lineReferences = ImmutableList.copyOf(bankStatementDAO.retrieveLineReferences(bankStatementLineId));
+					final ImmutableList<BankStatementLineReference> lineReferences = ImmutableList.copyOf(bankStatementDAO.getLineReferences(bankStatementLineId));
 					assertThat(lineReferences).hasSize(1);
 					assertThat(lineReferences).element(0)
 							.returns(paymentRow.getPaymentId(), BankStatementLineReference::getPaymentId)
@@ -523,7 +528,7 @@ public class ReconcilePaymentsCommandTest
 					final BankStatementLineId bankStatementLineId = bankStatementLineRow.getBankStatementLineId();
 					assertMultiplePayments(bankStatementLineId);
 
-					final ImmutableList<BankStatementLineReference> lineReferences = ImmutableList.copyOf(bankStatementDAO.retrieveLineReferences(bankStatementLineId));
+					final ImmutableList<BankStatementLineReference> lineReferences = ImmutableList.copyOf(bankStatementDAO.getLineReferences(bankStatementLineId));
 					assertThat(lineReferences).hasSize(2);
 					assertThat(lineReferences).element(0)
 							.returns(paymentRow1.getPaymentId(), BankStatementLineReference::getPaymentId)
@@ -573,7 +578,7 @@ public class ReconcilePaymentsCommandTest
 				final BankStatementLineId bankStatementLineId = bankStatementLineRow.getBankStatementLineId();
 				assertMultiplePayments(bankStatementLineId);
 
-				final ImmutableList<BankStatementLineReference> lineReferences = ImmutableList.copyOf(bankStatementDAO.retrieveLineReferences(bankStatementLineId));
+				final ImmutableList<BankStatementLineReference> lineReferences = ImmutableList.copyOf(bankStatementDAO.getLineReferences(bankStatementLineId));
 				assertThat(lineReferences).hasSize(1);
 				assertThat(lineReferences).element(0)
 						.returns(paymentRow.getPaymentId(), BankStatementLineReference::getPaymentId)

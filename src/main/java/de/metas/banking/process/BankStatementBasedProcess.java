@@ -13,7 +13,6 @@ import de.metas.banking.BankStatementId;
 import de.metas.banking.BankStatementLineId;
 import de.metas.banking.payment.IBankStatementPaymentBL;
 import de.metas.banking.service.IBankStatementBL;
-import de.metas.banking.service.IBankStatementDAO;
 import de.metas.document.engine.DocStatus;
 import de.metas.i18n.IMsgBL;
 import de.metas.payment.PaymentId;
@@ -61,7 +60,6 @@ abstract class BankStatementBasedProcess extends JavaProcess implements IProcess
 	// services
 	protected final IMsgBL msgBL = Services.get(IMsgBL.class);
 	protected final IBankStatementBL bankStatementBL = Services.get(IBankStatementBL.class);
-	protected final IBankStatementDAO bankStatementDAO = Services.get(IBankStatementDAO.class);
 	protected final IBankStatementPaymentBL bankStatementPaymentBL = Services.get(IBankStatementPaymentBL.class);
 	private final BankStatementReconciliationViewFactory bankStatementReconciliationViewFactory = SpringContextHolder.instance.getBean(BankStatementReconciliationViewFactory.class);
 
@@ -78,7 +76,7 @@ abstract class BankStatementBasedProcess extends JavaProcess implements IProcess
 		}
 
 		final BankStatementId bankStatementId = BankStatementId.ofRepoId(context.getSingleSelectedRecordId());
-		final I_C_BankStatement bankStatement = bankStatementDAO.getById(bankStatementId);
+		final I_C_BankStatement bankStatement = bankStatementBL.getById(bankStatementId);
 		final DocStatus docStatus = DocStatus.ofCode(bankStatement.getDocStatus());
 		if (!docStatus.isDraftedInProgressOrCompleted())
 		{
@@ -99,7 +97,7 @@ abstract class BankStatementBasedProcess extends JavaProcess implements IProcess
 
 		final TableRecordReference bankStatemementLineRef = bankStatemementLineRefs.iterator().next();
 		final BankStatementLineId bankStatementLineId = BankStatementLineId.ofRepoId(bankStatemementLineRef.getRecord_ID());
-		final I_C_BankStatementLine line = bankStatementDAO.getLineById(bankStatementLineId);
+		final I_C_BankStatementLine line = bankStatementBL.getLineById(bankStatementLineId);
 		if (line.isReconciled())
 		{
 			return ProcessPreconditionsResolution.reject(msgBL.getTranslatableMsgText(LINE_SHOULD_NOT_HAVE_A_PAYMENT_MSG));
@@ -107,17 +105,17 @@ abstract class BankStatementBasedProcess extends JavaProcess implements IProcess
 
 		return ProcessPreconditionsResolution.accept();
 	}
-	
+
 	protected final I_C_BankStatement getSelectedBankStatement()
 	{
 		final BankStatementId bankStatementId = BankStatementId.ofRepoId(getRecord_ID());
-		return bankStatementDAO.getById(bankStatementId);
+		return bankStatementBL.getById(bankStatementId);
 	}
 
 	protected final I_C_BankStatementLine getSingleSelectedBankStatementLine()
 	{
 		final BankStatementLineId lineId = getSingleSelectedBankStatementLineId();
-		return bankStatementDAO.getLineById(lineId);
+		return bankStatementBL.getLineById(lineId);
 	}
 
 	protected final BankStatementLineId getSingleSelectedBankStatementLineId()

@@ -57,7 +57,7 @@ public class C_BankStatement_UnReconcileLine extends BankStatementBasedProcess
 
 		final TableRecordReference bankStatemementLineRef = bankStatemementLineRefs.iterator().next();
 		final BankStatementLineId bankStatementLineId = BankStatementLineId.ofRepoId(bankStatemementLineRef.getRecord_ID());
-		final I_C_BankStatementLine line = bankStatementDAO.getLineById(bankStatementLineId);
+		final I_C_BankStatementLine line = bankStatementBL.getLineById(bankStatementLineId);
 		if (!line.isReconciled())
 		{
 			return ProcessPreconditionsResolution.rejectWithInternalReason("line shall be reconciled");
