@@ -2,7 +2,7 @@ package de.metas.banking.process;
 
 import java.util.Set;
 
-import de.metas.banking.model.PaySelectionId;
+import de.metas.banking.PaySelectionId;
 import de.metas.banking.payment.IPaySelectionBL;
 import de.metas.payment.PaymentId;
 import de.metas.process.IProcessPreconditionsContext;

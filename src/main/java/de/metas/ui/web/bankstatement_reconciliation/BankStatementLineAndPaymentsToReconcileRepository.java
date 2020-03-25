@@ -21,7 +21,7 @@ import com.google.common.collect.ImmutableSetMultimap;
 import com.google.common.collect.SetMultimap;
 
 import de.metas.allocation.api.IAllocationDAO;
-import de.metas.banking.model.BankStatementLineId;
+import de.metas.banking.BankStatementLineId;
 import de.metas.banking.service.IBankStatementDAO;
 import de.metas.currency.Amount;
 import de.metas.currency.CurrencyCode;
