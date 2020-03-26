@@ -138,18 +138,17 @@ public final class DateTimeConverters
 		}
 	}
 
-	private static Timestamp fromJdbcTimestampToLocalDateTime(final Object valueObj)
+	private static Timestamp fromJdbcTimestampToLocalDateTime(@NonNull final String s)
 	{
-		return Timestamp.valueOf((String)valueObj);
+		return Timestamp.valueOf(s);
 	}
 
 	/*
 	 * Saved User Query records generate the date as jdbc timestamp, and these fail for the formats we use.
 	 * They appear as follows: `2016-06-11 00:00:00.0`.
 	 */
-	private static boolean isPossibleJdbcTimestamp(@NonNull final Object valueObj)
+	private static boolean isPossibleJdbcTimestamp(@NonNull final String s)
 	{
-		final String s = (String)valueObj;
 		return s.length() == 21 && s.charAt(10) == ' ';
 	}
 
@@ -232,9 +231,9 @@ public final class DateTimeConverters
 			{
 				return null;
 			}
-			else if (isPossibleJdbcTimestamp(valueObj))
+			else if (isPossibleJdbcTimestamp(json))
 			{
-				final Timestamp timestamp = fromJdbcTimestampToLocalDateTime(valueObj);
+				final Timestamp timestamp = fromJdbcTimestampToLocalDateTime(json);
 				return fromObjectConverter.apply(timestamp);
 			}
 			else
