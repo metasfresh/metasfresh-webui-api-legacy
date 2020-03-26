@@ -42,6 +42,10 @@ public class PaymentsToReconcileView_Reconcile extends PaymentsToReconcileViewBa
 	protected String doIt()
 	{
 		reconcilePayments().execute();
+
+		// NOTE: usually this would not be needed but it seems frontend has some problems to refresh the left side view
+		invalidateBankStatementReconciliationView();
+
 		return MSG_OK;
 	}
 

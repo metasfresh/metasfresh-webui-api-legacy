@@ -68,12 +68,22 @@ abstract class PaymentsToReconcileViewBasedProcess extends ViewBasedProcessTempl
 				.collect(ImmutableList.toImmutableList());
 	}
 
+	protected ViewId getBanksStatementReconciliationViewId()
+	{
+		return getView().getBankStatementViewId();
+	}
+
 	protected final BankStatementReconciliationView getBanksStatementReconciliationView()
 	{
-		final ViewId bankStatementViewId = getView().getBankStatementViewId();
+		final ViewId bankStatementViewId = getBanksStatementReconciliationViewId();
 
 		final IViewsRepository viewsRepo = getViewsRepo();
 		return BankStatementReconciliationView.cast(viewsRepo.getView(bankStatementViewId));
+	}
+
+	protected final void invalidateBankStatementReconciliationView()
+	{
+		invalidateView(getBanksStatementReconciliationViewId());
 	}
 
 	protected final BankStatementLineRow getSingleSelectedBankStatementRowOrNull()
