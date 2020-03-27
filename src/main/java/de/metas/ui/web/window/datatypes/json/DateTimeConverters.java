@@ -252,7 +252,7 @@ public final class DateTimeConverters
 				}
 				catch (final Exception e)
 				{
-					logger.warn("Error while converting possible JDBC Timestamp String to Timestamp. String to parse: {}. Exception: {}", json, e);
+					logger.warn("Error while converting possible JDBC Timestamp `{}` to java.sql.Timestamp", json, e);
 					return fromJsonConverer.apply(json);
 				}
 			}
