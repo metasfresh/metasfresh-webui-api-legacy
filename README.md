@@ -2,7 +2,7 @@
 [![Join the chat at https://gitter.im/metasfresh/metasfresh](https://badges.gitter.im/metasfresh/metasfresh.svg)](https://gitter.im/metasfresh/metasfresh?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 [![Krihelimeter](http://krihelinator.xyz/badge/metasfresh/metasfresh-webui-api)](http://krihelinator.xyz)
 
-# metasfresh-webui-api
+# metasfresh-webui-api23
 
 This repo contains the API service of our webui. The frontend can be found in its [own repository](https://github.com/metasfresh/metasfresh-webui-frontend).
 
