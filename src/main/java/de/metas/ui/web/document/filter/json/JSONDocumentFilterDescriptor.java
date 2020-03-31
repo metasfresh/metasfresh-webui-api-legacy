@@ -136,6 +136,8 @@ public final class JSONDocumentFilterDescriptor
 		includedFilters = null;
 
 		debugProperties = filter.getDebugProperties();
+		debugProperties = filter.getDebugProperties()
+				.toMap();
 	}
 
 	/** Filters group constructor */
