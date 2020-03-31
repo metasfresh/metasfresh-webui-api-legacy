@@ -4,7 +4,6 @@ import java.time.ZonedDateTime;
 import java.util.List;
 
 import org.adempiere.exceptions.AdempiereException;
-import org.adempiere.util.lang.SynchronizedMutable;
 import org.adempiere.util.lang.impl.TableRecordReferenceSet;
 import org.compiere.model.I_C_Payment;
 
@@ -13,6 +12,7 @@ import com.google.common.collect.ImmutableSet;
 
 import de.metas.payment.PaymentId;
 import de.metas.ui.web.view.template.IRowsData;
+import de.metas.ui.web.view.template.SynchronizedRowsIndexHolder;
 import de.metas.ui.web.window.datatypes.DocumentId;
 import de.metas.ui.web.window.datatypes.DocumentIdsSelection;
 import lombok.Builder;
@@ -49,7 +49,7 @@ public class PaymentRows implements IRowsData<PaymentRow>
 
 	private final PaymentAndInvoiceRowsRepo repository;
 	private final ZonedDateTime evaluationDate;
-	private final SynchronizedMutable<ImmutableRowsIndex<PaymentRow>> rowsHolder;
+	private final SynchronizedRowsIndexHolder<PaymentRow> rowsHolder;
 
 	@Builder
 	private PaymentRows(
@@ -59,22 +59,21 @@ public class PaymentRows implements IRowsData<PaymentRow>
 	{
 		this.repository = repository;
 		this.evaluationDate = evaluationDate;
-		rowsHolder = SynchronizedMutable.of(ImmutableRowsIndex.of(initialRows));
+		rowsHolder = SynchronizedRowsIndexHolder.of(initialRows);
 	}
 
 	@Override
 	public ImmutableMap<DocumentId, PaymentRow> getDocumentId2TopLevelRows()
 	{
-		return rowsHolder.getValue().getDocumentId2TopLevelRows();
+		return rowsHolder.getDocumentId2TopLevelRows();
 	}
 
 	@Override
 	public DocumentIdsSelection getDocumentIdsToInvalidate(final TableRecordReferenceSet recordRefs)
 	{
-		final ImmutableRowsIndex<PaymentRow> rows = rowsHolder.getValue();
 		return recordRefs.streamIds(I_C_Payment.Table_Name, PaymentId::ofRepoId)
 				.map(PaymentRow::convertPaymentIdToDocumentId)
-				.filter(rows::isRelevantForRefreshing)
+				.filter(rowsHolder.isRelevantForRefreshingByDocumentId())
 				.collect(DocumentIdsSelection.toDocumentIdsSelection());
 	}
 
@@ -89,7 +88,6 @@ public class PaymentRows implements IRowsData<PaymentRow>
 	public void invalidate(final DocumentIdsSelection rowIds)
 	{
 		final ImmutableSet<PaymentId> paymentIds = rowsHolder
-				.getValue()
 				.getRecordIdsToRefresh(rowIds, PaymentRow::convertDocumentIdToPaymentId);
 
 		final List<PaymentRow> newRows = repository.getPaymentRowsListByPaymentId(paymentIds, evaluationDate);
