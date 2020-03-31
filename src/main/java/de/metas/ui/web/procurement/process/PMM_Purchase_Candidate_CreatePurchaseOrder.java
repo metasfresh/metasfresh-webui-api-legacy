@@ -4,7 +4,14 @@ import de.metas.Profiles;
 import de.metas.procurement.base.model.I_PMM_PurchaseCandidate;
 import de.metas.procurement.base.order.async.PMM_GenerateOrders;
 import de.metas.ui.web.process.adprocess.ViewBasedProcessTemplate;
+import de.metas.util.Services;
+import org.adempiere.ad.dao.ConstantQueryFilter;
+import org.adempiere.ad.dao.ICompositeQueryFilter;
+import org.adempiere.ad.dao.IQueryBL;
+import org.adempiere.ad.dao.impl.CompareQueryFilter;
 import org.springframework.context.annotation.Profile;
+
+import java.math.BigDecimal;
 
 /*
  * #%L
@@ -39,12 +46,14 @@ public class PMM_Purchase_Candidate_CreatePurchaseOrder
 
 {
 	private int recordsEnqueued;
-
+	private final IQueryBL queryBL =Services.get(IQueryBL.class);
 	@Override
 	protected String doIt() throws Exception
 	{
+		final ICompositeQueryFilter<I_PMM_PurchaseCandidate> i_pmm_purchaseCandidateICompositeQueryFilter = queryBL.createCompositeQueryFilter(I_PMM_PurchaseCandidate.class)
+				.addCompareFilter(I_PMM_PurchaseCandidate.COLUMNNAME_QtyOrdered, CompareQueryFilter.Operator.GREATER, BigDecimal.ZERO).addFilter(ConstantQueryFilter.of(true));
 		recordsEnqueued = PMM_GenerateOrders.prepareEnqueuing()
-				.filter(getProcessInfo().getQueryFilterOrElseFalse())
+				.filter(i_pmm_purchaseCandidateICompositeQueryFilter)
 				.enqueue();
 		return MSG_OK;
 	}
