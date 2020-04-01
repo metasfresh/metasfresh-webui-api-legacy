@@ -49,4 +49,21 @@ class JsonUserDashboardItemAddRequestTest
 
 		assertThat(objDeserialized).isEqualTo(obj);
 	}
+
+	@Test
+	void testSerializeDeserialize2()
+	{
+		final JSONObjectMapper<JsonUserDashboardItemAddRequest> jsonObjectMapper = JSONObjectMapper.forClass(JsonUserDashboardItemAddRequest.class);
+
+		final JsonUserDashboardItemAddRequest obj = JsonUserDashboardItemAddRequest.builder()
+				.kpiId(1000006)
+				.position(4)
+				.build();
+
+		final String json = jsonObjectMapper.writeValueAsString(obj);
+
+		final Object objDeserialized = jsonObjectMapper.readValue(json);
+
+		assertThat(objDeserialized).isEqualTo(obj);
+	}
 }

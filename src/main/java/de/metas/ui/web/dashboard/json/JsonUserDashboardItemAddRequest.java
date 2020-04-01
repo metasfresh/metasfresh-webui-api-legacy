@@ -64,7 +64,6 @@ public class JsonUserDashboardItemAddRequest
 		private final String esTimeRangeEnd;
 	}
 
-	@JsonIgnoreProperties(ignoreUnknown = true)
 	@JsonPOJOBuilder(withPrefix = "")
 	public static class JsonUserDashboardItemAddRequestBuilder
 	{
