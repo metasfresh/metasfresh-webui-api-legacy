@@ -157,14 +157,9 @@ final class JSONDocumentChangedWebSocketEvent implements WebsocketEndpointAware
 		return WebSocketConfig.buildDocumentTopicName(windowId, id);
 	}
 
-	public void staleTab(@NonNull final DetailId tabId)
-	{
-		getIncludedTabInfo(tabId).setStale();
-	}
-
 	public void staleTabs(@NonNull final Collection<DetailId> tabIds)
 	{
-		tabIds.stream().map(this::getIncludedTabInfo).forEach(JSONIncludedTabInfo::setStale);
+		tabIds.stream().map(this::getIncludedTabInfo).forEach(JSONIncludedTabInfo::markAllRowsStaled);
 	}
 
 	public void staleIncludedRows(@NonNull final DetailId tabId, @NonNull final DocumentIdsSelection rowIds)

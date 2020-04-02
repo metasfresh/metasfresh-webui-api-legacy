@@ -137,7 +137,7 @@ public final class JSONDocument extends JSONDocumentBase
 		final JSONIncludedTabInfo tabInfo = JSONIncludedTabInfo.newInstance(includedDocumentsCollection.getDetailId());
 		if (includedDocumentsCollection.isStale())
 		{
-			tabInfo.setStale();
+			tabInfo.markAllRowsStaled();
 		}
 
 		final LogicExpressionResult allowCreateNew = includedDocumentsCollection.getAllowCreateNewDocument();
@@ -261,7 +261,7 @@ public final class JSONDocument extends JSONDocumentBase
 		final JSONIncludedTabInfo tabInfo = JSONIncludedTabInfo.newInstance(includedDetailInfo.getDetailId());
 		if (includedDetailInfo.isStale())
 		{
-			tabInfo.setStale();
+			tabInfo.markAllRowsStaled();
 		}
 
 		final LogicExpressionResult allowCreateNew = includedDetailInfo.getAllowNew();
