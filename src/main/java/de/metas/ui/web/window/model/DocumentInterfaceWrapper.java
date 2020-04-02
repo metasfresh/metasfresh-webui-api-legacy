@@ -350,7 +350,14 @@ public class DocumentInterfaceWrapper implements InvocationHandler, IInterfaceWr
 			Object defaultValue = null;
 			if (method.getReturnType() == int.class)
 			{
-				defaultValue = Integer.valueOf(0);
+				if (methodName.endsWith("_ID"))
+				{
+					defaultValue = -1;
+				}
+				else
+				{
+					defaultValue = 0;
+				}
 			}
 			else if (method.getReturnType() == BigDecimal.class)
 			{
