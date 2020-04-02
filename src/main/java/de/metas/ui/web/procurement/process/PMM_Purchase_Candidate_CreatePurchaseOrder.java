@@ -1,16 +1,14 @@
 package de.metas.ui.web.procurement.process;
 
 import de.metas.Profiles;
+import de.metas.process.IProcessPrecondition;
+import de.metas.process.ProcessPreconditionsResolution;
 import de.metas.procurement.base.model.I_PMM_PurchaseCandidate;
 import de.metas.procurement.base.order.async.PMM_GenerateOrders;
 import de.metas.ui.web.process.adprocess.ViewBasedProcessTemplate;
-import de.metas.ui.web.view.IView;
-import de.metas.ui.web.view.IViewRow;
-import de.metas.ui.web.window.datatypes.DocumentId;
 import de.metas.ui.web.window.datatypes.DocumentIdsSelection;
 import de.metas.ui.web.window.model.sql.SqlOptions;
 import de.metas.util.Services;
-import org.adempiere.ad.dao.ConstantQueryFilter;
 import org.adempiere.ad.dao.ICompositeQueryFilter;
 import org.adempiere.ad.dao.IQueryBL;
 import org.adempiere.ad.dao.impl.CompareQueryFilter;
@@ -18,8 +16,6 @@ import org.adempiere.ad.dao.impl.TypedSqlQueryFilter;
 import org.springframework.context.annotation.Profile;
 
 import java.math.BigDecimal;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 /*
  * #%L
@@ -51,10 +47,25 @@ import java.util.stream.Collectors;
 @Profile(Profiles.PROFILE_Webui)
 public class PMM_Purchase_Candidate_CreatePurchaseOrder
 		extends ViewBasedProcessTemplate
+		implements IProcessPrecondition
 
 {
+
 	private int recordsEnqueued;
-	private final IQueryBL queryBL =Services.get(IQueryBL.class);
+	private final IQueryBL queryBL = Services.get(IQueryBL.class);
+
+	@Override
+	protected ProcessPreconditionsResolution checkPreconditionsApplicable()
+	{
+		// only showing the action if there are rows in the view
+		if (getView().size() <= 0)
+		{
+			return ProcessPreconditionsResolution.reject();
+		}
+
+		return ProcessPreconditionsResolution.accept();
+	}
+
 	@Override
 	protected String doIt() throws Exception
 	{
