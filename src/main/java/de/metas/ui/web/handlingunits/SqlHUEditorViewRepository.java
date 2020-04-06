@@ -243,7 +243,7 @@ public class SqlHUEditorViewRepository implements HUEditorViewRepository
 				.setAttributesProvider(attributesProvider)
 				//
 				.setCode(hu.getValue())
-				.setIsOwnPalette(hu.isHUPlanningReceiptOwnerPM())
+				.setIsOwnPalette(huRecordType == HUEditorRowType.LU ? hu.isHUPlanningReceiptOwnerPM() : null)
 				.setHUUnitType(huUnitTypeLookupValue)
 				.setHUStatusDisplay(huStatusDisplay)
 				.setHUStatus(hu.getHUStatus())
