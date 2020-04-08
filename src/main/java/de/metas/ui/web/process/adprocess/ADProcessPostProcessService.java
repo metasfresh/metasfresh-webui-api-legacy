@@ -200,7 +200,7 @@ public class ADProcessPostProcessService
 
 	private static final DocumentPath extractSingleDocumentPath(final RecordsToOpen recordsToOpen)
 	{
-		final TableRecordReference recordRef = recordsToOpen.getSingleRecord();
+		final TableRecordReference recordRef = recordsToOpen.getFirstRecord();
 		final int documentId = recordRef.getRecord_ID();
 
 		WindowId windowId = WindowId.fromNullableJson(recordsToOpen.getWindowIdString());
