@@ -201,7 +201,7 @@ public class WebuiHUTransformCommand
 			}
 			case TU_Set_Ownership:
 			{
-				return action_updatePlanningReceiptOwnerPM(row, parameters.isHuPlanningReceiptOwnerPM_TU());
+				return action_updatePlanningReceiptOwnerPM(row, !parameters.isHuPlanningReceiptOwnerPM_TU());
 			}
 			case TU_To_NewTUs:
 			{
@@ -217,7 +217,7 @@ public class WebuiHUTransformCommand
 			}
 			case LU_Set_Ownership:
 			{
-				return action_updatePlanningReceiptOwnerPM(row, parameters.isHuPlanningReceiptOwnerPM_LU());
+				return action_updatePlanningReceiptOwnerPM(row, !parameters.isHuPlanningReceiptOwnerPM_LU());
 			}
 			case TU_To_ExistingLU:
 			{
