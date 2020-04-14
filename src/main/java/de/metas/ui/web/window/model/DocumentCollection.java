@@ -140,6 +140,7 @@ public class DocumentCollection
 	/**
 	 * Delegates to the {@link DocumentDescriptorFactory#isWindowIdSupported(WindowId)} of this instance's {@code documentDescriptorFactory}.
 	 */
+	@SuppressWarnings("BooleanMethodIsAlwaysInverted")
 	public boolean isWindowIdSupported(@Nullable final WindowId windowId)
 	{
 		return documentDescriptorFactory.isWindowIdSupported(windowId);
@@ -225,7 +226,7 @@ public class DocumentCollection
 	{
 		final DocumentKey rootDocumentKey = DocumentKey.ofRootDocumentPath(documentPath.getRootDocumentPath());
 
-		try (final IAutoCloseable readLock = getOrLoadDocument(rootDocumentKey).lockForReading())
+		try (@SuppressWarnings("unused") final IAutoCloseable readLock = getOrLoadDocument(rootDocumentKey).lockForReading())
 		{
 			final Document rootDocument = getOrLoadDocument(rootDocumentKey).copy(CopyMode.CheckInReadonly, NullDocumentChangesCollector.instance);
 			DocumentPermissionsHelper.assertCanView(rootDocument, UserSession.getCurrentPermissions());
@@ -288,7 +289,7 @@ public class DocumentCollection
 			isNewRootDocument = false;
 		}
 
-		try (final IAutoCloseable writeLock = lockHolder.lockForWriting())
+		try (@SuppressWarnings("unused") final IAutoCloseable writeLock = lockHolder.lockForWriting())
 		{
 			final Document rootDocument;
 			if (isNewRootDocument)
@@ -342,6 +343,7 @@ public class DocumentCollection
 		assertNewDocumentAllowed(entityDescriptor);
 
 		final DocumentsRepository documentsRepository = entityDescriptor.getDataBinding().getDocumentsRepository();
+		@SuppressWarnings("UnnecessaryLocalVariable")
 		final Document document = documentsRepository.createNewDocument(entityDescriptor, Document.NULL, changesCollector);
 		// NOTE: we assume document is writable
 		// NOTE: we are not adding it to index. That shall be done on "commit".
@@ -562,8 +564,6 @@ public class DocumentCollection
 
 	/**
 	 * Retrieves document path for given ZoomInto info.
-	 *
-	 * @param zoomIntoInfo
 	 */
 	public DocumentPath getDocumentPath(@NonNull final DocumentZoomIntoInfo zoomIntoInfo)
 	{
@@ -615,7 +615,7 @@ public class DocumentCollection
 					.retrieveParentDocumentId(rootEntityDescriptor);
 
 			//
-			return DocumentPath.includedDocumentPath(zoomIntoWindowIdEffective, rootDocumentId, childEntityDescriptor.getDetailId(), rowId);
+			return DocumentPath.includedDocumentPath(zoomIntoWindowIdEffective, rootDocumentId, Objects.requireNonNull(childEntityDescriptor.getDetailId()), rowId);
 		}
 	}
 
@@ -656,9 +656,6 @@ public class DocumentCollection
 
 	/**
 	 * Invalidates all root documents identified by tableName/recordId and notifies frontend (via websocket).
-	 *
-	 * @param tableName
-	 * @param recordId
 	 */
 	public void invalidateDocumentByRecordId(final String tableName, final int recordId)
 	{
@@ -706,7 +703,7 @@ public class DocumentCollection
 			final Document rootDocument = rootDocuments.getIfPresent(rootDocumentKey);
 			if (rootDocument != null)
 			{
-				try (final IAutoCloseable lock = rootDocument.lockForWriting())
+				try (@SuppressWarnings("unused") final IAutoCloseable lock = rootDocument.lockForWriting())
 				{
 					for (final IncludedDocumentToInvalidate includedDocumentToInvalidate : documentToInvalidate.getIncludedDocuments())
 					{
@@ -720,7 +717,7 @@ public class DocumentCollection
 						{
 							final DetailId detailId = includedEntityDescriptor.getDetailId();
 
-							rootDocument.getIncludedDocumentsCollection(detailId).markStale(includedRowIds);
+							rootDocument.getIncludedDocumentsCollection(Objects.requireNonNull(detailId)).markStale(includedRowIds);
 							websocketPublisher.staleIncludedDocuments(windowId, rootDocumentId, detailId, includedRowIds);
 						}
 					}
