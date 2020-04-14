@@ -59,7 +59,7 @@ public class BankStatementReconciliationViewFactory implements IViewFactory, IVi
 	private final IMsgBL msgBL = Services.get(IMsgBL.class);
 	private final IADProcessDAO adProcessDAO = Services.get(IADProcessDAO.class);
 	private final BankStatementLineAndPaymentsToReconcileRepository rowsRepo;
-	private final DefaultViewsRepositoryStorage views = new DefaultViewsRepositoryStorage();
+	private final DefaultViewsRepositoryStorage views = new DefaultViewsRepositoryStorage(1);
 
 	public BankStatementReconciliationViewFactory(
 			@NonNull final BankStatementLineAndPaymentsToReconcileRepository rowsRepo)

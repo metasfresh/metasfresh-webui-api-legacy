@@ -66,7 +66,7 @@ public class PaymentsViewFactory implements IViewFactory, IViewsIndexStorage
 
 	private final IMsgBL msgBL = Services.get(IMsgBL.class);
 	private final PaymentAndInvoiceRowsRepo rowsRepo;
-	private final DefaultViewsRepositoryStorage views = new DefaultViewsRepositoryStorage();
+	private final DefaultViewsRepositoryStorage views = new DefaultViewsRepositoryStorage(1);
 
 	public PaymentsViewFactory(
 			@NonNull final PaymentAndInvoiceRowsRepo rowsRepo)

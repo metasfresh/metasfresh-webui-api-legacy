@@ -81,7 +81,7 @@ public class ViewsRepository implements IViewsRepository
 	private boolean truncateSelectionOnStartUp;
 
 	private final ImmutableMap<WindowId, IViewsIndexStorage> viewsIndexStorages;
-	private final IViewsIndexStorage defaultViewsIndexStorage = new DefaultViewsRepositoryStorage();
+	private final IViewsIndexStorage defaultViewsIndexStorage = new DefaultViewsRepositoryStorage(1);
 
 	/**
 	 *

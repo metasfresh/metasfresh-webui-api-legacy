@@ -48,7 +48,7 @@ import lombok.NonNull;
 @Service
 public class MaterialCockpitViewsIndexStorage implements IViewsIndexStorage
 {
-	private final DefaultViewsRepositoryStorage defaultViewsRepositoryStorage = new DefaultViewsRepositoryStorage();
+	private final DefaultViewsRepositoryStorage defaultViewsRepositoryStorage = new DefaultViewsRepositoryStorage(1);
 
 	public MaterialCockpitViewsIndexStorage()
 	{
