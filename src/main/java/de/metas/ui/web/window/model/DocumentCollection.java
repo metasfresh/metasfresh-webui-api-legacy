@@ -28,6 +28,7 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import de.metas.i18n.AdMessageKey;
 import de.metas.letters.model.MADBoilerPlate;
 import de.metas.letters.model.MADBoilerPlate.BoilerPlateContext;
 import de.metas.letters.model.MADBoilerPlate.SourceDocument;
@@ -105,6 +106,7 @@ public class DocumentCollection
 	private static final int DEFAULT_CACHE_SIZE = 800;
 
 	private static final Logger logger = LogManager.getLogger(DocumentCollection.class);
+	public static final AdMessageKey MSG_CLONING_NOT_ALLOWED_FOR_CURRENT_WINDOW = AdMessageKey.of("de.metas.ui.web.window.model.DocumentCollection.CloningNotAllowedForCurrentWindow");
 
 	@Autowired
 	private DocumentDescriptorFactory documentDescriptorFactory;
@@ -780,8 +782,7 @@ public class DocumentCollection
 
 		if (!CopyRecordFactory.isEnabledForTableName(tableName))
 		{
-			// TODO tbp: make this message better. maybe it should contain the window name? (how to get that from fromDocumentPath.getWindowId()?)
-			throw new AdempiereException("Cloning not allowed for " + tableName);
+			throw new AdempiereException(MSG_CLONING_NOT_ALLOWED_FOR_CURRENT_WINDOW);
 		}
 
 		final PO toPO = TableModelLoader.instance.newPO(Env.getCtx(), tableName, ITrx.TRXNAME_ThreadInherited);
