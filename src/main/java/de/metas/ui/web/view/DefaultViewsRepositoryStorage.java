@@ -3,9 +3,11 @@ package de.metas.ui.web.view;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalNotification;
+import de.metas.logging.LogManager;
 import de.metas.ui.web.view.event.ViewChangesCollector;
 import de.metas.ui.web.window.datatypes.WindowId;
 import lombok.NonNull;
+import org.slf4j.Logger;
 
 import javax.annotation.Nullable;
 import java.util.concurrent.TimeUnit;
@@ -36,12 +38,14 @@ import java.util.stream.Stream;
 // NOTE: don't add it to spring context! i.e. don't annotate it with @Component or similar
 public final class DefaultViewsRepositoryStorage implements IViewsIndexStorage
 {
+	private static transient final Logger logger = LogManager.getLogger(DefaultViewsRepositoryStorage.class);
+
 	private final Cache<ViewId, IView> views;
 
-	public DefaultViewsRepositoryStorage(final int viewExpirationTimeoutInHours)
+	public DefaultViewsRepositoryStorage(final long viewExpirationTimeoutInMinutes)
 	{
 		views = CacheBuilder.newBuilder()
-				.expireAfterAccess(viewExpirationTimeoutInHours, TimeUnit.HOURS)
+				.expireAfterAccess(viewExpirationTimeoutInMinutes, TimeUnit.MINUTES)
 				.removalListener(this::onViewRemoved)
 				.build();
 	}
@@ -91,6 +95,7 @@ public final class DefaultViewsRepositoryStorage implements IViewsIndexStorage
 	private void onViewRemoved(final RemovalNotification<Object, Object> notification)
 	{
 		final IView view = (IView)notification.getValue();
+		logger.debug("View <" + view.getViewId() + "> removed from cache. Cause: " + notification.getCause());
 		view.afterDestroy();
 	}
 

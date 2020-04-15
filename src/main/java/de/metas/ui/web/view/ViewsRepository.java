@@ -39,6 +39,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
 /*
@@ -100,8 +101,8 @@ public class ViewsRepository implements IViewsRepository
 		this.defaultFactory = defaultFactory;
 		this.menuTreeRepo = menuTreeRepo;
 
-		final int viewExpirationTimeoutInHours = Services.get(ISysConfigBL.class).getIntValue("de.metas.ui.web.view.ViewExpirationTimeoutInHours", 1);
-		defaultViewsIndexStorage = new DefaultViewsRepositoryStorage(viewExpirationTimeoutInHours);
+		final int viewExpirationTimeoutInMinutes = Services.get(ISysConfigBL.class).getIntValue("de.metas.ui.web.view.ViewExpirationTimeoutInMinutes", 60);
+		defaultViewsIndexStorage = new DefaultViewsRepositoryStorage(viewExpirationTimeoutInMinutes);
 	}
 
 	@PostConstruct
