@@ -617,7 +617,7 @@ public class DocumentCollection
 					.retrieveParentDocumentId(rootEntityDescriptor);
 
 			//
-			return DocumentPath.includedDocumentPath(zoomIntoWindowIdEffective, rootDocumentId, Objects.requireNonNull(childEntityDescriptor.getDetailId()), rowId);
+			return DocumentPath.includedDocumentPath(zoomIntoWindowIdEffective, rootDocumentId, Check.assumeNotNull(childEntityDescriptor.getDetailId(), "Expected childEntityDescriptor.getDetailId not null"), rowId);
 		}
 	}
 
@@ -719,11 +719,10 @@ public class DocumentCollection
 						{
 							final DetailId detailId = includedEntityDescriptor.getDetailId();
 
-							rootDocument.getIncludedDocumentsCollection(Objects.requireNonNull(detailId)).markStale(includedRowIds);
+							rootDocument.getIncludedDocumentsCollection(Check.assumeNotNull(detailId, "Expected detailId not null")).markStale(includedRowIds);
 							websocketPublisher.staleIncludedDocuments(windowId, rootDocumentId, detailId, includedRowIds);
 						}
 					}
-
 				}
 			}
 
