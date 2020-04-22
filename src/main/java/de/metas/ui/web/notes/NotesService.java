@@ -60,7 +60,7 @@ public class NotesService
 					final I_AD_User user = userDAO.getById(UserId.ofRepoId(it.getCreatedBy()));
 
 					return JSONNote.builder()
-							.characterData(it.getCharacterData())
+							.text(it.getCharacterData())
 							.created(it.getCreated().toString())
 							.createdBy(user.getName())
 							.build();
@@ -68,8 +68,8 @@ public class NotesService
 				.collect(GuavaCollectors.toImmutableList());
 	}
 
-	public void addNote(@NonNull final TableRecordReference tableRecordReference, @NonNull final String characterData)
+	public void addNote(@NonNull final TableRecordReference tableRecordReference, @NonNull final String text)
 	{
-		notesRepository.createNote(characterData, tableRecordReference);
+		notesRepository.createNote(text, tableRecordReference);
 	}
 }

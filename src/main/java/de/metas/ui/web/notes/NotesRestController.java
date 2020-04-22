@@ -32,8 +32,8 @@ import org.adempiere.util.lang.impl.TableRecordReference;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -76,7 +76,7 @@ public class NotesRestController
 	public void addNote(
 			@PathVariable("windowId") final String windowIdStr,
 			@PathVariable("documentId") final String documentId,
-			@RequestParam("text") final String characterData
+			@RequestBody final String text
 	)
 	{
 		// userSession.assertLoggedIn();  // TODO tbp: this needs to be enabled
@@ -85,6 +85,6 @@ public class NotesRestController
 
 		final TableRecordReference tableRecordReference = documentDescriptorFactory.getTableRecordReference(documentPath);
 
-		notesService.addNote(tableRecordReference, characterData);
+		notesService.addNote(tableRecordReference, text);
 	}
 }

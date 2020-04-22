@@ -24,8 +24,10 @@ package de.metas.ui.web.notes.json;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import lombok.Builder;
+import lombok.Value;
 
 @Builder
+@Value
 @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY, getterVisibility = JsonAutoDetect.Visibility.NONE, isGetterVisibility = JsonAutoDetect.Visibility.NONE, setterVisibility = JsonAutoDetect.Visibility.NONE)
 public class JSONNote
 {
@@ -33,5 +35,5 @@ public class JSONNote
 
 	String created;
 
-	String characterData;
+	String text;
 }
