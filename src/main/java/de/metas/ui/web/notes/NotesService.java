@@ -35,6 +35,7 @@ import org.compiere.model.I_CM_ChatEntry;
 import org.compiere.util.TimeUtil;
 import org.springframework.stereotype.Service;
 
+import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -65,6 +66,7 @@ public class NotesService
 							.createdBy(user.getName())
 							.build();
 				})
+				.sorted(Comparator.comparing(JSONNote::getCreated))
 				.collect(GuavaCollectors.toImmutableList());
 	}
 
