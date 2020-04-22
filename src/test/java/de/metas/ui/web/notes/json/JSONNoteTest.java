@@ -22,28 +22,28 @@
 
 package de.metas.ui.web.notes.json;
 
-import com.fasterxml.jackson.annotation.JsonAutoDetect;
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
-import lombok.Builder;
-import lombok.NonNull;
-import lombok.Value;
+import de.metas.util.JSONObjectMapper;
+import org.junit.jupiter.api.Test;
 
-@Builder
-@Value
-@JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY, getterVisibility = JsonAutoDetect.Visibility.NONE, isGetterVisibility = JsonAutoDetect.Visibility.NONE, setterVisibility = JsonAutoDetect.Visibility.NONE)
-@JsonDeserialize(builder = JSONNote.JSONNoteBuilder.class)
-public class JSONNote
+import static org.assertj.core.api.Assertions.assertThat;
+
+class JSONNoteTest
 {
-	@NonNull String createdBy;
 
-	@NonNull String created;
-
-	@NonNull String text;
-
-	@JsonPOJOBuilder(withPrefix = "")
-	public static class JSONNoteBuilder
+	@Test
+	void testSerialisationDeserialisation()
 	{
-	}
-}
+		final JSONObjectMapper<JSONNote> jsonObjectMapper = JSONObjectMapper.forClass(JSONNote.class);
 
+		final JSONNote expectedNote = JSONNote.builder()
+				.createdBy("who created this?")
+				.created("time when this was created")
+				.text("This is a test note.\nTra la la.")
+				.build();
+
+		final String json = jsonObjectMapper.writeValueAsString(expectedNote);
+		final JSONNote deserialisedRequest = jsonObjectMapper.readValue(json);
+		assertThat(deserialisedRequest).isEqualToIgnoringGivenFields(expectedNote);
+	}
+
+}
