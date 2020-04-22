@@ -30,9 +30,9 @@ import de.metas.user.api.IUserDAO;
 import de.metas.util.GuavaCollectors;
 import de.metas.util.Services;
 import lombok.NonNull;
-import org.adempiere.util.lang.ITableRecordReference;
 import org.adempiere.util.lang.impl.TableRecordReference;
 import org.compiere.model.I_CM_ChatEntry;
+import org.compiere.util.TimeUtil;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -48,11 +48,11 @@ public class NotesService
 	}
 
 	@NonNull
-	public List<JSONNote> getNotesFor(@NonNull final ITableRecordReference tableRecordReference)
+	public List<JSONNote> getNotesFor(@NonNull final TableRecordReference tableRecordReference)
 	{
 		final IUserDAO userDAO = Services.get(IUserDAO.class);
 
-		final List<I_CM_ChatEntry> chatEntries = notesRepository.retrieveAllNotes(tableRecordReference);
+		final List<I_CM_ChatEntry> chatEntries = notesRepository.retrieveNotes(tableRecordReference, 100);
 
 		return chatEntries.stream()
 				.map(it ->
@@ -61,7 +61,7 @@ public class NotesService
 
 					return JSONNote.builder()
 							.text(it.getCharacterData())
-							.created(it.getCreated().toString())
+							.created(TimeUtil.asZonedDateTime(it.getCreated()))
 							.createdBy(user.getName())
 							.build();
 				})

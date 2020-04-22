@@ -25,6 +25,9 @@ package de.metas.ui.web.notes.json;
 import de.metas.util.JSONObjectMapper;
 import org.junit.jupiter.api.Test;
 
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class JSONNoteTest
@@ -37,7 +40,7 @@ class JSONNoteTest
 
 		final JSONNote expectedNote = JSONNote.builder()
 				.createdBy("who created this?")
-				.created("time when this was created")
+				.created(ZonedDateTime.of(2020, 4, 22, 11, 11, 11, 0, ZoneId.of("UTC+3")))
 				.text("This is a test note.\nTra la la.")
 				.build();
 
