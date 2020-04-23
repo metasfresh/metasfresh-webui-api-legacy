@@ -22,16 +22,17 @@
 
 package de.metas.ui.web.notes;
 
-import de.metas.adempiere.model.I_AD_User;
+import com.sun.istack.internal.NotNull;
 import de.metas.notes.NotesRepository;
+import de.metas.notes.RecordNote;
 import de.metas.ui.web.notes.json.JSONNote;
 import de.metas.user.UserId;
 import de.metas.user.api.IUserDAO;
 import de.metas.util.GuavaCollectors;
 import de.metas.util.Services;
+import de.metas.util.time.SystemTime;
 import lombok.NonNull;
 import org.adempiere.util.lang.impl.TableRecordReference;
-import org.compiere.model.I_CM_ChatEntry;
 import org.compiere.util.TimeUtil;
 import org.springframework.stereotype.Service;
 
@@ -58,12 +59,12 @@ public class NotesService
 		return notes.stream()
 				.map(it ->
 				{
-					final I_AD_User user = userDAO.getById(UserId.ofRepoId(it.getCreatedBy()));
+					final String userName = userDAO.retrieveUserFullname(it.getCreatedBy());
 
 					return JSONNote.builder()
-							.text(it.getCharacterData())
-							.created(TimeUtil.asZonedDateTime(it.getCreated()))
-							.createdBy(user.getName())
+							.text(it.getText())
+							.created(TimeUtil.asZonedDateTime(it.getCreated(), SystemTime.zoneId()))
+							.createdBy(userName)
 							.build();
 				})
 				.sorted(Comparator.comparing(JSONNote::getCreated))
