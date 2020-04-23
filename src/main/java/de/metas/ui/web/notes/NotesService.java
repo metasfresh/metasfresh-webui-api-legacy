@@ -53,9 +53,9 @@ public class NotesService
 	{
 		final IUserDAO userDAO = Services.get(IUserDAO.class);
 
-		final List<I_CM_ChatEntry> chatEntries = notesRepository.retrieveLastNotes(tableRecordReference, 100);
+		final List<RecordNote> notes = notesRepository.retrieveLastNotes(tableRecordReference, 100);
 
-		return chatEntries.stream()
+		return notes.stream()
 				.map(it ->
 				{
 					final I_AD_User user = userDAO.getById(UserId.ofRepoId(it.getCreatedBy()));
