@@ -70,7 +70,11 @@ public class NotesService
 		final ZonedDateTime created = TimeUtil.asZonedDateTime(note.getCreated(), SystemTime.zoneId());
 		final String createdBy = userDAO.retrieveUserFullname(note.getCreatedBy());
 
-		return JSONNote.of(text, created, createdBy);
+		return JSONNote.builder()
+				.text(text)
+				.created(created)
+				.createdBy(createdBy)
+				.build();
 	}
 
 	public void addNote(@NonNull final TableRecordReference tableRecordReference, @NotNull final JSONNoteCreateRequest jsonNoteCreateRequest)

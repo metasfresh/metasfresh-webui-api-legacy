@@ -43,15 +43,6 @@ public class JSONNote
 
 	@NonNull String text;
 
-	public static JSONNote of(final String text, final ZonedDateTime created, final String createdBy)
-	{
-		return JSONNote.builder()
-				.text(text)
-				.created(created)
-				.createdBy(createdBy)
-				.build();
-	}
-
 	@JsonPOJOBuilder(withPrefix = "")
 	public static class JSONNoteBuilder
 	{
