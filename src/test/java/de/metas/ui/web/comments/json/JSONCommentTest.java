@@ -25,6 +25,7 @@ package de.metas.ui.web.comments.json;
 import de.metas.util.JSONObjectMapper;
 import org.junit.jupiter.api.Test;
 
+import java.time.Month;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 
@@ -39,7 +40,7 @@ class JSONCommentTest
 
 		final JSONComment expected = JSONComment.builder()
 				.createdBy("who created this?")
-				.created(ZonedDateTime.of(2020, 4, 22, 11, 11, 11, 0, ZoneId.of("UTC+3")))
+				.created(ZonedDateTime.of(2020, Month.APRIL.getValue(), 22, 11, 11, 11, 0, ZoneId.of("UTC+3")))
 				.text("This is a test Comment.\nTra la la.")
 				.build();
 
