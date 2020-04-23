@@ -23,6 +23,7 @@
 package de.metas.ui.web.notes;
 
 import de.metas.ui.web.notes.json.JSONNote;
+import de.metas.ui.web.notes.json.JSONNoteCreateRequest;
 import de.metas.ui.web.session.UserSession;
 import de.metas.ui.web.window.controller.WindowRestController;
 import de.metas.ui.web.window.datatypes.DocumentPath;
@@ -76,7 +77,7 @@ public class NotesRestController
 	public void addNote(
 			@PathVariable("windowId") final String windowIdStr,
 			@PathVariable("documentId") final String documentId,
-			@RequestBody final String text
+			@RequestBody final JSONNoteCreateRequest jsonNoteCreateRequest
 	)
 	{
 		// userSession.assertLoggedIn();  // TODO tbp: this needs to be enabled
@@ -85,6 +86,6 @@ public class NotesRestController
 
 		final TableRecordReference tableRecordReference = documentDescriptorFactory.getTableRecordReference(documentPath);
 
-		notesService.addNote(tableRecordReference, text);
+		notesService.addNote(tableRecordReference, jsonNoteCreateRequest);
 	}
 }

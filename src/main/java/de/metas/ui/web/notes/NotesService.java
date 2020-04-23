@@ -26,7 +26,7 @@ import com.sun.istack.internal.NotNull;
 import de.metas.notes.NotesRepository;
 import de.metas.notes.RecordNote;
 import de.metas.ui.web.notes.json.JSONNote;
-import de.metas.user.UserId;
+import de.metas.ui.web.notes.json.JSONNoteCreateRequest;
 import de.metas.user.api.IUserDAO;
 import de.metas.util.GuavaCollectors;
 import de.metas.util.Services;
@@ -71,8 +71,8 @@ public class NotesService
 				.collect(GuavaCollectors.toImmutableList());
 	}
 
-	public void addNote(@NonNull final TableRecordReference tableRecordReference, @NonNull final String text)
+	public void addNote(@NonNull final TableRecordReference tableRecordReference, @NotNull final JSONNoteCreateRequest jsonNoteCreateRequest)
 	{
-		notesRepository.createNote(text, tableRecordReference);
+		notesRepository.createNote(jsonNoteCreateRequest.getText(), tableRecordReference);
 	}
 }
