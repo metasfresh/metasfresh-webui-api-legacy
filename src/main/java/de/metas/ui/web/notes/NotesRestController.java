@@ -64,7 +64,7 @@ public class NotesRestController
 			@PathVariable("documentId") final String documentId
 	)
 	{
-		// userSession.assertLoggedIn();  // TODO tbp: this needs to be enabled
+		userSession.assertLoggedIn();
 
 		final DocumentPath documentPath = DocumentPath.rootDocumentPath(WindowId.fromJson(windowIdStr), documentId);
 
@@ -80,7 +80,7 @@ public class NotesRestController
 			@RequestBody final JSONNoteCreateRequest jsonNoteCreateRequest
 	)
 	{
-		// userSession.assertLoggedIn();  // TODO tbp: this needs to be enabled
+		userSession.assertLoggedIn();
 
 		final DocumentPath documentPath = DocumentPath.rootDocumentPath(WindowId.fromJson(windowIdStr), documentId);
 
