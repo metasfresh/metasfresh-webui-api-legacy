@@ -20,32 +20,24 @@
  * #L%
  */
 
-package de.metas.ui.web.notes.json;
+package de.metas.ui.web.comments.json;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
-import lombok.Builder;
-import lombok.NonNull;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.sun.istack.internal.NotNull;
 import lombok.Value;
 
-import java.time.ZonedDateTime;
-
-@Builder
 @Value
 @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY, getterVisibility = JsonAutoDetect.Visibility.NONE, isGetterVisibility = JsonAutoDetect.Visibility.NONE, setterVisibility = JsonAutoDetect.Visibility.NONE)
-@JsonDeserialize(builder = JSONNote.JSONNoteBuilder.class)
-public class JSONNote
+public class JSONCommentCreateRequest
 {
-	@NonNull String createdBy;
+	@NotNull
+	String text;
 
-	@NonNull ZonedDateTime created;
-
-	@NonNull String text;
-
-	@JsonPOJOBuilder(withPrefix = "")
-	public static class JSONNoteBuilder
+	@JsonCreator
+	public JSONCommentCreateRequest(@NotNull @JsonProperty("text") final String text)
 	{
+		this.text = text;
 	}
 }
-

@@ -20,26 +20,31 @@
  * #L%
  */
 
-package de.metas.ui.web.notes.json;
+package de.metas.ui.web.comments.json;
 
 import de.metas.util.JSONObjectMapper;
 import org.junit.jupiter.api.Test;
 
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
-class JSONNoteCreateRequestTest
+class JSONCommentTest
 {
 	@Test
 	void testSerialisationDeserialisation()
 	{
-		final JSONObjectMapper<JSONNoteCreateRequest> jsonObjectMapper = JSONObjectMapper.forClass(JSONNoteCreateRequest.class);
+		final JSONObjectMapper<JSONComment> jsonObjectMapper = JSONObjectMapper.forClass(JSONComment.class);
 
-		final JSONNoteCreateRequest expectedNote = new JSONNoteCreateRequest("This is a test note.\nTra la la.");
+		final JSONComment expected = JSONComment.builder()
+				.createdBy("who created this?")
+				.created(ZonedDateTime.of(2020, 4, 22, 11, 11, 11, 0, ZoneId.of("UTC+3")))
+				.text("This is a test Comment.\nTra la la.")
+				.build();
 
-		final String json = jsonObjectMapper.writeValueAsString(expectedNote);
-		final JSONNoteCreateRequest deserialisedRequest = jsonObjectMapper.readValue(json);
-		assertThat(deserialisedRequest).isEqualToIgnoringGivenFields(expectedNote);
-		System.out.println(deserialisedRequest);
+		final String json = jsonObjectMapper.writeValueAsString(expected);
+		final JSONComment deserialisedRequest = jsonObjectMapper.readValue(json);
+		assertThat(deserialisedRequest).isEqualToIgnoringGivenFields(expected);
 	}
-
 }

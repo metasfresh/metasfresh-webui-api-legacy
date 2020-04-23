@@ -20,13 +20,13 @@
  * #L%
  */
 
-package de.metas.ui.web.notes;
+package de.metas.ui.web.comments;
 
 import com.sun.istack.internal.NotNull;
-import de.metas.notes.NotesRepository;
-import de.metas.notes.UserRecordNote;
-import de.metas.ui.web.notes.json.JSONNote;
-import de.metas.ui.web.notes.json.JSONNoteCreateRequest;
+import de.metas.comments.CommentsRepository;
+import de.metas.comments.RecordComment;
+import de.metas.ui.web.comments.json.JSONComment;
+import de.metas.ui.web.comments.json.JSONCommentCreateRequest;
 import de.metas.user.api.IUserDAO;
 import de.metas.util.GuavaCollectors;
 import de.metas.util.Services;
@@ -41,44 +41,44 @@ import java.util.Comparator;
 import java.util.List;
 
 @Service
-public class NotesService
+public class CommentsService
 {
-	private final NotesRepository notesRepository;
+	private final CommentsRepository commentsRepository;
 	final IUserDAO userDAO = Services.get(IUserDAO.class);
 
-	public NotesService(final NotesRepository notesRepository)
+	public CommentsService(final CommentsRepository commentsRepository)
 	{
-		this.notesRepository = notesRepository;
+		this.commentsRepository = commentsRepository;
 	}
 
 	@NonNull
-	public List<JSONNote> getNotesFor(@NonNull final TableRecordReference tableRecordReference)
+	public List<JSONComment> getCommentsFor(@NonNull final TableRecordReference tableRecordReference)
 	{
 
-		final List<UserRecordNote> notes = notesRepository.retrieveLastNotes(tableRecordReference, 100);
+		final List<RecordComment> comments = commentsRepository.retrieveLastComments(tableRecordReference, 100);
 
-		return notes.stream()
-				.map(note -> toJsonNote(note, userDAO))
-				.sorted(Comparator.comparing(JSONNote::getCreated))
+		return comments.stream()
+				.map(comment -> toJsonComment(comment, userDAO))
+				.sorted(Comparator.comparing(JSONComment::getCreated))
 				.collect(GuavaCollectors.toImmutableList());
 	}
 
 	@NonNull
-	private static JSONNote toJsonNote(@NotNull final UserRecordNote note, @NotNull final IUserDAO userDAO)
+	private static JSONComment toJsonComment(@NotNull final RecordComment comment, @NotNull final IUserDAO userDAO)
 	{
-		final String text = note.getText();
-		final ZonedDateTime created = TimeUtil.asZonedDateTime(note.getCreated(), SystemTime.zoneId());
-		final String createdBy = userDAO.retrieveUserFullname(note.getCreatedBy());
+		final String text = comment.getText();
+		final ZonedDateTime created = TimeUtil.asZonedDateTime(comment.getCreated(), SystemTime.zoneId());
+		final String createdBy = userDAO.retrieveUserFullname(comment.getCreatedBy());
 
-		return JSONNote.builder()
+		return JSONComment.builder()
 				.text(text)
 				.created(created)
 				.createdBy(createdBy)
 				.build();
 	}
 
-	public void addNote(@NonNull final TableRecordReference tableRecordReference, @NotNull final JSONNoteCreateRequest jsonNoteCreateRequest)
+	public void addComment(@NonNull final TableRecordReference tableRecordReference, @NotNull final JSONCommentCreateRequest jsonCommentCreateRequest)
 	{
-		notesRepository.createNote(jsonNoteCreateRequest.getText(), tableRecordReference);
+		commentsRepository.createComment(jsonCommentCreateRequest.getText(), tableRecordReference);
 	}
 }

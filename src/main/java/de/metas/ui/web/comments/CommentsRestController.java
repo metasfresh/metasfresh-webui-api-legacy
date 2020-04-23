@@ -20,10 +20,10 @@
  * #L%
  */
 
-package de.metas.ui.web.notes;
+package de.metas.ui.web.comments;
 
-import de.metas.ui.web.notes.json.JSONNote;
-import de.metas.ui.web.notes.json.JSONNoteCreateRequest;
+import de.metas.ui.web.comments.json.JSONComment;
+import de.metas.ui.web.comments.json.JSONCommentCreateRequest;
 import de.metas.ui.web.session.UserSession;
 import de.metas.ui.web.window.controller.WindowRestController;
 import de.metas.ui.web.window.datatypes.DocumentPath;
@@ -40,26 +40,26 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping(NotesRestController.ENDPOINT)
-public class NotesRestController
+@RequestMapping(CommentsRestController.ENDPOINT)
+public class CommentsRestController
 {
-	protected static final String ENDPOINT = WindowRestController.ENDPOINT + "/{windowId}/{documentId}/notes";
+	protected static final String ENDPOINT = WindowRestController.ENDPOINT + "/{windowId}/{documentId}/comments";
 	private final UserSession userSession;
 
 	private final DocumentDescriptorFactory documentDescriptorFactory;
-	private final NotesService notesService;
+	private final CommentsService commentsService;
 
-	public NotesRestController(
+	public CommentsRestController(
 			final UserSession userSession,
-			final DocumentDescriptorFactory documentDescriptorFactory, final NotesService notesService)
+			final DocumentDescriptorFactory documentDescriptorFactory, final CommentsService commentsService)
 	{
 		this.userSession = userSession;
 		this.documentDescriptorFactory = documentDescriptorFactory;
-		this.notesService = notesService;
+		this.commentsService = commentsService;
 	}
 
 	@GetMapping
-	public List<JSONNote> getAll(
+	public List<JSONComment> getAll(
 			@PathVariable("windowId") final String windowIdStr,
 			@PathVariable("documentId") final String documentId
 	)
@@ -70,14 +70,14 @@ public class NotesRestController
 
 		final TableRecordReference tableRecordReference = documentDescriptorFactory.getTableRecordReference(documentPath);
 
-		return notesService.getNotesFor(tableRecordReference);
+		return commentsService.getCommentsFor(tableRecordReference);
 	}
 
 	@PostMapping
-	public void addNote(
+	public void addComment(
 			@PathVariable("windowId") final String windowIdStr,
 			@PathVariable("documentId") final String documentId,
-			@RequestBody final JSONNoteCreateRequest jsonNoteCreateRequest
+			@RequestBody final JSONCommentCreateRequest jsonCommentCreateRequest
 	)
 	{
 		userSession.assertLoggedIn();
@@ -86,6 +86,6 @@ public class NotesRestController
 
 		final TableRecordReference tableRecordReference = documentDescriptorFactory.getTableRecordReference(documentPath);
 
-		notesService.addNote(tableRecordReference, jsonNoteCreateRequest);
+		commentsService.addComment(tableRecordReference, jsonCommentCreateRequest);
 	}
 }
