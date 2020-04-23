@@ -24,7 +24,7 @@ package de.metas.ui.web.notes;
 
 import com.sun.istack.internal.NotNull;
 import de.metas.notes.NotesRepository;
-import de.metas.notes.RecordNote;
+import de.metas.notes.UserRecordNote;
 import de.metas.ui.web.notes.json.JSONNote;
 import de.metas.ui.web.notes.json.JSONNoteCreateRequest;
 import de.metas.user.api.IUserDAO;
@@ -54,7 +54,7 @@ public class NotesService
 	{
 		final IUserDAO userDAO = Services.get(IUserDAO.class);
 
-		final List<RecordNote> notes = notesRepository.retrieveLastNotes(tableRecordReference, 100);
+		final List<UserRecordNote> notes = notesRepository.retrieveLastNotes(tableRecordReference, 100);
 
 		return notes.stream()
 				.map(it ->
