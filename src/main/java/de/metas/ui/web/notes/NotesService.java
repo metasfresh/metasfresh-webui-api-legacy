@@ -53,7 +53,7 @@ public class NotesService
 	{
 		final IUserDAO userDAO = Services.get(IUserDAO.class);
 
-		final List<I_CM_ChatEntry> chatEntries = notesRepository.retrieveNotes(tableRecordReference, 100);
+		final List<I_CM_ChatEntry> chatEntries = notesRepository.retrieveLastNotes(tableRecordReference, 100);
 
 		return chatEntries.stream()
 				.map(it ->
