@@ -36,6 +36,7 @@ import org.adempiere.util.lang.impl.TableRecordReference;
 import org.compiere.util.TimeUtil;
 import org.springframework.stereotype.Service;
 
+import java.time.ZonedDateTime;
 import java.util.Comparator;
 import java.util.List;
 
@@ -43,6 +44,7 @@ import java.util.List;
 public class NotesService
 {
 	private final NotesRepository notesRepository;
+	final IUserDAO userDAO = Services.get(IUserDAO.class);
 
 	public NotesService(final NotesRepository notesRepository)
 	{
@@ -52,23 +54,23 @@ public class NotesService
 	@NonNull
 	public List<JSONNote> getNotesFor(@NonNull final TableRecordReference tableRecordReference)
 	{
-		final IUserDAO userDAO = Services.get(IUserDAO.class);
 
 		final List<UserRecordNote> notes = notesRepository.retrieveLastNotes(tableRecordReference, 100);
 
 		return notes.stream()
-				.map(it ->
-				{
-					final String userName = userDAO.retrieveUserFullname(it.getCreatedBy());
-
-					return JSONNote.builder()
-							.text(it.getText())
-							.created(TimeUtil.asZonedDateTime(it.getCreated(), SystemTime.zoneId()))
-							.createdBy(userName)
-							.build();
-				})
+				.map(note -> toJsonNote(note, userDAO))
 				.sorted(Comparator.comparing(JSONNote::getCreated))
 				.collect(GuavaCollectors.toImmutableList());
+	}
+
+	@NonNull
+	private static JSONNote toJsonNote(@NotNull final UserRecordNote note, @NotNull final IUserDAO userDAO)
+	{
+		final String text = note.getText();
+		final ZonedDateTime created = TimeUtil.asZonedDateTime(note.getCreated(), SystemTime.zoneId());
+		final String createdBy = userDAO.retrieveUserFullname(note.getCreatedBy());
+
+		return JSONNote.of(text, created, createdBy);
 	}
 
 	public void addNote(@NonNull final TableRecordReference tableRecordReference, @NotNull final JSONNoteCreateRequest jsonNoteCreateRequest)

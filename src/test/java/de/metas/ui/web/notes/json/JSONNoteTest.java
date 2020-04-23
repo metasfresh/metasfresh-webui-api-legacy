@@ -32,7 +32,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class JSONNoteTest
 {
-
 	@Test
 	void testSerialisationDeserialisation()
 	{
@@ -48,5 +47,4 @@ class JSONNoteTest
 		final JSONNote deserialisedRequest = jsonObjectMapper.readValue(json);
 		assertThat(deserialisedRequest).isEqualToIgnoringGivenFields(expectedNote);
 	}
-
 }
