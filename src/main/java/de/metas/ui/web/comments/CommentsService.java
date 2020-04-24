@@ -27,7 +27,6 @@ import de.metas.comments.CommentEntryRepository;
 import de.metas.ui.web.comments.json.JSONComment;
 import de.metas.ui.web.comments.json.JSONCommentCreateRequest;
 import de.metas.ui.web.window.datatypes.json.DateTimeConverters;
-import de.metas.ui.web.window.datatypes.json.JSONOptions;
 import de.metas.user.api.IUserDAO;
 import de.metas.util.GuavaCollectors;
 import de.metas.util.Services;
@@ -35,13 +34,13 @@ import lombok.NonNull;
 import org.adempiere.util.lang.impl.TableRecordReference;
 import org.springframework.stereotype.Service;
 
+import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.List;
 
 @Service
 public class CommentsService
 {
-	private static final JSONOptions jsonOptions = JSONOptions.newInstance();
 	private final CommentEntryRepository commentEntryRepository;
 	final IUserDAO userDAO = Services.get(IUserDAO.class);
 
@@ -51,22 +50,22 @@ public class CommentsService
 	}
 
 	@NonNull
-	public List<JSONComment> getCommentsFor(@NonNull final TableRecordReference tableRecordReference)
+	public List<JSONComment> getCommentsFor(@NonNull final TableRecordReference tableRecordReference, final ZoneId zoneId)
 	{
 
 		final List<CommentEntry> comments = commentEntryRepository.retrieveLastCommentEntries(tableRecordReference, 100);
 
 		return comments.stream()
-				.map(comment -> toJsonComment(comment, userDAO))
+				.map(comment -> toJsonComment(comment, zoneId))
 				.sorted(Comparator.comparing(JSONComment::getCreated))
 				.collect(GuavaCollectors.toImmutableList());
 	}
 
 	@NonNull
-	private static JSONComment toJsonComment(@NonNull final CommentEntry comment, @NonNull final IUserDAO userDAO)
+	private JSONComment toJsonComment(@NonNull final CommentEntry comment, final ZoneId zoneId)
 	{
 		final String text = comment.getText();
-		final String created = DateTimeConverters.toJson(comment.getCreated(), jsonOptions.getZoneId());
+		final String created = DateTimeConverters.toJson(comment.getCreated(), zoneId);
 		final String createdBy = userDAO.retrieveUserFullname(comment.getCreatedBy());
 
 		return JSONComment.builder()

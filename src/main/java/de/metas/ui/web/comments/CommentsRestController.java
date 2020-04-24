@@ -28,6 +28,7 @@ import de.metas.ui.web.session.UserSession;
 import de.metas.ui.web.window.controller.WindowRestController;
 import de.metas.ui.web.window.datatypes.DocumentPath;
 import de.metas.ui.web.window.datatypes.WindowId;
+import de.metas.ui.web.window.datatypes.json.JSONOptions;
 import de.metas.ui.web.window.descriptor.factory.DocumentDescriptorFactory;
 import org.adempiere.util.lang.impl.TableRecordReference;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -37,6 +38,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.ZoneId;
 import java.util.List;
 
 @RestController
@@ -70,7 +72,8 @@ public class CommentsRestController
 
 		final TableRecordReference tableRecordReference = documentDescriptorFactory.getTableRecordReference(documentPath);
 
-		return commentsService.getCommentsFor(tableRecordReference);
+		final ZoneId zoneId = JSONOptions.of(userSession).getZoneId();
+		return commentsService.getCommentsFor(tableRecordReference, zoneId);
 	}
 
 	@PostMapping

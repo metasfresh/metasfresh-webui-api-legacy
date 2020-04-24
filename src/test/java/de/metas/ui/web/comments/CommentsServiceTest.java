@@ -22,14 +22,14 @@
 
 package de.metas.ui.web.comments;
 
-import de.metas.comments.CommentEntryId;
-import de.metas.comments.CommentId;
-import de.metas.comments.CommentsRepository;
 import de.metas.comments.CommentEntry;
+import de.metas.comments.CommentEntryId;
+import de.metas.comments.CommentEntryRepository;
+import de.metas.comments.CommentId;
 import de.metas.ui.web.comments.json.JSONComment;
 import de.metas.ui.web.comments.json.JSONCommentCreateRequest;
+import de.metas.ui.web.window.datatypes.json.DateTimeConverters;
 import de.metas.user.UserId;
-import de.metas.util.time.FixedTimeSource;
 import de.metas.util.time.SystemTime;
 import org.adempiere.model.InterfaceWrapperHelper;
 import org.adempiere.test.AdempiereTestHelper;
@@ -41,6 +41,7 @@ import org.compiere.model.I_CM_ChatEntry;
 import org.compiere.model.I_C_BPartner;
 import org.compiere.model.X_CM_ChatEntry;
 import org.compiere.util.Env;
+import org.compiere.util.TimeUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -56,19 +57,23 @@ class CommentsServiceTest
 {
 	public static final int AD_USER_ID = 10;
 	public static final String THE_USER_NAME = "The User Name";
-	private final CommentsRepository commentsRepository = new CommentsRepository();
-	private final CommentsService commentsService = new CommentsService(commentsRepository);
+	public static final ZonedDateTime ZONED_DATE_TIME = ZonedDateTime.of(2020, Month.APRIL.getValue(), 23, 1, 1, 1, 0, ZoneId.of("UTC+8"));
+
+	private CommentEntryRepository commentEntryRepository;
+	private CommentsService commentsService;
 
 	@BeforeEach
 	public void init()
 	{
 		AdempiereTestHelper.get().init();
-		SystemTime.setTimeSource(new FixedTimeSource(2020, Month.APRIL.getValue(), 23, 1, 1, 1));
+		SystemTime.setTimeSource(() -> ZONED_DATE_TIME.toInstant().toEpochMilli());
 
 		// all created POs will have this user
 		Env.setLoggedUserId(Env.getCtx(), UserId.ofRepoId(AD_USER_ID));
 
 		createDefaultUser();
+		commentEntryRepository = new CommentEntryRepository();
+		commentsService = new CommentsService(commentEntryRepository);
 	}
 
 	@Nested
@@ -80,24 +85,22 @@ class CommentsServiceTest
 			// create test data
 			final TableRecordReference tableRecordReference = TableRecordReference.of("DummyTable", 1);
 
-			final JSONCommentCreateRequest request1 = new JSONCommentCreateRequest("comment1");
-			final JSONCommentCreateRequest request2 = new JSONCommentCreateRequest("comment2");
-			commentsService.addComment(tableRecordReference, request1);
-			commentsService.addComment(tableRecordReference, request2);
+			commentsService.addComment(tableRecordReference, new JSONCommentCreateRequest("comment1"));
+			commentsService.addComment(tableRecordReference, new JSONCommentCreateRequest("comment2"));
 
 			// check the comments exist
-			final List<CommentEntry> actual = commentsRepository.retrieveLastComments(tableRecordReference, 4);
+			final List<CommentEntry> actual = commentEntryRepository.retrieveLastCommentEntries(tableRecordReference, 4);
 
 			final List<CommentEntry> expected = Arrays.asList(
 					CommentEntry.of(
 							UserId.ofRepoId(AD_USER_ID),
-							ZonedDateTime.of(2020, Month.APRIL.getValue(), 23, 1, 1, 1, 0, ZoneId.systemDefault()),
+							updateToSystemTimezone(ZONED_DATE_TIME),
 							"comment1",
 							CommentEntryId.ofRepoId(1)
 					),
 					CommentEntry.of(
 							UserId.ofRepoId(AD_USER_ID),
-							ZonedDateTime.of(2020, Month.APRIL.getValue(), 23, 1, 1, 1, 0, ZoneId.systemDefault()),
+							updateToSystemTimezone(ZONED_DATE_TIME),
 							"comment2",
 							CommentEntryId.ofRepoId(1)
 					)
@@ -122,18 +125,20 @@ class CommentsServiceTest
 			createChatEntry(commentId, "comment2");
 
 			//
-			final List<JSONComment> actual = commentsService.getCommentsFor(tableRecordReference);
+			final List<JSONComment> actual = commentsService.getCommentsFor(tableRecordReference, ZoneId.of("UTC+8"));
 			System.out.println(actual);
+
+			final String zonedDateTimeString = DateTimeConverters.toJson(ZONED_DATE_TIME, ZoneId.of("UTC+8"));
 
 			final List<JSONComment> expected = Arrays.asList(
 					JSONComment.builder()
-							.created(ZonedDateTime.of(2020, Month.APRIL.getValue(), 23, 1, 1, 1, 0, ZoneId.systemDefault()))
+							.created(zonedDateTimeString)
 							.text("comment1")
 							.createdBy(THE_USER_NAME)
 							.build(),
 
 					JSONComment.builder()
-							.created(ZonedDateTime.of(2020, Month.APRIL.getValue(), 23, 1, 1, 1, 0, ZoneId.systemDefault()))
+							.created(zonedDateTimeString)
 							.text("comment2")
 							.createdBy(THE_USER_NAME)
 							.build()
@@ -149,7 +154,7 @@ class CommentsServiceTest
 			final TableRecordReference tableRecordReference = TableRecordReference.of("DummyTable", 1);
 
 			//
-			final List<JSONComment> actual = commentsService.getCommentsFor(tableRecordReference);
+			final List<JSONComment> actual = commentsService.getCommentsFor(tableRecordReference, ZoneId.of("UTC+8"));
 			System.out.println(actual);
 
 			final List<JSONComment> expected = Collections.emptyList();
@@ -188,5 +193,16 @@ class CommentsServiceTest
 		chatEntry.setChatEntryType(X_CM_ChatEntry.CHATENTRYTYPE_NoteFlat);
 		InterfaceWrapperHelper.save(chatEntry);
 		CommentEntryId.ofRepoId(chatEntry.getCM_ChatEntry_ID());
+	}
+
+	/**
+	 * Since JDBC always uses the system local timezone, the expected result should also be compared in system timezone.
+	 * <p>
+	 * Basically this method is needed to make sure both strings have the same timezone.
+	 */
+	@SuppressWarnings("SameParameterValue")
+	private ZonedDateTime updateToSystemTimezone(final ZonedDateTime zonedDateTime)
+	{
+		return TimeUtil.convertToTimeZone(zonedDateTime, ZoneId.systemDefault());
 	}
 }
