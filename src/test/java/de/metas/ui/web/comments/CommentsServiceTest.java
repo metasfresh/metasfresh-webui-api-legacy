@@ -25,7 +25,7 @@ package de.metas.ui.web.comments;
 import de.metas.comments.CommentEntry;
 import de.metas.comments.CommentEntryId;
 import de.metas.comments.CommentEntryRepository;
-import de.metas.comments.CommentId;
+import de.metas.comments.CommentEntryParentId;
 import de.metas.ui.web.comments.json.JSONComment;
 import de.metas.ui.web.comments.json.JSONCommentCreateRequest;
 import de.metas.ui.web.window.datatypes.json.DateTimeConverters;
@@ -136,9 +136,9 @@ class CommentsServiceTest
 		{
 			// create test data
 			final TableRecordReference tableRecordReference = TableRecordReference.of("DummyTable", 1);
-			final CommentId commentId = createChat(tableRecordReference);
-			createChatEntry(commentId, "comment1");
-			createChatEntry(commentId, "comment2");
+			final CommentEntryParentId commentEntryParentId = createChat(tableRecordReference);
+			createChatEntry(commentEntryParentId, "comment1");
+			createChatEntry(commentEntryParentId, "comment2");
 
 			//
 			final List<JSONComment> actual = commentsService.getCommentsFor(tableRecordReference, ZoneId.of("UTC+8"));
@@ -190,20 +190,20 @@ class CommentsServiceTest
 		InterfaceWrapperHelper.save(user);
 	}
 
-	private CommentId createChat(final TableRecordReference tableRecordReference)
+	private CommentEntryParentId createChat(final TableRecordReference tableRecordReference)
 	{
 		final I_CM_Chat chat = InterfaceWrapperHelper.newInstance(I_CM_Chat.class);
 		chat.setDescription("Table name: " + I_C_BPartner.Table_Name);
 		chat.setAD_Table_ID(tableRecordReference.getAD_Table_ID());
 		chat.setRecord_ID(tableRecordReference.getRecord_ID());
 		InterfaceWrapperHelper.save(chat);
-		return CommentId.ofRepoId(chat.getCM_Chat_ID());
+		return CommentEntryParentId.ofRepoId(chat.getCM_Chat_ID());
 	}
 
-	private void createChatEntry(final CommentId commentId, final String characterData)
+	private void createChatEntry(final CommentEntryParentId commentEntryParentId, final String characterData)
 	{
 		final I_CM_ChatEntry chatEntry = InterfaceWrapperHelper.newInstance(I_CM_ChatEntry.class);
-		chatEntry.setCM_Chat_ID(commentId.getRepoId());
+		chatEntry.setCM_Chat_ID(commentEntryParentId.getRepoId());
 		chatEntry.setConfidentialType(X_CM_ChatEntry.CONFIDENTIALTYPE_PublicInformation);
 		chatEntry.setCharacterData(characterData);
 		chatEntry.setChatEntryType(X_CM_ChatEntry.CHATENTRYTYPE_NoteFlat);
