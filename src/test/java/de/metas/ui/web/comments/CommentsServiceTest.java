@@ -22,10 +22,10 @@
 
 package de.metas.ui.web.comments;
 
-import de.metas.comments.ChatEntryId;
-import de.metas.comments.ChatId;
+import de.metas.comments.CommentEntryId;
+import de.metas.comments.CommentId;
 import de.metas.comments.CommentsRepository;
-import de.metas.comments.RecordComment;
+import de.metas.comments.CommentEntry;
 import de.metas.ui.web.comments.json.JSONComment;
 import de.metas.ui.web.comments.json.JSONCommentCreateRequest;
 import de.metas.user.UserId;
@@ -86,20 +86,20 @@ class CommentsServiceTest
 			commentsService.addComment(tableRecordReference, request2);
 
 			// check the comments exist
-			final List<RecordComment> actual = commentsRepository.retrieveLastComments(tableRecordReference, 4);
+			final List<CommentEntry> actual = commentsRepository.retrieveLastComments(tableRecordReference, 4);
 
-			final List<RecordComment> expected = Arrays.asList(
-					RecordComment.of(
+			final List<CommentEntry> expected = Arrays.asList(
+					CommentEntry.of(
 							UserId.ofRepoId(AD_USER_ID),
 							ZonedDateTime.of(2020, Month.APRIL.getValue(), 23, 1, 1, 1, 0, ZoneId.systemDefault()),
 							"comment1",
-							ChatEntryId.ofRepoId(1)
+							CommentEntryId.ofRepoId(1)
 					),
-					RecordComment.of(
+					CommentEntry.of(
 							UserId.ofRepoId(AD_USER_ID),
 							ZonedDateTime.of(2020, Month.APRIL.getValue(), 23, 1, 1, 1, 0, ZoneId.systemDefault()),
 							"comment2",
-							ChatEntryId.ofRepoId(1)
+							CommentEntryId.ofRepoId(1)
 					)
 			);
 
@@ -117,9 +117,9 @@ class CommentsServiceTest
 		{
 			// create test data
 			final TableRecordReference tableRecordReference = TableRecordReference.of("DummyTable", 1);
-			final ChatId chatId = createChat(tableRecordReference);
-			createChatEntry(chatId, "comment1");
-			createChatEntry(chatId, "comment2");
+			final CommentId commentId = createChat(tableRecordReference);
+			createChatEntry(commentId, "comment1");
+			createChatEntry(commentId, "comment2");
 
 			//
 			final List<JSONComment> actual = commentsService.getCommentsFor(tableRecordReference);
@@ -169,24 +169,24 @@ class CommentsServiceTest
 		InterfaceWrapperHelper.save(user);
 	}
 
-	private ChatId createChat(final TableRecordReference tableRecordReference)
+	private CommentId createChat(final TableRecordReference tableRecordReference)
 	{
 		final I_CM_Chat chat = InterfaceWrapperHelper.newInstance(I_CM_Chat.class);
 		chat.setDescription("Table name: " + I_C_BPartner.Table_Name);
 		chat.setAD_Table_ID(tableRecordReference.getAD_Table_ID());
 		chat.setRecord_ID(tableRecordReference.getRecord_ID());
 		InterfaceWrapperHelper.save(chat);
-		return ChatId.ofRepoId(chat.getCM_Chat_ID());
+		return CommentId.ofRepoId(chat.getCM_Chat_ID());
 	}
 
-	private ChatEntryId createChatEntry(final ChatId chatId, final String characterData)
+	private void createChatEntry(final CommentId commentId, final String characterData)
 	{
 		final I_CM_ChatEntry chatEntry = InterfaceWrapperHelper.newInstance(I_CM_ChatEntry.class);
-		chatEntry.setCM_Chat_ID(chatId.getRepoId());
+		chatEntry.setCM_Chat_ID(commentId.getRepoId());
 		chatEntry.setConfidentialType(X_CM_ChatEntry.CONFIDENTIALTYPE_PublicInformation);
 		chatEntry.setCharacterData(characterData);
 		chatEntry.setChatEntryType(X_CM_ChatEntry.CHATENTRYTYPE_NoteFlat);
 		InterfaceWrapperHelper.save(chatEntry);
-		return ChatEntryId.ofRepoId(chatEntry.getCM_ChatEntry_ID());
+		CommentEntryId.ofRepoId(chatEntry.getCM_ChatEntry_ID());
 	}
 }

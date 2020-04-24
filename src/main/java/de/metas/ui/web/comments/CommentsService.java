@@ -23,8 +23,8 @@
 package de.metas.ui.web.comments;
 
 import com.sun.istack.internal.NotNull;
-import de.metas.comments.CommentsRepository;
-import de.metas.comments.RecordComment;
+import de.metas.comments.CommentEntryRepository;
+import de.metas.comments.CommentEntry;
 import de.metas.ui.web.comments.json.JSONComment;
 import de.metas.ui.web.comments.json.JSONCommentCreateRequest;
 import de.metas.user.api.IUserDAO;
@@ -43,19 +43,19 @@ import java.util.List;
 @Service
 public class CommentsService
 {
-	private final CommentsRepository commentsRepository;
+	private final CommentEntryRepository commentEntryRepository;
 	final IUserDAO userDAO = Services.get(IUserDAO.class);
 
-	public CommentsService(final CommentsRepository commentsRepository)
+	public CommentsService(final CommentEntryRepository commentEntryRepository)
 	{
-		this.commentsRepository = commentsRepository;
+		this.commentEntryRepository = commentEntryRepository;
 	}
 
 	@NonNull
 	public List<JSONComment> getCommentsFor(@NonNull final TableRecordReference tableRecordReference)
 	{
 
-		final List<RecordComment> comments = commentsRepository.retrieveLastComments(tableRecordReference, 100);
+		final List<CommentEntry> comments = commentEntryRepository.retrieveLastCommentEntries(tableRecordReference, 100);
 
 		return comments.stream()
 				.map(comment -> toJsonComment(comment, userDAO))
@@ -64,7 +64,7 @@ public class CommentsService
 	}
 
 	@NonNull
-	private static JSONComment toJsonComment(@NotNull final RecordComment comment, @NotNull final IUserDAO userDAO)
+	private static JSONComment toJsonComment(@NotNull final CommentEntry comment, @NotNull final IUserDAO userDAO)
 	{
 		final String text = comment.getText();
 		final ZonedDateTime created = TimeUtil.asZonedDateTime(comment.getCreated(), SystemTime.zoneId());
@@ -79,6 +79,6 @@ public class CommentsService
 
 	public void addComment(@NonNull final TableRecordReference tableRecordReference, @NotNull final JSONCommentCreateRequest jsonCommentCreateRequest)
 	{
-		commentsRepository.createComment(jsonCommentCreateRequest.getText(), tableRecordReference);
+		commentEntryRepository.createCommentEntry(jsonCommentCreateRequest.getText(), tableRecordReference);
 	}
 }
