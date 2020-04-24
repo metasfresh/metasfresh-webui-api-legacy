@@ -39,7 +39,6 @@ class JSONCommentCreateRequestTest
 		final String json = jsonObjectMapper.writeValueAsString(expected);
 		final JSONCommentCreateRequest deserialisedRequest = jsonObjectMapper.readValue(json);
 		assertThat(deserialisedRequest).isEqualToIgnoringGivenFields(expected);
-		System.out.println(deserialisedRequest);
 	}
 
 }
