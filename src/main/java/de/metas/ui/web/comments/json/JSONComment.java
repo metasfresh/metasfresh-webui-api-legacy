@@ -29,8 +29,6 @@ import lombok.Builder;
 import lombok.NonNull;
 import lombok.Value;
 
-import java.time.ZonedDateTime;
-
 @Builder
 @Value
 @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY, getterVisibility = JsonAutoDetect.Visibility.NONE, isGetterVisibility = JsonAutoDetect.Visibility.NONE, setterVisibility = JsonAutoDetect.Visibility.NONE)
@@ -39,7 +37,7 @@ public class JSONComment
 {
 	@NonNull String createdBy;
 
-	@NonNull ZonedDateTime created;
+	@NonNull String created;
 
 	@NonNull String text;
 
