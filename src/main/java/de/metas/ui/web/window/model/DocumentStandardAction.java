@@ -43,7 +43,7 @@ public enum DocumentStandardAction
 	Letter("letter"), //
 	Print("print"), //
 	Delete("delete"), //
-	Notes("notes")//
+	Comments("comments")//
 	;
 
 	private final String json;
