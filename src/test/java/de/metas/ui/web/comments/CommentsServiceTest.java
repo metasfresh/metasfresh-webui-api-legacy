@@ -85,30 +85,46 @@ class CommentsServiceTest
 			// create test data
 			final TableRecordReference tableRecordReference = TableRecordReference.of("DummyTable", 1);
 
-			commentsService.addComment(tableRecordReference, new JSONCommentCreateRequest("comment1"));
-			commentsService.addComment(tableRecordReference, new JSONCommentCreateRequest("comment2"));
+			apiAddComment(tableRecordReference, "comment1");
+			apiAddComment(tableRecordReference, "comment2");
 
 			// check the comments exist
-			final List<CommentEntry> actual = commentEntryRepository.retrieveLastCommentEntries(tableRecordReference, 4);
+			final List<CommentEntry> actual = commentEntryRepository.retrieveLastCommentEntries(tableRecordReference, 2);
 
 			final List<CommentEntry> expected = Arrays.asList(
-					CommentEntry.builder()
-							.createdBy(UserId.ofRepoId(AD_USER_ID))
-							.created(updateToSystemTimezone(ZONED_DATE_TIME))
-							.text("comment1")
-							.id(CommentEntryId.ofRepoId(1))
-							.build(),
-					CommentEntry.builder()
-							.createdBy(UserId.ofRepoId(AD_USER_ID))
-							.created(updateToSystemTimezone(ZONED_DATE_TIME))
-							.text("comment2")
-							.id(CommentEntryId.ofRepoId(1))
-							.build()
+					createCommentEntry("comment1"),
+					createCommentEntry("comment2")
 			);
 
 			Assertions.assertThat(actual)
 					.usingElementComparatorIgnoringFields("id")
 					.isEqualTo(expected);
+		}
+
+		private void apiAddComment(final TableRecordReference tableRecordReference, final String comment)
+		{
+			commentsService.addComment(tableRecordReference, new JSONCommentCreateRequest(comment));
+		}
+
+		private CommentEntry createCommentEntry(final String comment)
+		{
+			return CommentEntry.builder()
+					.createdBy(UserId.ofRepoId(AD_USER_ID))
+					.created(updateToSystemTimezone(ZONED_DATE_TIME))
+					.text(comment)
+					.id(CommentEntryId.ofRepoId(1))
+					.build();
+		}
+
+		/**
+		 * Since JDBC always uses the system local timezone, the expected result should also be compared in system timezone.
+		 * <p>
+		 * Basically this method is needed to make sure both strings have the same timezone.
+		 */
+		@SuppressWarnings("SameParameterValue")
+		private ZonedDateTime updateToSystemTimezone(final ZonedDateTime zonedDateTime)
+		{
+			return TimeUtil.convertToTimeZone(zonedDateTime, ZoneId.systemDefault());
 		}
 	}
 
@@ -131,17 +147,8 @@ class CommentsServiceTest
 			final String zonedDateTimeString = DateTimeConverters.toJson(ZONED_DATE_TIME, ZoneId.of("UTC+8"));
 
 			final List<JSONComment> expected = Arrays.asList(
-					JSONComment.builder()
-							.created(zonedDateTimeString)
-							.text("comment1")
-							.createdBy(THE_USER_NAME)
-							.build(),
-
-					JSONComment.builder()
-							.created(zonedDateTimeString)
-							.text("comment2")
-							.createdBy(THE_USER_NAME)
-							.build()
+					createJsonComment(zonedDateTimeString, "comment1"),
+					createJsonComment(zonedDateTimeString, "comment2")
 			);
 
 			Assertions.assertThat(actual).isEqualTo(expected);
@@ -160,6 +167,15 @@ class CommentsServiceTest
 			final List<JSONComment> expected = Collections.emptyList();
 
 			Assertions.assertThat(actual).isEqualTo(expected);
+		}
+
+		private JSONComment createJsonComment(final String zonedDateTimeString, final String comment)
+		{
+			return JSONComment.builder()
+					.created(zonedDateTimeString)
+					.text(comment)
+					.createdBy(THE_USER_NAME)
+					.build();
 		}
 	}
 
@@ -193,16 +209,5 @@ class CommentsServiceTest
 		chatEntry.setChatEntryType(X_CM_ChatEntry.CHATENTRYTYPE_NoteFlat);
 		InterfaceWrapperHelper.save(chatEntry);
 		CommentEntryId.ofRepoId(chatEntry.getCM_ChatEntry_ID());
-	}
-
-	/**
-	 * Since JDBC always uses the system local timezone, the expected result should also be compared in system timezone.
-	 * <p>
-	 * Basically this method is needed to make sure both strings have the same timezone.
-	 */
-	@SuppressWarnings("SameParameterValue")
-	private ZonedDateTime updateToSystemTimezone(final ZonedDateTime zonedDateTime)
-	{
-		return TimeUtil.convertToTimeZone(zonedDateTime, ZoneId.systemDefault());
 	}
 }
