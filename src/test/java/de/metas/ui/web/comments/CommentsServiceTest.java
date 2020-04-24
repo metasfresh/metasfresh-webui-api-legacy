@@ -92,18 +92,18 @@ class CommentsServiceTest
 			final List<CommentEntry> actual = commentEntryRepository.retrieveLastCommentEntries(tableRecordReference, 4);
 
 			final List<CommentEntry> expected = Arrays.asList(
-					CommentEntry.of(
-							UserId.ofRepoId(AD_USER_ID),
-							updateToSystemTimezone(ZONED_DATE_TIME),
-							"comment1",
-							CommentEntryId.ofRepoId(1)
-					),
-					CommentEntry.of(
-							UserId.ofRepoId(AD_USER_ID),
-							updateToSystemTimezone(ZONED_DATE_TIME),
-							"comment2",
-							CommentEntryId.ofRepoId(1)
-					)
+					CommentEntry.builder()
+							.createdBy(UserId.ofRepoId(AD_USER_ID))
+							.created(updateToSystemTimezone(ZONED_DATE_TIME))
+							.text("comment1")
+							.id(CommentEntryId.ofRepoId(1))
+							.build(),
+					CommentEntry.builder()
+							.createdBy(UserId.ofRepoId(AD_USER_ID))
+							.created(updateToSystemTimezone(ZONED_DATE_TIME))
+							.text("comment2")
+							.id(CommentEntryId.ofRepoId(1))
+							.build()
 			);
 
 			Assertions.assertThat(actual)
