@@ -236,4 +236,42 @@ public class PaymentsViewAllocateCommandTest
 						.build());
 	}
 
+	@Test
+	public void invoice_creditMemo_and_payment_partial()
+	{
+		final PaymentRow paymentRow = paymentRow().direction(PaymentDirection.INBOUND).payAmt(euro(200)).build();
+		final InvoiceRow invoiceRow = invoiceRow().soTrx(SOTrx.SALES).openAmt(euro(100)).build();
+		final InvoiceRow creditMemoRow = invoiceRow().soTrx(SOTrx.SALES).openAmt(euro(-20)).creditMemo(true).build();
+
+		final PaymentAllocationResult result = PaymentsViewAllocateCommand.builder()
+				.moneyService(moneyService)
+				.paymentRow(paymentRow)
+				.invoiceRow(invoiceRow)
+				.invoiceRow(creditMemoRow)
+				.build()
+				.run();
+
+		System.out.println(result);
+
+		assertThat(result.isOK()).isTrue();
+		assertThat(result.getCandidates()).hasSize(2);
+		assertThat(result.getCandidates().get(0))
+				.isEqualToComparingFieldByField(AllocationLineCandidate.builder()
+						.type(AllocationLineCandidateType.InvoiceToCreditMemo)
+						.bpartnerId(bpartnerId)
+						.paymentDocumentRef(toRecordRef(creditMemoRow))
+						.payableDocumentRef(toRecordRef(invoiceRow))
+						.amount(new BigDecimal("20"))
+						.payableOverUnderAmt(new BigDecimal("80"))
+						.build());
+		assertThat(result.getCandidates().get(1))
+				.isEqualToComparingFieldByField(AllocationLineCandidate.builder()
+						.type(AllocationLineCandidateType.InvoiceToPayment)
+						.bpartnerId(bpartnerId)
+						.paymentDocumentRef(toRecordRef(paymentRow))
+						.payableDocumentRef(toRecordRef(invoiceRow))
+						.amount(new BigDecimal("80"))
+						.paymentOverUnderAmt(new BigDecimal("120"))
+						.build());
+	}
 }
