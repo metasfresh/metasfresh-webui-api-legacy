@@ -24,6 +24,9 @@ import de.metas.currency.CurrencyCode;
 import de.metas.currency.CurrencyRepository;
 import de.metas.document.IDocTypeBL;
 import de.metas.invoice.InvoiceId;
+import de.metas.invoice.invoiceProcessorServiceCompany.InvoiceProcessorFeeCalculation;
+import de.metas.invoice.invoiceProcessorServiceCompany.InvoiceProcessorFeeComputeRequest;
+import de.metas.invoice.invoiceProcessorServiceCompany.InvoiceProcessorServiceCompanyService;
 import de.metas.money.CurrencyId;
 import de.metas.payment.PaymentId;
 import de.metas.ui.web.window.model.lookup.LookupDataSource;
@@ -62,13 +65,16 @@ public class PaymentAndInvoiceRowsRepo
 	private final CurrencyRepository currenciesRepo;
 	private final PaymentAllocationRepository paymentAllocationRepo;
 	private final LookupDataSource bpartnersLookup;
+	private final InvoiceProcessorServiceCompanyService invoiceProcessorServiceCompanyService;
 
 	public PaymentAndInvoiceRowsRepo(
 			@NonNull final CurrencyRepository currenciesRepo,
-			@NonNull final PaymentAllocationRepository paymentAllocationRepo)
+			@NonNull final PaymentAllocationRepository paymentAllocationRepo,
+			@NonNull final InvoiceProcessorServiceCompanyService invoiceProcessorServiceCompanyService)
 	{
 		this.currenciesRepo = currenciesRepo;
 		this.paymentAllocationRepo = paymentAllocationRepo;
+		this.invoiceProcessorServiceCompanyService = invoiceProcessorServiceCompanyService;
 		bpartnersLookup = LookupDataSourceFactory.instance.searchInTableLookup(I_C_BPartner.Table_Name);
 	}
 
@@ -163,6 +169,12 @@ public class PaymentAndInvoiceRowsRepo
 
 	private InvoiceRow toInvoiceRow(final InvoiceToAllocate invoiceToAllocate)
 	{
+		final Optional<InvoiceProcessorFeeCalculation> serviceFee = invoiceProcessorServiceCompanyService.computeFee(InvoiceProcessorFeeComputeRequest.builder()
+				.customerId(invoiceToAllocate.getBpartnerId())
+				.invoiceId(invoiceToAllocate.getInvoiceId())
+				.invoiceGrandTotal(invoiceToAllocate.getGrandTotal())
+				.build());
+
 		return InvoiceRow.builder()
 				.invoiceId(invoiceToAllocate.getInvoiceId())
 				.clientAndOrgId(invoiceToAllocate.getClientAndOrgId())
@@ -175,6 +187,7 @@ public class PaymentAndInvoiceRowsRepo
 				.grandTotal(invoiceToAllocate.getGrandTotal())
 				.openAmt(invoiceToAllocate.getOpenAmountConverted())
 				.discountAmt(invoiceToAllocate.getDiscountAmountConverted())
+				.serviceFee(serviceFee.orElse(null))
 				.build();
 	}
 

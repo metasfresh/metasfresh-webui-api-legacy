@@ -7,6 +7,7 @@ import org.adempiere.exceptions.AdempiereException;
 
 import de.metas.currency.Amount;
 import de.metas.currency.CurrencyCode;
+import de.metas.invoice.invoiceProcessorServiceCompany.InvoiceProcessorFeeCalculation;
 import de.metas.ui.web.payment_allocation.InvoiceRow.InvoiceRowBuilder;
 import de.metas.ui.web.window.datatypes.json.JSONDocumentChangedEvent;
 import lombok.NonNull;
@@ -47,11 +48,18 @@ public class InvoiceRowReducers
 			final String fieldName = fieldChangeRequest.getPath();
 			if (InvoiceRow.FIELD_DiscountAmt.contentEquals(fieldName))
 			{
-				final BigDecimal discountAmtBD = fieldChangeRequest.getValueAsBigDecimal();
+				final BigDecimal discountAmtBD = fieldChangeRequest.getValueAsBigDecimal(BigDecimal.ZERO);
 
 				final CurrencyCode currencyCode = row.getDiscountAmt().getCurrencyCode();
 				final Amount discountAmt = Amount.of(discountAmtBD, currencyCode);
 				rowBuilder.discountAmt(discountAmt);
+			}
+			else if (InvoiceRow.FIELD_ServiceFeeAmt.contentEquals(fieldName))
+			{
+				final BigDecimal serviceFeeAmtBD = fieldChangeRequest.getValueAsBigDecimal(BigDecimal.ZERO);
+
+				final InvoiceProcessorFeeCalculation serviceFee = row.getServiceFee().withFeeAmountIncludingTax(serviceFeeAmtBD);
+				rowBuilder.serviceFee(serviceFee);
 			}
 			else
 			{

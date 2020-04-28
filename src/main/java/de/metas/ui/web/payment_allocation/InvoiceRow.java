@@ -3,6 +3,8 @@ package de.metas.ui.web.payment_allocation;
 import java.time.LocalDate;
 import java.util.Set;
 
+import javax.annotation.Nullable;
+
 import org.adempiere.util.lang.impl.TableRecordReference;
 import org.compiere.model.I_C_Invoice;
 
@@ -13,6 +15,7 @@ import de.metas.bpartner.BPartnerId;
 import de.metas.currency.Amount;
 import de.metas.i18n.ITranslatableString;
 import de.metas.invoice.InvoiceId;
+import de.metas.invoice.invoiceProcessorServiceCompany.InvoiceProcessorFeeCalculation;
 import de.metas.lang.SOTrx;
 import de.metas.organization.ClientAndOrgId;
 import de.metas.organization.OrgId;
@@ -79,8 +82,17 @@ public class InvoiceRow implements IViewRow
 	@Getter
 	private final Amount discountAmt;
 
-	@ViewColumn(seqNo = 80, widgetType = DocumentFieldWidgetType.Text, widgetSize = WidgetSize.Small, captionKey = "C_Currency_ID")
+	public static final String FIELD_ServiceFeeAmt = "serviceFeeAmt";
+	@ViewColumn(seqNo = 80, widgetType = DocumentFieldWidgetType.Amount, widgetSize = WidgetSize.Small, captionKey = "ServiceFeeAmt", fieldName = FIELD_ServiceFeeAmt)
+	@Getter
+	private final Amount serviceFeeAmt;
+
+	@ViewColumn(seqNo = 90, widgetType = DocumentFieldWidgetType.Text, widgetSize = WidgetSize.Small, captionKey = "C_Currency_ID")
 	private final String currencyCode;
+
+	//
+	//
+	//
 
 	private final DocumentId rowId;
 	@Getter
@@ -90,11 +102,10 @@ public class InvoiceRow implements IViewRow
 	private final SOTrx soTrx;
 	@Getter
 	private final boolean creditMemo;
+	@Getter
+	private final InvoiceProcessorFeeCalculation serviceFee;
 
 	private final ViewRowFieldNameAndJsonValuesHolder<InvoiceRow> values;
-	private static final ImmutableMap<String, ViewEditorRenderMode> EDITOR_RENDER_MODES = ImmutableMap.<String, ViewEditorRenderMode> builder()
-			.put(FIELD_DiscountAmt, ViewEditorRenderMode.ALWAYS)
-			.build();
 
 	@Builder(toBuilder = true)
 	private InvoiceRow(
@@ -108,25 +119,43 @@ public class InvoiceRow implements IViewRow
 			final boolean creditMemo,
 			@NonNull final Amount grandTotal,
 			@NonNull final Amount openAmt,
-			@NonNull final Amount discountAmt)
+			@NonNull final Amount discountAmt,
+			@Nullable final InvoiceProcessorFeeCalculation serviceFee)
 	{
-		rowId = convertInvoiceIdToDocumentId(invoiceId);
-		this.invoiceId = invoiceId;
-		this.clientAndOrgId = clientAndOrgId;
 		this.docTypeName = docTypeName;
 		this.documentNo = documentNo;
 		this.dateInvoiced = dateInvoiced;
 		this.bpartner = bpartner;
 		this.soTrx = soTrx;
 		this.creditMemo = creditMemo;
+
 		this.grandTotal = grandTotal;
 		this.openAmt = openAmt;
 		this.discountAmt = discountAmt;
-		this.currencyCode = Amount.getCommonCurrencyCodeOfAll(grandTotal, openAmt, discountAmt)
+		this.serviceFeeAmt = serviceFee != null ? serviceFee.getFeeAmountIncludingTax() : null;
+		this.currencyCode = Amount.getCommonCurrencyCodeOfAll(grandTotal, openAmt, discountAmt, this.serviceFeeAmt)
 				.toThreeLetterCode();
 
-		values = ViewRowFieldNameAndJsonValuesHolder.builder(InvoiceRow.class)
-				.viewEditorRenderModeByFieldName(EDITOR_RENDER_MODES)
+		rowId = convertInvoiceIdToDocumentId(invoiceId);
+		this.invoiceId = invoiceId;
+		this.clientAndOrgId = clientAndOrgId;
+		this.serviceFee = serviceFee;
+
+		this.values = buildViewRowFieldNameAndJsonValuesHolder(serviceFeeAmt);
+	}
+
+	private static ViewRowFieldNameAndJsonValuesHolder<InvoiceRow> buildViewRowFieldNameAndJsonValuesHolder(final Amount serviceFeeAmt)
+	{
+		final ImmutableMap.Builder<String, ViewEditorRenderMode> viewEditorRenderModes = ImmutableMap.<String, ViewEditorRenderMode> builder()
+				.put(FIELD_DiscountAmt, ViewEditorRenderMode.ALWAYS);
+
+		if (serviceFeeAmt != null)
+		{
+			viewEditorRenderModes.put(FIELD_ServiceFeeAmt, ViewEditorRenderMode.ALWAYS);
+		}
+
+		return ViewRowFieldNameAndJsonValuesHolder.builder(InvoiceRow.class)
+				.viewEditorRenderModeByFieldName(viewEditorRenderModes.build())
 				.build();
 	}
 
