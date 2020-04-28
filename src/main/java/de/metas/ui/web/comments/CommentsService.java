@@ -57,7 +57,7 @@ public class CommentsService
 
 		return comments.stream()
 				.map(comment -> toJsonComment(comment, zoneId))
-				.sorted(Comparator.comparing(JSONComment::getCreated))
+				.sorted(Comparator.comparing(JSONComment::getCreated).reversed())
 				.collect(GuavaCollectors.toImmutableList());
 	}
 
