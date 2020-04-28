@@ -17,8 +17,6 @@ import de.metas.banking.payment.paymentallocation.service.PaymentAllocationBuild
 import de.metas.banking.payment.paymentallocation.service.PaymentAllocationBuilder.PayableRemainingOpenAmtPolicy;
 import de.metas.banking.payment.paymentallocation.service.PaymentAllocationResult;
 import de.metas.banking.payment.paymentallocation.service.PaymentDocument;
-import de.metas.currency.CurrencyCode;
-import de.metas.money.CurrencyId;
 import de.metas.money.Money;
 import de.metas.money.MoneyService;
 import de.metas.organization.OrgId;
@@ -119,7 +117,6 @@ public class PaymentsViewAllocateCommand
 
 		return PaymentAllocationBuilder.newBuilder()
 				.orgId(getOrgId())
-				.currencyId(getCurrencyId())
 				.dateTrx(dateTrx)
 				.dateAcct(dateTrx)
 				.paymentDocuments(paymentDocuments)
@@ -151,37 +148,6 @@ public class PaymentsViewAllocateCommand
 		}
 
 		throw new AdempiereException("Cannot detect organization if no payments and no invoices were specified");
-	}
-
-	private CurrencyId getCurrencyId()
-	{
-		final CurrencyCode currencyCode = getCurrencyCode();
-		return moneyService.getCurrencyIdByCurrencyCode(currencyCode);
-	}
-
-	private CurrencyCode getCurrencyCode()
-	{
-		if (paymentRow != null)
-		{
-			return paymentRow.getOpenAmt().getCurrencyCode();
-		}
-
-		if (!invoiceRows.isEmpty())
-		{
-			final ImmutableSet<CurrencyCode> invoiceCurrencyCodes = invoiceRows.stream()
-					.map(invoiceRow -> invoiceRow.getOpenAmt().getCurrencyCode())
-					.collect(ImmutableSet.toImmutableSet());
-			if (invoiceCurrencyCodes.size() != 1)
-			{
-				throw new AdempiereException("More than one currency found");
-			}
-			else
-			{
-				return invoiceCurrencyCodes.iterator().next();
-			}
-		}
-
-		throw new AdempiereException("Cannot detect currency if no payments and no invoices were specified");
 	}
 
 	private PayableDocument toPayableDocument(final InvoiceRow row)

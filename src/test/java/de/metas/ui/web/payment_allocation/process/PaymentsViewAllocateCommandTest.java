@@ -4,7 +4,6 @@ import static org.adempiere.model.InterfaceWrapperHelper.newInstance;
 import static org.adempiere.model.InterfaceWrapperHelper.saveRecord;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.Month;
 
@@ -16,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import de.metas.adempiere.model.I_C_Invoice;
+import de.metas.banking.payment.paymentallocation.service.AllocationAmounts;
 import de.metas.banking.payment.paymentallocation.service.AllocationLineCandidate;
 import de.metas.banking.payment.paymentallocation.service.AllocationLineCandidate.AllocationLineCandidateType;
 import de.metas.banking.payment.paymentallocation.service.PaymentAllocationResult;
@@ -23,10 +23,13 @@ import de.metas.bpartner.BPartnerId;
 import de.metas.currency.Amount;
 import de.metas.currency.CurrencyCode;
 import de.metas.currency.CurrencyRepository;
+import de.metas.currency.impl.PlainCurrencyDAO;
 import de.metas.document.archive.model.I_C_BPartner;
 import de.metas.i18n.TranslatableStrings;
 import de.metas.invoice.InvoiceId;
 import de.metas.lang.SOTrx;
+import de.metas.money.CurrencyId;
+import de.metas.money.Money;
 import de.metas.money.MoneyService;
 import de.metas.organization.ClientAndOrgId;
 import de.metas.organization.OrgId;
@@ -65,6 +68,7 @@ public class PaymentsViewAllocateCommandTest
 	private static final OrgId orgId = OrgId.ofRepoId(1);
 
 	private MoneyService moneyService;
+	private CurrencyId euroCurrencyId;
 	private BPartnerId bpartnerId;
 
 	@BeforeEach
@@ -73,6 +77,8 @@ public class PaymentsViewAllocateCommandTest
 		AdempiereTestHelper.get().init();
 
 		moneyService = new MoneyService(new CurrencyRepository());
+
+		euroCurrencyId = PlainCurrencyDAO.createCurrencyId(CurrencyCode.EUR);
 
 		bpartnerId = createBPartnerId();
 	}
@@ -166,7 +172,9 @@ public class PaymentsViewAllocateCommandTest
 						.bpartnerId(bpartnerId)
 						.paymentDocumentRef(toRecordRef(paymentRow))
 						.payableDocumentRef(toRecordRef(invoiceRow))
-						.amount(new BigDecimal("100"))
+						.amounts(AllocationAmounts.builder()
+								.payAmt(Money.of("100", euroCurrencyId))
+								.build())
 						.build());
 	}
 
@@ -193,8 +201,10 @@ public class PaymentsViewAllocateCommandTest
 						.bpartnerId(bpartnerId)
 						.paymentDocumentRef(toRecordRef(creditMemoRow))
 						.payableDocumentRef(toRecordRef(invoiceRow))
-						.amount(new BigDecimal("20"))
-						.payableOverUnderAmt(new BigDecimal("80"))
+						.amounts(AllocationAmounts.builder()
+								.payAmt(Money.of("20", euroCurrencyId))
+								.build())
+						.payableOverUnderAmt(Money.of("80", euroCurrencyId))
 						.build());
 	}
 
@@ -223,8 +233,10 @@ public class PaymentsViewAllocateCommandTest
 						.bpartnerId(bpartnerId)
 						.paymentDocumentRef(toRecordRef(creditMemoRow))
 						.payableDocumentRef(toRecordRef(invoiceRow))
-						.amount(new BigDecimal("20"))
-						.payableOverUnderAmt(new BigDecimal("80"))
+						.amounts(AllocationAmounts.builder()
+								.payAmt(Money.of("20", euroCurrencyId))
+								.build())
+						.payableOverUnderAmt(Money.of("80", euroCurrencyId))
 						.build());
 		assertThat(result.getCandidates().get(1))
 				.isEqualToComparingFieldByField(AllocationLineCandidate.builder()
@@ -232,7 +244,9 @@ public class PaymentsViewAllocateCommandTest
 						.bpartnerId(bpartnerId)
 						.paymentDocumentRef(toRecordRef(paymentRow))
 						.payableDocumentRef(toRecordRef(invoiceRow))
-						.amount(new BigDecimal("80"))
+						.amounts(AllocationAmounts.builder()
+								.payAmt(Money.of("80", euroCurrencyId))
+								.build())
 						.build());
 	}
 
@@ -261,8 +275,10 @@ public class PaymentsViewAllocateCommandTest
 						.bpartnerId(bpartnerId)
 						.paymentDocumentRef(toRecordRef(creditMemoRow))
 						.payableDocumentRef(toRecordRef(invoiceRow))
-						.amount(new BigDecimal("20"))
-						.payableOverUnderAmt(new BigDecimal("80"))
+						.amounts(AllocationAmounts.builder()
+								.payAmt(Money.of("20", euroCurrencyId))
+								.build())
+						.payableOverUnderAmt(Money.of("80", euroCurrencyId))
 						.build());
 		assertThat(result.getCandidates().get(1))
 				.isEqualToComparingFieldByField(AllocationLineCandidate.builder()
@@ -270,8 +286,10 @@ public class PaymentsViewAllocateCommandTest
 						.bpartnerId(bpartnerId)
 						.paymentDocumentRef(toRecordRef(paymentRow))
 						.payableDocumentRef(toRecordRef(invoiceRow))
-						.amount(new BigDecimal("80"))
-						.paymentOverUnderAmt(new BigDecimal("120"))
+						.amounts(AllocationAmounts.builder()
+								.payAmt(Money.of("80", euroCurrencyId))
+								.build())
+						.paymentOverUnderAmt(Money.of("120", euroCurrencyId))
 						.build());
 	}
 }
