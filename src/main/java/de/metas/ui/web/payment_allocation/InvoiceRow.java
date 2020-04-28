@@ -7,6 +7,7 @@ import org.adempiere.util.lang.impl.TableRecordReference;
 import org.compiere.model.I_C_Invoice;
 
 import com.google.common.base.MoreObjects;
+import com.google.common.collect.ImmutableMap;
 
 import de.metas.bpartner.BPartnerId;
 import de.metas.currency.Amount;
@@ -23,6 +24,7 @@ import de.metas.ui.web.window.datatypes.DocumentId;
 import de.metas.ui.web.window.datatypes.DocumentPath;
 import de.metas.ui.web.window.datatypes.LookupValue;
 import de.metas.ui.web.window.descriptor.DocumentFieldWidgetType;
+import de.metas.ui.web.window.descriptor.ViewEditorRenderMode;
 import de.metas.ui.web.window.descriptor.WidgetSize;
 import lombok.Builder;
 import lombok.Getter;
@@ -72,7 +74,8 @@ public class InvoiceRow implements IViewRow
 	@Getter
 	private final Amount openAmt;
 
-	@ViewColumn(seqNo = 70, widgetType = DocumentFieldWidgetType.Amount, widgetSize = WidgetSize.Small, captionKey = "Discount")
+	public static final String FIELD_DiscountAmt = "discountAmt";
+	@ViewColumn(seqNo = 70, widgetType = DocumentFieldWidgetType.Amount, widgetSize = WidgetSize.Small, captionKey = "Discount", fieldName = FIELD_DiscountAmt)
 	@Getter
 	private final Amount discountAmt;
 
@@ -89,8 +92,11 @@ public class InvoiceRow implements IViewRow
 	private final boolean creditMemo;
 
 	private final ViewRowFieldNameAndJsonValuesHolder<InvoiceRow> values;
+	private static final ImmutableMap<String, ViewEditorRenderMode> EDITOR_RENDER_MODES = ImmutableMap.<String, ViewEditorRenderMode> builder()
+			.put(FIELD_DiscountAmt, ViewEditorRenderMode.ALWAYS)
+			.build();
 
-	@Builder
+	@Builder(toBuilder = true)
 	private InvoiceRow(
 			@NonNull final InvoiceId invoiceId,
 			@NonNull final ClientAndOrgId clientAndOrgId,
@@ -119,7 +125,9 @@ public class InvoiceRow implements IViewRow
 		this.currencyCode = Amount.getCommonCurrencyCodeOfAll(grandTotal, openAmt, discountAmt)
 				.toThreeLetterCode();
 
-		values = ViewRowFieldNameAndJsonValuesHolder.newInstance(InvoiceRow.class);
+		values = ViewRowFieldNameAndJsonValuesHolder.builder(InvoiceRow.class)
+				.viewEditorRenderModeByFieldName(EDITOR_RENDER_MODES)
+				.build();
 	}
 
 	static DocumentId convertInvoiceIdToDocumentId(@NonNull final InvoiceId invoiceId)
