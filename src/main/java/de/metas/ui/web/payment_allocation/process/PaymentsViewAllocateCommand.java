@@ -9,7 +9,6 @@ import javax.annotation.Nullable;
 import org.adempiere.exceptions.AdempiereException;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
 
 import de.metas.banking.payment.paymentallocation.service.AllocationAmounts;
 import de.metas.banking.payment.paymentallocation.service.PayableDocument;
@@ -19,7 +18,6 @@ import de.metas.banking.payment.paymentallocation.service.PaymentAllocationResul
 import de.metas.banking.payment.paymentallocation.service.PaymentDocument;
 import de.metas.money.Money;
 import de.metas.money.MoneyService;
-import de.metas.organization.OrgId;
 import de.metas.ui.web.payment_allocation.InvoiceRow;
 import de.metas.ui.web.payment_allocation.PaymentRow;
 import de.metas.util.lang.CoalesceUtil;
@@ -116,7 +114,6 @@ public class PaymentsViewAllocateCommand
 				.collect(ImmutableList.toImmutableList());
 
 		return PaymentAllocationBuilder.newBuilder()
-				.orgId(getOrgId())
 				.dateTrx(dateTrx)
 				.dateAcct(dateTrx)
 				.paymentDocuments(paymentDocuments)
@@ -125,41 +122,17 @@ public class PaymentsViewAllocateCommand
 				.payableRemainingOpenAmtPolicy(payableRemainingOpenAmtPolicy);
 	}
 
-	private OrgId getOrgId()
-	{
-		if (paymentRow != null)
-		{
-			return paymentRow.getOrgId();
-		}
-
-		if (!invoiceRows.isEmpty())
-		{
-			final ImmutableSet<OrgId> invoiceOrgIds = invoiceRows.stream()
-					.map(invoiceRow -> invoiceRow.getOrgId())
-					.collect(ImmutableSet.toImmutableSet());
-			if (invoiceOrgIds.size() != 1)
-			{
-				throw new AdempiereException("More than one organization found");
-			}
-			else
-			{
-				return invoiceOrgIds.iterator().next();
-			}
-		}
-
-		throw new AdempiereException("Cannot detect organization if no payments and no invoices were specified");
-	}
-
 	private PayableDocument toPayableDocument(final InvoiceRow row)
 	{
 		final Money openAmt = moneyService.toMoney(row.getOpenAmt());
 		final Money discountAmt = moneyService.toMoney(row.getDiscountAmt());
 
 		return PayableDocument.builder()
+				.orgId(row.getOrgId())
 				.invoiceId(row.getInvoiceId())
 				.bpartnerId(row.getBPartnerId())
 				.documentNo(row.getDocumentNo())
-				.isSOTrx(row.getSoTrx().toBoolean())
+				.soTrx(row.getSoTrx())
 				.creditMemo(row.isCreditMemo())
 				.openAmt(openAmt)
 				.amountsToAllocate(AllocationAmounts.builder()
@@ -174,6 +147,7 @@ public class PaymentsViewAllocateCommand
 		final Money openAmt = moneyService.toMoney(row.getOpenAmt());
 
 		return PaymentDocument.builder()
+				.orgId(row.getOrgId())
 				.paymentId(row.getPaymentId())
 				.bpartnerId(row.getBPartnerId())
 				.documentNo(row.getDocumentNo())
