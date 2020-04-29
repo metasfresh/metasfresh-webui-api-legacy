@@ -16,6 +16,7 @@ import de.metas.banking.payment.paymentallocation.service.PaymentAllocationBuild
 import de.metas.banking.payment.paymentallocation.service.PaymentAllocationBuilder.PayableRemainingOpenAmtPolicy;
 import de.metas.banking.payment.paymentallocation.service.PaymentAllocationResult;
 import de.metas.banking.payment.paymentallocation.service.PaymentDocument;
+import de.metas.invoice.invoiceProcessorServiceCompany.InvoiceProcessorFeeCalculation;
 import de.metas.money.Money;
 import de.metas.money.MoneyService;
 import de.metas.ui.web.payment_allocation.InvoiceRow;
@@ -55,6 +56,7 @@ public class PaymentsViewAllocateCommand
 	private final PaymentRow paymentRow;
 	private final List<InvoiceRow> invoiceRows;
 	private final PayableRemainingOpenAmtPolicy payableRemainingOpenAmtPolicy;
+	private final boolean allowPurchaseSalesInvoiceCompensation;
 	private final LocalDate dateTrx;
 
 	@Builder
@@ -63,12 +65,14 @@ public class PaymentsViewAllocateCommand
 			@Nullable final PaymentRow paymentRow,
 			@NonNull @Singular final ImmutableList<InvoiceRow> invoiceRows,
 			@Nullable final PayableRemainingOpenAmtPolicy payableRemainingOpenAmtPolicy,
+			@NonNull final Boolean allowPurchaseSalesInvoiceCompensation,
 			@Nullable final LocalDate dateTrx)
 	{
 		this.moneyService = moneyService;
 		this.paymentRow = paymentRow;
 		this.invoiceRows = invoiceRows;
 		this.payableRemainingOpenAmtPolicy = CoalesceUtil.coalesce(payableRemainingOpenAmtPolicy, PayableRemainingOpenAmtPolicy.DO_NOTHING);
+		this.allowPurchaseSalesInvoiceCompensation = allowPurchaseSalesInvoiceCompensation;
 		this.dateTrx = dateTrx != null ? dateTrx : SystemTime.asLocalDate();
 	}
 
@@ -119,13 +123,19 @@ public class PaymentsViewAllocateCommand
 				.paymentDocuments(paymentDocuments)
 				.payableDocuments(invoiceDocuments)
 				.allowPartialAllocations(true)
-				.payableRemainingOpenAmtPolicy(payableRemainingOpenAmtPolicy);
+				.payableRemainingOpenAmtPolicy(payableRemainingOpenAmtPolicy)
+				.allowPurchaseSalesInvoiceCompensation(allowPurchaseSalesInvoiceCompensation);
 	}
 
 	private PayableDocument toPayableDocument(final InvoiceRow row)
 	{
 		final Money openAmt = moneyService.toMoney(row.getOpenAmt());
 		final Money discountAmt = moneyService.toMoney(row.getDiscountAmt());
+
+		final InvoiceProcessorFeeCalculation serviceFee = row.getServiceFee();
+		final Money serviceFeeAmt = serviceFee != null
+				? moneyService.toMoney(serviceFee.getFeeAmountIncludingTax())
+				: null;
 
 		return PayableDocument.builder()
 				.orgId(row.getOrgId())

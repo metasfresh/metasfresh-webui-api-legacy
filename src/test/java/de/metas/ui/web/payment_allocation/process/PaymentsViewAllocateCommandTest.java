@@ -161,6 +161,7 @@ public class PaymentsViewAllocateCommandTest
 				.moneyService(moneyService)
 				.paymentRow(paymentRow)
 				.invoiceRow(invoiceRow)
+				.allowPurchaseSalesInvoiceCompensation(false)
 				.build()
 				.run();
 
@@ -189,6 +190,7 @@ public class PaymentsViewAllocateCommandTest
 				.moneyService(moneyService)
 				.invoiceRow(invoiceRow)
 				.invoiceRow(creditMemoRow)
+				.allowPurchaseSalesInvoiceCompensation(false)
 				.build()
 				.run();
 
@@ -222,6 +224,7 @@ public class PaymentsViewAllocateCommandTest
 				.paymentRow(paymentRow)
 				.invoiceRow(invoiceRow)
 				.invoiceRow(creditMemoRow)
+				.allowPurchaseSalesInvoiceCompensation(false)
 				.build()
 				.run();
 
@@ -266,6 +269,7 @@ public class PaymentsViewAllocateCommandTest
 				.paymentRow(paymentRow)
 				.invoiceRow(invoiceRow)
 				.invoiceRow(creditMemoRow)
+				.allowPurchaseSalesInvoiceCompensation(false)
 				.build()
 				.run();
 
