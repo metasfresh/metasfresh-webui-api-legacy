@@ -65,7 +65,10 @@ import lombok.NonNull;
 
 public class PaymentsViewAllocateCommandTest
 {
+
 	private static final OrgId orgId = OrgId.ofRepoId(1);
+	private static final LocalDate dateInvoiced = LocalDate.of(2020, Month.APRIL, 1);
+	private static final LocalDate paymentDateTrx = LocalDate.of(2020, Month.APRIL, 25);
 
 	private MoneyService moneyService;
 	private CurrencyId euroCurrencyId;
@@ -118,7 +121,7 @@ public class PaymentsViewAllocateCommandTest
 				.paymentId(paymentId)
 				.clientAndOrgId(ClientAndOrgId.ofClientAndOrg(ClientId.METASFRESH, orgId))
 				.documentNo("paymentNo_" + paymentId.getRepoId())
-				.dateTrx(LocalDate.of(2020, Month.APRIL, 25))
+				.dateTrx(paymentDateTrx)
 				.bpartner(IntegerLookupValue.of(bpartnerId.getRepoId(), "BPartner"))
 				.payAmt(payAmt)
 				.openAmt(payAmt)
@@ -141,7 +144,7 @@ public class PaymentsViewAllocateCommandTest
 				.clientAndOrgId(ClientAndOrgId.ofClientAndOrg(ClientId.METASFRESH, orgId))
 				.docTypeName(TranslatableStrings.anyLanguage("invoice doc type"))
 				.documentNo("invoiceNo_" + invoiceId.getRepoId())
-				.dateInvoiced(LocalDate.of(2020, Month.APRIL, 1))
+				.dateInvoiced(dateInvoiced)
 				.bpartner(IntegerLookupValue.of(bpartnerId.getRepoId(), "BPartner"))
 				.soTrx(soTrx)
 				.creditMemo(creditMemo)
@@ -162,6 +165,7 @@ public class PaymentsViewAllocateCommandTest
 				.paymentRow(paymentRow)
 				.invoiceRow(invoiceRow)
 				.allowPurchaseSalesInvoiceCompensation(false)
+				.dateTrx(LocalDate.parse("2020-04-30"))
 				.build()
 				.run();
 
@@ -174,6 +178,8 @@ public class PaymentsViewAllocateCommandTest
 						.bpartnerId(bpartnerId)
 						.paymentDocumentRef(toRecordRef(paymentRow))
 						.payableDocumentRef(toRecordRef(invoiceRow))
+						.dateTrx(LocalDate.parse("2020-04-30"))
+						.dateAcct(LocalDate.parse("2020-04-30"))
 						.amounts(AllocationAmounts.builder()
 								.payAmt(Money.of("100", euroCurrencyId))
 								.build())
@@ -191,6 +197,7 @@ public class PaymentsViewAllocateCommandTest
 				.invoiceRow(invoiceRow)
 				.invoiceRow(creditMemoRow)
 				.allowPurchaseSalesInvoiceCompensation(false)
+				.dateTrx(LocalDate.parse("2020-04-30"))
 				.build()
 				.run();
 
@@ -205,6 +212,8 @@ public class PaymentsViewAllocateCommandTest
 						.bpartnerId(bpartnerId)
 						.paymentDocumentRef(toRecordRef(creditMemoRow))
 						.payableDocumentRef(toRecordRef(invoiceRow))
+						.dateTrx(LocalDate.parse("2020-04-30"))
+						.dateAcct(LocalDate.parse("2020-04-30"))
 						.amounts(AllocationAmounts.builder()
 								.payAmt(Money.of("20", euroCurrencyId))
 								.build())
@@ -225,6 +234,7 @@ public class PaymentsViewAllocateCommandTest
 				.invoiceRow(invoiceRow)
 				.invoiceRow(creditMemoRow)
 				.allowPurchaseSalesInvoiceCompensation(false)
+				.dateTrx(LocalDate.parse("2020-04-30"))
 				.build()
 				.run();
 
@@ -239,6 +249,8 @@ public class PaymentsViewAllocateCommandTest
 						.bpartnerId(bpartnerId)
 						.paymentDocumentRef(toRecordRef(creditMemoRow))
 						.payableDocumentRef(toRecordRef(invoiceRow))
+						.dateTrx(LocalDate.parse("2020-04-30"))
+						.dateAcct(LocalDate.parse("2020-04-30"))
 						.amounts(AllocationAmounts.builder()
 								.payAmt(Money.of("20", euroCurrencyId))
 								.build())
@@ -251,6 +263,8 @@ public class PaymentsViewAllocateCommandTest
 						.bpartnerId(bpartnerId)
 						.paymentDocumentRef(toRecordRef(paymentRow))
 						.payableDocumentRef(toRecordRef(invoiceRow))
+						.dateTrx(LocalDate.parse("2020-04-30"))
+						.dateAcct(LocalDate.parse("2020-04-30"))
 						.amounts(AllocationAmounts.builder()
 								.payAmt(Money.of("80", euroCurrencyId))
 								.build())
@@ -270,6 +284,7 @@ public class PaymentsViewAllocateCommandTest
 				.invoiceRow(invoiceRow)
 				.invoiceRow(creditMemoRow)
 				.allowPurchaseSalesInvoiceCompensation(false)
+				.dateTrx(LocalDate.parse("2020-04-30"))
 				.build()
 				.run();
 
@@ -284,6 +299,8 @@ public class PaymentsViewAllocateCommandTest
 						.bpartnerId(bpartnerId)
 						.paymentDocumentRef(toRecordRef(creditMemoRow))
 						.payableDocumentRef(toRecordRef(invoiceRow))
+						.dateTrx(LocalDate.parse("2020-04-30"))
+						.dateAcct(LocalDate.parse("2020-04-30"))
 						.amounts(AllocationAmounts.builder()
 								.payAmt(Money.of("20", euroCurrencyId))
 								.build())
@@ -296,6 +313,8 @@ public class PaymentsViewAllocateCommandTest
 						.bpartnerId(bpartnerId)
 						.paymentDocumentRef(toRecordRef(paymentRow))
 						.payableDocumentRef(toRecordRef(invoiceRow))
+						.dateTrx(LocalDate.parse("2020-04-30"))
+						.dateAcct(LocalDate.parse("2020-04-30"))
 						.amounts(AllocationAmounts.builder()
 								.payAmt(Money.of("80", euroCurrencyId))
 								.build())
