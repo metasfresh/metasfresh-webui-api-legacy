@@ -7,7 +7,7 @@ import org.adempiere.exceptions.AdempiereException;
 
 import de.metas.currency.Amount;
 import de.metas.currency.CurrencyCode;
-import de.metas.invoice.invoiceProcessorServiceCompany.InvoiceProcessorFeeCalculation;
+import de.metas.invoice.invoiceProcessingServiceCompany.InvoiceProcessingFeeCalculation;
 import de.metas.ui.web.payment_allocation.InvoiceRow.InvoiceRowBuilder;
 import de.metas.ui.web.window.datatypes.json.JSONDocumentChangedEvent;
 import lombok.NonNull;
@@ -58,8 +58,8 @@ public class InvoiceRowReducers
 			{
 				final BigDecimal serviceFeeAmtBD = fieldChangeRequest.getValueAsBigDecimal(BigDecimal.ZERO);
 
-				final InvoiceProcessorFeeCalculation serviceFee = row.getServiceFee().withFeeAmountIncludingTax(serviceFeeAmtBD);
-				rowBuilder.serviceFee(serviceFee);
+				final InvoiceProcessingFeeCalculation serviceFee = row.getServiceFeeCalculation().withFeeAmountIncludingTax(serviceFeeAmtBD);
+				rowBuilder.serviceFeeCalculation(serviceFee);
 			}
 			else
 			{

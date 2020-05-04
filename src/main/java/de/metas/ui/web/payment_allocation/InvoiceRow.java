@@ -15,7 +15,7 @@ import de.metas.bpartner.BPartnerId;
 import de.metas.currency.Amount;
 import de.metas.i18n.ITranslatableString;
 import de.metas.invoice.InvoiceId;
-import de.metas.invoice.invoiceProcessorServiceCompany.InvoiceProcessorFeeCalculation;
+import de.metas.invoice.invoiceProcessingServiceCompany.InvoiceProcessingFeeCalculation;
 import de.metas.lang.SOTrx;
 import de.metas.organization.ClientAndOrgId;
 import de.metas.organization.OrgId;
@@ -103,7 +103,7 @@ public class InvoiceRow implements IViewRow
 	@Getter
 	private final boolean creditMemo;
 	@Getter
-	private final InvoiceProcessorFeeCalculation serviceFee;
+	private final InvoiceProcessingFeeCalculation serviceFeeCalculation;
 
 	private final ViewRowFieldNameAndJsonValuesHolder<InvoiceRow> values;
 
@@ -120,7 +120,7 @@ public class InvoiceRow implements IViewRow
 			@NonNull final Amount grandTotal,
 			@NonNull final Amount openAmt,
 			@NonNull final Amount discountAmt,
-			@Nullable final InvoiceProcessorFeeCalculation serviceFee)
+			@Nullable final InvoiceProcessingFeeCalculation serviceFeeCalculation)
 	{
 		this.docTypeName = docTypeName;
 		this.documentNo = documentNo;
@@ -132,14 +132,14 @@ public class InvoiceRow implements IViewRow
 		this.grandTotal = grandTotal;
 		this.openAmt = openAmt;
 		this.discountAmt = discountAmt;
-		this.serviceFeeAmt = serviceFee != null ? serviceFee.getFeeAmountIncludingTax() : null;
+		this.serviceFeeAmt = serviceFeeCalculation != null ? serviceFeeCalculation.getFeeAmountIncludingTax() : null;
 		this.currencyCode = Amount.getCommonCurrencyCodeOfAll(grandTotal, openAmt, discountAmt, this.serviceFeeAmt)
 				.toThreeLetterCode();
 
 		rowId = convertInvoiceIdToDocumentId(invoiceId);
 		this.invoiceId = invoiceId;
 		this.clientAndOrgId = clientAndOrgId;
-		this.serviceFee = serviceFee;
+		this.serviceFeeCalculation = serviceFeeCalculation;
 
 		this.values = buildViewRowFieldNameAndJsonValuesHolder(serviceFeeAmt);
 	}
