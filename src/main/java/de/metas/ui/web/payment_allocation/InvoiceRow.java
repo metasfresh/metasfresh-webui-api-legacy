@@ -141,15 +141,16 @@ public class InvoiceRow implements IViewRow
 		this.clientAndOrgId = clientAndOrgId;
 		this.serviceFeeCalculation = serviceFeeCalculation;
 
-		this.values = buildViewRowFieldNameAndJsonValuesHolder(serviceFeeAmt);
+		this.values = buildViewRowFieldNameAndJsonValuesHolder(serviceFeeCalculation);
 	}
 
-	private static ViewRowFieldNameAndJsonValuesHolder<InvoiceRow> buildViewRowFieldNameAndJsonValuesHolder(final Amount serviceFeeAmt)
+	private static ViewRowFieldNameAndJsonValuesHolder<InvoiceRow> buildViewRowFieldNameAndJsonValuesHolder(
+			@Nullable final InvoiceProcessingFeeCalculation serviceFeeCalculation)
 	{
 		final ImmutableMap.Builder<String, ViewEditorRenderMode> viewEditorRenderModes = ImmutableMap.<String, ViewEditorRenderMode> builder()
 				.put(FIELD_DiscountAmt, ViewEditorRenderMode.ALWAYS);
 
-		if (serviceFeeAmt != null)
+		if (serviceFeeCalculation != null)
 		{
 			viewEditorRenderModes.put(FIELD_ServiceFeeAmt, ViewEditorRenderMode.ALWAYS);
 		}
