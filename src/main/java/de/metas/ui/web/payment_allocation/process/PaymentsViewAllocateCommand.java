@@ -14,9 +14,10 @@ import de.metas.banking.payment.paymentallocation.service.AllocationAmounts;
 import de.metas.banking.payment.paymentallocation.service.PayableDocument;
 import de.metas.banking.payment.paymentallocation.service.PaymentAllocationBuilder;
 import de.metas.banking.payment.paymentallocation.service.PaymentAllocationBuilder.PayableRemainingOpenAmtPolicy;
-import de.metas.invoice.invoiceProcessingServiceCompany.InvoiceProcessingFeeCalculation;
 import de.metas.banking.payment.paymentallocation.service.PaymentAllocationResult;
 import de.metas.banking.payment.paymentallocation.service.PaymentDocument;
+import de.metas.invoice.invoiceProcessingServiceCompany.InvoiceProcessingFeeCalculation;
+import de.metas.invoice.invoiceProcessingServiceCompany.InvoiceProcessingServiceCompanyService;
 import de.metas.money.Money;
 import de.metas.money.MoneyService;
 import de.metas.ui.web.payment_allocation.InvoiceRow;
@@ -52,6 +53,7 @@ import lombok.Singular;
 public class PaymentsViewAllocateCommand
 {
 	private final MoneyService moneyService;
+	private final InvoiceProcessingServiceCompanyService invoiceProcessingServiceCompanyService;
 
 	private final PaymentRow paymentRow;
 	private final List<InvoiceRow> invoiceRows;
@@ -62,6 +64,8 @@ public class PaymentsViewAllocateCommand
 	@Builder
 	private PaymentsViewAllocateCommand(
 			@NonNull final MoneyService moneyService,
+			@NonNull final InvoiceProcessingServiceCompanyService invoiceProcessingServiceCompanyService,
+			//
 			@Nullable final PaymentRow paymentRow,
 			@NonNull @Singular final ImmutableList<InvoiceRow> invoiceRows,
 			@Nullable final PayableRemainingOpenAmtPolicy payableRemainingOpenAmtPolicy,
@@ -69,6 +73,8 @@ public class PaymentsViewAllocateCommand
 			@Nullable final LocalDate dateTrx)
 	{
 		this.moneyService = moneyService;
+		this.invoiceProcessingServiceCompanyService = invoiceProcessingServiceCompanyService;
+
 		this.paymentRow = paymentRow;
 		this.invoiceRows = invoiceRows;
 		this.payableRemainingOpenAmtPolicy = CoalesceUtil.coalesce(payableRemainingOpenAmtPolicy, PayableRemainingOpenAmtPolicy.DO_NOTHING);
@@ -118,6 +124,8 @@ public class PaymentsViewAllocateCommand
 				.collect(ImmutableList.toImmutableList());
 
 		return PaymentAllocationBuilder.newBuilder()
+				.invoiceProcessingServiceCompanyService(invoiceProcessingServiceCompanyService)
+				//
 				.dateTrx(dateTrx)
 				.dateAcct(dateTrx)
 				.paymentDocuments(paymentDocuments)
