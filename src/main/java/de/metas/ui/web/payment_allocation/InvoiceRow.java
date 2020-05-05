@@ -1,6 +1,7 @@
 package de.metas.ui.web.payment_allocation;
 
 import java.time.LocalDate;
+import java.util.Map;
 import java.util.Set;
 
 import javax.annotation.Nullable;
@@ -213,6 +214,12 @@ public class InvoiceRow implements IViewRow
 	public ViewRowFieldNameAndJsonValues getFieldNameAndJsonValues()
 	{
 		return values.get(this);
+	}
+
+	@Override
+	public Map<String, ViewEditorRenderMode> getViewEditorRenderModeByFieldName()
+	{
+		return values.getViewEditorRenderModeByFieldName();
 	}
 
 	public BPartnerId getBPartnerId()

@@ -158,6 +158,7 @@ public class PaymentsViewAllocateCommand
 						.discountAmt(discountAmt)
 						.invoiceProcessingFee(invoiceProcessingFee)
 						.build())
+				.invoiceProcessingFeeCalculation(invoiceProcessingFeeCalculation)
 				.build();
 	}
 
