@@ -18,6 +18,7 @@ import de.metas.banking.payment.paymentallocation.service.PaymentAllocationResul
 import de.metas.banking.payment.paymentallocation.service.PaymentDocument;
 import de.metas.invoice.invoiceProcessingServiceCompany.InvoiceProcessingFeeCalculation;
 import de.metas.invoice.invoiceProcessingServiceCompany.InvoiceProcessingServiceCompanyService;
+import de.metas.money.CurrencyId;
 import de.metas.money.Money;
 import de.metas.money.MoneyService;
 import de.metas.ui.web.payment_allocation.InvoiceRow;
@@ -139,11 +140,14 @@ public class PaymentsViewAllocateCommand
 	{
 		final Money openAmt = moneyService.toMoney(row.getOpenAmt());
 		final Money discountAmt = moneyService.toMoney(row.getDiscountAmt());
+		final CurrencyId currencyId = openAmt.getCurrencyId();
 
 		final InvoiceProcessingFeeCalculation invoiceProcessingFeeCalculation = row.getServiceFeeCalculation();
 		final Money invoiceProcessingFee = invoiceProcessingFeeCalculation != null
 				? moneyService.toMoney(invoiceProcessingFeeCalculation.getFeeAmountIncludingTax())
-				: null;
+				: Money.zero(currencyId);
+
+		final Money payAmt = openAmt.subtract(discountAmt).subtract(invoiceProcessingFee);
 
 		return PayableDocument.builder()
 				.orgId(row.getOrgId())
@@ -154,7 +158,7 @@ public class PaymentsViewAllocateCommand
 				.creditMemo(row.getDocBaseType().isCreditMemo())
 				.openAmt(openAmt)
 				.amountsToAllocate(AllocationAmounts.builder()
-						.payAmt(openAmt)
+						.payAmt(payAmt)
 						.discountAmt(discountAmt)
 						.invoiceProcessingFee(invoiceProcessingFee)
 						.build())
