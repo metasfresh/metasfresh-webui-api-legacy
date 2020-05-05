@@ -14,9 +14,9 @@ import com.google.common.collect.ImmutableMap;
 import de.metas.bpartner.BPartnerId;
 import de.metas.currency.Amount;
 import de.metas.i18n.ITranslatableString;
+import de.metas.invoice.InvoiceDocBaseType;
 import de.metas.invoice.InvoiceId;
 import de.metas.invoice.invoiceProcessingServiceCompany.InvoiceProcessingFeeCalculation;
-import de.metas.lang.SOTrx;
 import de.metas.organization.ClientAndOrgId;
 import de.metas.organization.OrgId;
 import de.metas.ui.web.view.IViewRow;
@@ -99,9 +99,7 @@ public class InvoiceRow implements IViewRow
 	private final InvoiceId invoiceId;
 	private final ClientAndOrgId clientAndOrgId;
 	@Getter
-	private final SOTrx soTrx;
-	@Getter
-	private final boolean creditMemo;
+	private final InvoiceDocBaseType docBaseType;
 	@Getter
 	private final InvoiceProcessingFeeCalculation serviceFeeCalculation;
 
@@ -115,8 +113,7 @@ public class InvoiceRow implements IViewRow
 			@NonNull final String documentNo,
 			@NonNull final LocalDate dateInvoiced,
 			@NonNull final LookupValue bpartner,
-			@NonNull final SOTrx soTrx,
-			final boolean creditMemo,
+			@NonNull final InvoiceDocBaseType docBaseType,
 			@NonNull final Amount grandTotal,
 			@NonNull final Amount openAmt,
 			@NonNull final Amount discountAmt,
@@ -126,8 +123,7 @@ public class InvoiceRow implements IViewRow
 		this.documentNo = documentNo;
 		this.dateInvoiced = dateInvoiced;
 		this.bpartner = bpartner;
-		this.soTrx = soTrx;
-		this.creditMemo = creditMemo;
+		this.docBaseType = docBaseType;
 
 		this.grandTotal = grandTotal;
 		this.openAmt = openAmt;

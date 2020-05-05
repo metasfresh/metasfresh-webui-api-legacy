@@ -26,8 +26,10 @@ import de.metas.currency.CurrencyRepository;
 import de.metas.currency.impl.PlainCurrencyDAO;
 import de.metas.document.archive.model.I_C_BPartner;
 import de.metas.i18n.TranslatableStrings;
+import de.metas.invoice.InvoiceDocBaseType;
 import de.metas.invoice.InvoiceId;
-import de.metas.lang.SOTrx;
+import de.metas.invoice.invoiceProcessingServiceCompany.InvoiceProcessingServiceCompanyConfigRepository;
+import de.metas.invoice.invoiceProcessingServiceCompany.InvoiceProcessingServiceCompanyService;
 import de.metas.money.CurrencyId;
 import de.metas.money.Money;
 import de.metas.money.MoneyService;
@@ -71,6 +73,8 @@ public class PaymentsViewAllocateCommandTest
 	private static final LocalDate paymentDateTrx = LocalDate.of(2020, Month.APRIL, 25);
 
 	private MoneyService moneyService;
+	private InvoiceProcessingServiceCompanyService invoiceProcessingServiceCompanyService;
+
 	private CurrencyId euroCurrencyId;
 	private BPartnerId bpartnerId;
 
@@ -80,6 +84,9 @@ public class PaymentsViewAllocateCommandTest
 		AdempiereTestHelper.get().init();
 
 		moneyService = new MoneyService(new CurrencyRepository());
+		invoiceProcessingServiceCompanyService = new InvoiceProcessingServiceCompanyService(
+				new InvoiceProcessingServiceCompanyConfigRepository(),
+				moneyService);
 
 		euroCurrencyId = PlainCurrencyDAO.createCurrencyId(CurrencyCode.EUR);
 
@@ -132,8 +139,7 @@ public class PaymentsViewAllocateCommandTest
 	@Builder(builderMethodName = "invoiceRow", builderClassName = "InvoiceRowBuilder")
 	private InvoiceRow createInvoiceRow(
 			@NonNull final Amount openAmt,
-			@NonNull final SOTrx soTrx,
-			final boolean creditMemo)
+			@NonNull final InvoiceDocBaseType docBaseType)
 	{
 		final I_C_Invoice invoiceRecord = newInstance(I_C_Invoice.class);
 		saveRecord(invoiceRecord);
@@ -146,8 +152,7 @@ public class PaymentsViewAllocateCommandTest
 				.documentNo("invoiceNo_" + invoiceId.getRepoId())
 				.dateInvoiced(dateInvoiced)
 				.bpartner(IntegerLookupValue.of(bpartnerId.getRepoId(), "BPartner"))
-				.soTrx(soTrx)
-				.creditMemo(creditMemo)
+				.docBaseType(docBaseType)
 				.grandTotal(openAmt)
 				.openAmt(openAmt)
 				.discountAmt(Amount.zero(openAmt.getCurrencyCode()))
@@ -158,10 +163,11 @@ public class PaymentsViewAllocateCommandTest
 	public void singleInvoice_to_singlePayment()
 	{
 		final PaymentRow paymentRow = paymentRow().direction(PaymentDirection.INBOUND).payAmt(euro(100)).build();
-		final InvoiceRow invoiceRow = invoiceRow().soTrx(SOTrx.SALES).openAmt(euro(100)).build();
+		final InvoiceRow invoiceRow = invoiceRow().docBaseType(InvoiceDocBaseType.CustomerInvoice).openAmt(euro(100)).build();
 
 		final PaymentAllocationResult result = PaymentsViewAllocateCommand.builder()
 				.moneyService(moneyService)
+				.invoiceProcessingServiceCompanyService(invoiceProcessingServiceCompanyService)
 				.paymentRow(paymentRow)
 				.invoiceRow(invoiceRow)
 				.allowPurchaseSalesInvoiceCompensation(false)
@@ -189,11 +195,12 @@ public class PaymentsViewAllocateCommandTest
 	@Test
 	public void invoice_to_creditMemo()
 	{
-		final InvoiceRow invoiceRow = invoiceRow().soTrx(SOTrx.SALES).openAmt(euro(100)).build();
-		final InvoiceRow creditMemoRow = invoiceRow().soTrx(SOTrx.SALES).openAmt(euro(-20)).creditMemo(true).build();
+		final InvoiceRow invoiceRow = invoiceRow().docBaseType(InvoiceDocBaseType.CustomerInvoice).openAmt(euro(100)).build();
+		final InvoiceRow creditMemoRow = invoiceRow().docBaseType(InvoiceDocBaseType.CustomerCreditMemo).openAmt(euro(-20)).build();
 
 		final PaymentAllocationResult result = PaymentsViewAllocateCommand.builder()
 				.moneyService(moneyService)
+				.invoiceProcessingServiceCompanyService(invoiceProcessingServiceCompanyService)
 				.invoiceRow(invoiceRow)
 				.invoiceRow(creditMemoRow)
 				.allowPurchaseSalesInvoiceCompensation(false)
@@ -225,11 +232,12 @@ public class PaymentsViewAllocateCommandTest
 	public void invoice_creditMemo_and_payment()
 	{
 		final PaymentRow paymentRow = paymentRow().direction(PaymentDirection.INBOUND).payAmt(euro(80)).build();
-		final InvoiceRow invoiceRow = invoiceRow().soTrx(SOTrx.SALES).openAmt(euro(100)).build();
-		final InvoiceRow creditMemoRow = invoiceRow().soTrx(SOTrx.SALES).openAmt(euro(-20)).creditMemo(true).build();
+		final InvoiceRow invoiceRow = invoiceRow().docBaseType(InvoiceDocBaseType.CustomerInvoice).openAmt(euro(100)).build();
+		final InvoiceRow creditMemoRow = invoiceRow().docBaseType(InvoiceDocBaseType.CustomerCreditMemo).openAmt(euro(-20)).build();
 
 		final PaymentAllocationResult result = PaymentsViewAllocateCommand.builder()
 				.moneyService(moneyService)
+				.invoiceProcessingServiceCompanyService(invoiceProcessingServiceCompanyService)
 				.paymentRow(paymentRow)
 				.invoiceRow(invoiceRow)
 				.invoiceRow(creditMemoRow)
@@ -275,11 +283,12 @@ public class PaymentsViewAllocateCommandTest
 	public void invoice_creditMemo_and_payment_partial()
 	{
 		final PaymentRow paymentRow = paymentRow().direction(PaymentDirection.INBOUND).payAmt(euro(200)).build();
-		final InvoiceRow invoiceRow = invoiceRow().soTrx(SOTrx.SALES).openAmt(euro(100)).build();
-		final InvoiceRow creditMemoRow = invoiceRow().soTrx(SOTrx.SALES).openAmt(euro(-20)).creditMemo(true).build();
+		final InvoiceRow invoiceRow = invoiceRow().docBaseType(InvoiceDocBaseType.CustomerInvoice).openAmt(euro(100)).build();
+		final InvoiceRow creditMemoRow = invoiceRow().docBaseType(InvoiceDocBaseType.CustomerCreditMemo).openAmt(euro(-20)).build();
 
 		final PaymentAllocationResult result = PaymentsViewAllocateCommand.builder()
 				.moneyService(moneyService)
+				.invoiceProcessingServiceCompanyService(invoiceProcessingServiceCompanyService)
 				.paymentRow(paymentRow)
 				.invoiceRow(invoiceRow)
 				.invoiceRow(creditMemoRow)

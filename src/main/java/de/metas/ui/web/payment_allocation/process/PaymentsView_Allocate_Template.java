@@ -61,6 +61,8 @@ abstract class PaymentsView_Allocate_Template extends PaymentsViewBasedProcess
 	{
 		final PaymentsViewAllocateCommandBuilder builder = PaymentsViewAllocateCommand.builder()
 				.moneyService(moneyService)
+				.invoiceProcessingServiceCompanyService(invoiceProcessingServiceCompanyService)
+				//
 				.paymentRow(getSingleSelectedPaymentRowOrNull())
 				.invoiceRows(getSelectedInvoiceRows())
 				.allowPurchaseSalesInvoiceCompensation(paymentAllocationBL.isPurchaseSalesInvoiceCompensationAllowed());
