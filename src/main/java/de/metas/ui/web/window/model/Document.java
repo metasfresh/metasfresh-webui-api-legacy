@@ -856,7 +856,18 @@ public final class Document
 
 	public Properties getCtx()
 	{
-		return Env.getCtx(); // FIXME use document level context
+		// make sure that InterfaceWrapperHelper.newInstance(Class<T>, Object, boolean useClientOrgFromProvider) works
+		// (still, not sure if this is sufficient for all cases)
+		final Properties result = Env.copyCtx(Env.getCtx());
+		if (getClientId() != null)
+		{
+			Env.setClientId(result, getClientId());
+		}
+		if (getOrgId() != null)
+		{
+			Env.setOrgId(result, getOrgId());
+		}
+		return result;
 	}
 
 	public int getWindowNo()
