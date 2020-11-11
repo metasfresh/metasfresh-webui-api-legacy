@@ -3,8 +3,6 @@ package de.metas.ui.web.handlingunits;
 import java.util.List;
 import java.util.Set;
 
-import org.adempiere.util.collections.PagedIterator.Page;
-
 import de.metas.ui.web.document.filter.DocumentFilter;
 import de.metas.ui.web.handlingunits.HUIdsFilterHelper.HUIdsFilterData;
 import de.metas.ui.web.view.ViewEvaluationCtx;
@@ -12,6 +10,7 @@ import de.metas.ui.web.view.ViewId;
 import de.metas.ui.web.view.ViewRowIdsOrderedSelection;
 import de.metas.ui.web.window.datatypes.DocumentIdsSelection;
 import de.metas.ui.web.window.model.DocumentQueryOrderBy;
+import de.metas.util.collections.PagedIterator.Page;
 
 /*
  * #%L

@@ -7,7 +7,6 @@ import org.adempiere.ad.trx.api.ITrx;
 import org.adempiere.exceptions.AdempiereException;
 import org.adempiere.exceptions.FillMandatoryException;
 import org.adempiere.util.Services;
-import org.adempiere.util.collections.ListUtils;
 import org.compiere.util.Env;
 
 import com.google.common.collect.ImmutableList;
@@ -27,6 +26,7 @@ import de.metas.ui.web.handlingunits.HUEditorRow;
 import de.metas.ui.web.handlingunits.WEBUI_HU_Constants;
 import de.metas.ui.web.window.datatypes.DocumentId;
 import de.metas.ui.web.window.datatypes.DocumentIdsSelection;
+import de.metas.util.collections.ListUtils;
 
 /*
  * #%L
