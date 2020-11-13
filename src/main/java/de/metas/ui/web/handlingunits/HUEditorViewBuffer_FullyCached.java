@@ -283,7 +283,7 @@ class HUEditorViewBuffer_FullyCached implements HUEditorViewBuffer
 			return record;
 		}
 
-		public Stream<HUEditorRow> streamByIdsExcludingIncludedRows(final HUEditorRowFilter filter)
+		public Stream<HUEditorRow> streamByIdsExcludingIncludedRows(@NonNull final HUEditorRowFilter filter)
 		{
 			final ImmutableSet<HUEditorRowId> onlyRowIds = filter.getOnlyRowIds();
 			if (onlyRowIds.isEmpty())

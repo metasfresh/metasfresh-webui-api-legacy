@@ -12,7 +12,6 @@ import org.adempiere.exceptions.AdempiereException;
 import org.adempiere.exceptions.FillMandatoryException;
 import org.adempiere.util.GuavaCollectors;
 import org.adempiere.util.Services;
-import org.adempiere.util.collections.ListUtils;
 import org.adempiere.util.time.SystemTime;
 import org.compiere.model.I_C_UOM;
 
@@ -33,6 +32,7 @@ import de.metas.product.IProductBL;
 import de.metas.ui.web.handlingunits.HUEditorRow;
 import de.metas.ui.web.picking.packageable.PackageableRow;
 import de.metas.ui.web.window.datatypes.DocumentIdsSelection;
+import de.metas.util.collections.ListUtils;
 
 /*
  * #%L
