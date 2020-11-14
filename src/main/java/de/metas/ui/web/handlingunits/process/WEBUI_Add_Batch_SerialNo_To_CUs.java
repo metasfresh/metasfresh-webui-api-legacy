@@ -10,7 +10,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import org.adempiere.uom.api.IUOMDAO;
 import org.adempiere.util.Services;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -31,6 +30,7 @@ import de.metas.ui.web.handlingunits.HUEditorView;
 import de.metas.ui.web.handlingunits.WEBUI_HU_Constants;
 import de.metas.ui.web.window.datatypes.DocumentIdsSelection;
 import de.metas.ui.web.window.model.DocumentCollection;
+import de.metas.uom.IUOMDAO;
 
 /*
  * #%L
